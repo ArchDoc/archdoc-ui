@@ -1,6 +1,6 @@
 import { Github, RightC } from '@icon-park/react';
 import Icon from '@icon-park/react/es/all';
-import { ArchDocComponent } from '../../models/ArchdocModel';
+import { ArchDocComponent } from '../../models/ArchdocModel2';
 import { UsageSummary } from '../UsageSummary';
 import './index.css';
 
@@ -13,6 +13,8 @@ export const DetailSidebar = ({archdocComponent, onSelectComponent}: Props) => {
     if (archdocComponent === null) {
         return (<></>)
     }
+
+    console.log(archdocComponent.repository);
 
     const tags = archdocComponent?.tags.map((tag, idx) => <span key={idx} className='tag'>{tag}</span>);
 
@@ -34,7 +36,7 @@ export const DetailSidebar = ({archdocComponent, onSelectComponent}: Props) => {
     const consumerList = archdocComponent?.consumers.map((x, idx) => 
         <UsageSummary 
             key={idx}
-            component={x.sourceId} 
+            component={x.componentId} 
             description={x.description} 
             onComponentClick={onSelectComponent} />
     )
@@ -47,7 +49,7 @@ export const DetailSidebar = ({archdocComponent, onSelectComponent}: Props) => {
     const dependentList = archdocComponent?.dependencies.map((x, idx) => 
         <UsageSummary 
             key={idx}
-            component={x.targetId} 
+            component={x.componentId} 
             description={x.description} 
             onComponentClick={onSelectComponent} />
     )
@@ -75,7 +77,7 @@ export const DetailSidebar = ({archdocComponent, onSelectComponent}: Props) => {
                     <h3>Description</h3>
                     <p>{(archdocComponent) ? archdocComponent.description : "?"}</p>
                 </div>
-                {(archdocComponent.repository !== null) ? repositorySection : <></>}
+                {(archdocComponent.repository && archdocComponent.repository !== null) ? repositorySection : <></>}
                 {(consumerList.length > 0) ? consumerSection : <></>}
                 {(dependentList.length > 0) ? dependencySection : <></>}
                 <div>
