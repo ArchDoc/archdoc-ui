@@ -1,0 +1,17 @@
+.Menu {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    height: 100%;
+    width: 80px;
+}
+
+.Menu .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80px;
+}
+
+
+.Menu .logo img {
+    width: 80%;
+}

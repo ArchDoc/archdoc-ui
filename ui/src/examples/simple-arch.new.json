@@ -1,0 +1,108 @@
+[
+    {
+      "name": "client",
+      "type": "user",
+      "description": "The user of the application",
+      "tags": ["my", "user"],
+      "repository": null,
+      "consumers": [],
+      "dependencies": [
+        { "componentId": "ui", "description": "Interfaces with the UI" },
+        { "componentId": "other-service", "description": "Interfaces with the UI" }
+      ],
+      "documentation": "The user of the application"
+    },
+    {
+      "name": "ui",
+      "type": "service",
+      "description": "The Web UI of the application",
+      "tags": ["my", "ui"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "client", "description": "Interfaces with the UI" }
+      ],
+      "dependencies": [
+        { "componentId": "api", "description": "Consumes the REST API" }
+      ],
+      "documentation": "The user of the application"
+    },
+    {
+      "name": "other-service",
+      "type": "service",
+      "description": "The Web UI of the application",
+      "tags": ["my", "ui"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "client", "description": "Interfaces with the UI" }
+      ],
+      "dependencies": [
+        
+      ],
+      "documentation": "The user of the application"
+    },
+    {
+      "name": "api",
+      "type": "service",
+      "description": "The API gateway of the application. This services provides a REST API to consumers.",
+      "tags": ["my", "api"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "ui", "description": "Consumes the REST API" }
+      ],
+      "dependencies": [
+        { "componentId": "auth-service", "description": "Generates admin JWTs" },
+        { "componentId": "recipe-service", "description": "Manages users recipes" },
+        { "componentId": "product-service", "description": "Searches grocery store product catalogs" },
+        { "componentId": "widget-service", "description": "Searches grocery store product catalogs" }
+      ],
+      "documentation": "The API gateway of the application. This services provides a REST API to consumers."
+    },
+    {
+      "name": "auth-service",
+      "type": "service",
+      "description": "A microservice with the purpose of authenticating and authorizing users. This service signs and returns properly signed JWTs to be reused by clients to access other resources",
+      "tags": ["my", "new", "auth"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "api", "description": "Generates new JWTs for clients" }
+      ],
+      "dependencies": [],
+      "documentation": "Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat. consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    },
+    {
+      "name": "recipe-service",
+      "type": "service",
+      "description": "Service that is used to perform queries and operations on recipes.",
+      "tags": ["my", "new", "recipe"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "api", "description": "Manages users recipes" }
+      ],
+      "dependencies": [],
+      "documentation": "Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua."
+    },
+    {
+      "name": "product-service",
+      "type": "service",
+      "description": "A service that is used to query and search for Grocery Store products.",
+      "tags": ["my", "new", "product"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "api", "description": "Searches grocery store product catalogs" }
+      ],
+      "dependencies": [],
+      "documentation": "Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua."
+    },
+    {
+      "name": "widget-service",
+      "type": "service",
+      "description": "A service that is used to query and search for Grocery Store products.",
+      "tags": ["my", "new", "product"],
+      "repository": "https://github.com/ArchDoc/archdoc-ui",
+      "consumers": [
+        { "componentId": "api", "description": "Searches grocery store product catalogs" }
+      ],
+      "dependencies": [],
+      "documentation": "Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua."
+    }
+]
