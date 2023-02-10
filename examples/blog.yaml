@@ -1,0 +1,32 @@
+archdoc: 0.1.0
+
+users:
+  user:
+    description: "An unauthenticated user."
+    dependencies:
+      ui: "Reads blog posts and articles"
+    documentation: "An unauthenticated user that reads articles."
+  editor:
+    description: "The admin user of the blog."
+    dependencies:
+      ui: "Posts blog articles"
+    documentation: "The admin user that posts articles."
+
+services:
+  ui:
+    description: "The frontend application that serves the application users"
+    repository: "https://github.com/example/myblogui"
+    tags:
+      - "frontend"
+      - "Next.js"
+    dependencies:
+      db: "Queries and saves database records"
+    documentation: "A frontend application written in Next.js that serves all users to the blog."
+  
+  db:
+    description: "A Postgres database that stores all blog data"
+    tags:
+      - "database"
+      - "Postgres"
+    documentation: "A Postgres database that stores entities such as Posts, Users, Comments, etc."
+  

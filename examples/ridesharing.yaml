@@ -1,0 +1,64 @@
+archdoc: 0.1.0
+
+users:
+  passenger:
+    description: "1"
+    dependencies:
+      mobile-app: "A"
+      passenger-ui: "A"
+
+  driver:
+    description: "2"
+    dependencies:
+      mobile-app: "B"
+      driver-ui: "B"
+
+services:
+  mobile-app:
+    description: "2"
+    dependencies:
+      api-gateway: "C"
+
+  api-gateway:
+    description: "3"
+    dependencies:
+      passenger-management: "D"
+      driver-management: "D"
+      trip-management: "D"
+
+  passenger-ui:
+    description: "4"
+    dependencies:
+      passenger-management: "E"
+      driver-management: "E"
+
+  driver-ui:
+    description: "5"
+    dependencies:
+      driver-management: "F"
+
+  passenger-management:
+    description: "6"
+    dependencies:
+      payments: "G"
+  
+  driver-management:
+    description: "7"
+    dependencies:
+      payments: "H"
+      notifications: "H"
+
+  trip-management:
+    description: "8"
+    dependencies:
+      billing: "I"
+  
+  billing:
+    description: "9"
+
+  payments:
+    description: "10"
+
+  notifications:
+    description: "11"
+  

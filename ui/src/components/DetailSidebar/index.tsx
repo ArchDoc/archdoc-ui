@@ -16,7 +16,7 @@ export const DetailSidebar = ({archdocComponent, onSelectComponent}: Props) => {
 
     console.log(archdocComponent.repository);
 
-    const tags = archdocComponent?.tags.map((tag, idx) => <span key={idx} className='tag'>{tag}</span>);
+    const tags = (archdocComponent?.tags) ? archdocComponent.tags.map((tag, idx) => <span key={idx} className='tag'>{tag}</span>) : [];
 
     const repoistoryUrl = (archdocComponent) ? archdocComponent.repository : "#";
 

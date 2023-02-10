@@ -24,6 +24,17 @@ export class ArchdocSpecParser {
             archdocSpec = <ArchdocSpec> spec;
         } else {
             console.log(validate.errors);
+            console.error("AHH!!!");
+            
+            let errorMessage = `Unknown error`;
+
+            if (validate.errors && validate.errors.length > 0) {
+                const myError = validate.errors[0];
+
+                errorMessage = `parsing ${myError.keyword} error: ${myError.instancePath} ${myError.message} (${Object.values(myError.params)[0]})`
+            }
+
+            throw new Error(errorMessage);
         }
 
         if (archdocSpec === null) {
@@ -37,6 +48,8 @@ export class ArchdocSpecParser {
         }
 
         const depedencyList: DependencyMapping[] = [];
+
+        const definedServiceNames = Object.keys(archdocSpec.services);
 
         const userComponents: ArchDocComponent[] = Object.entries(archdocSpec.users)
             .map(([name, componentSpec]): ArchDocComponent => {
@@ -52,6 +65,11 @@ export class ArchdocSpecParser {
                         componentId: name,
                         description
                     }));
+
+                const invalidDependencies = dependencies.filter(d => !definedServiceNames.includes(d.componentId))
+                if (invalidDependencies.length > 0) {
+                    throw new Error(`Model Error: User ${name} has a dependency on a service (${invalidDependencies[0].componentId}) that doesn't exist.`)
+                }
 
                 dependencies.forEach(value => {
                     depedencyList.push({
@@ -91,6 +109,11 @@ export class ArchdocSpecParser {
                         componentId: name,
                         description
                     }));
+
+                const invalidDependencies = dependencies.filter(d => !definedServiceNames.includes(d.componentId))
+                if (invalidDependencies.length > 0) {
+                    throw new Error(`Model Error: Service ${name} has a dependency on a service (${invalidDependencies[0].componentId}) that doesn't exist.`)
+                }
 
                 dependencies.forEach(value => {
                     depedencyList.push({

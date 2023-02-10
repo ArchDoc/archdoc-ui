@@ -29,22 +29,23 @@ const edgeTypes: any = {
 };
 
 interface Props {
+  model: ArchDocModel
   onNodeSelect: (node: any) => void,
   selectedNode: string | null,
   setSelectedNode: (component: string|null) => void
 }
 
-function ImprovedGraph({onNodeSelect, selectedNode, setSelectedNode}: Props) {
-  const myModel: ArchDocModel = simpleArchModel;
+function ImprovedGraph({model, onNodeSelect, selectedNode, setSelectedNode}: Props) {
 
-  
+   //sampleGraph;
 
-  const archdocGraph = parseArchdocModel(myModel); //sampleGraph;
+  //console.log(archdocGraph);
 
   const onInit = (reactFlowInstance: any) => console.log('flow loaded:', reactFlowInstance.getNodes());
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(archdocGraph.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(archdocGraph.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
   const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), []);
 
   //const [selectedNode, setSelectedNode] = useState<string|null>(null);
@@ -65,7 +66,9 @@ function ImprovedGraph({onNodeSelect, selectedNode, setSelectedNode}: Props) {
 
   useEffect(() => {
     console.log("SELECTED!");
-    
+
+    const archdocGraph = parseArchdocModel(model);
+
     setNodes((nds) => nds.map((n) => {
       n.data = {
         ...n.data,
@@ -76,6 +79,15 @@ function ImprovedGraph({onNodeSelect, selectedNode, setSelectedNode}: Props) {
     }));
   }, [selectedNode, setNodes])
 
+  useEffect(() => {
+    console.log("Model Changed!");
+
+    const archdocGraph = parseArchdocModel(model);
+
+    setNodes(archdocGraph.nodes);
+    setEdges(archdocGraph.edges);
+  }, [model])
+
   return (
     <div className='Graph' >
       <ReactFlow 
@@ -85,7 +97,7 @@ function ImprovedGraph({onNodeSelect, selectedNode, setSelectedNode}: Props) {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={(e,n) => {setSelectedNode(n.id); console.log(`Selected ${n.id}`); onNodeSelect(n);}}
+        onNodeClick={(e,n) => {setSelectedNode(n.id); console.log(`Selected ${n.id}!`); onNodeSelect(n);}}
         onEdgeClick={(e) => console.log(e)}
         onConnect={onConnect}
         defaultEdgeOptions={defaultEdgeOptions}
