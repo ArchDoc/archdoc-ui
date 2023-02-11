@@ -18,7 +18,7 @@ ArchDoc UI is designed to tackle the problem of miscommunication between develop
 To get started with ArchDoc UI, you need to have Node.js v16 installed on your machine. Then, simply run the following command to install ArchDoc globally:
 
 ```bash
-npm i -g archdoc
+npm i -g @archdoc/archdoc-ui
 ```
 
 After the installation, you can run ArchDoc UI to visualize that file:

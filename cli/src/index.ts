@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { view } from './actions/view';
 import chalk from 'chalk';
 
-const packageJson = require('../package.json');
+const packageJson = require('../../package.json');
 
 const program = new Command();
 
