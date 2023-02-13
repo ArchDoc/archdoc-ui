@@ -21,7 +21,9 @@ To get started with ArchDoc UI, you need to have Node.js v16 installed on your m
 npm i -g @archdoc/archdoc-ui
 ```
 
-After the installation, you can run ArchDoc UI to visualize that file:
+Next, create an ArchDoc Spec file, following the documentation outlined in the [ArchDoc Documentation](https://github.com/ArchDoc/archdoc-ui/wiki/ArchDoc-Documentation).
+
+After the installation, you can run ArchDoc UI to visualize your ArchDoc Spec file:
 
 ```bash
 archdoc myarchitecture.yaml
