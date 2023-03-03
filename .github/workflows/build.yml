@@ -19,6 +19,8 @@ jobs:
     - name: yarn install, build, and test
       run: |
         yarn install --immutable
+        cd ./cli && yarn install --immutable && cd ..
+        cd ./ui && yarn install --immutable && cd ..
         yarn run build
         yarn test
       env:
