@@ -24,4 +24,4 @@ jobs:
         yarn run build
         yarn test
       env:
-        CI: true
+        CI: false # Setting to false. Will change to true when linting is fully setup

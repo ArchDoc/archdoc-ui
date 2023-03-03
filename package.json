@@ -10,7 +10,8 @@
     "archdoc": "./bin/index.js"
   },
   "scripts": {
-    "build": "cd ./cli && yarn build && cd ../ui && yarn build"
+    "build": "cd ./cli && yarn build && cd ../ui && yarn build",
+    "test": "cd ./ui && yarn test"
   },
   "dependencies": {
     "chalk": "4",
