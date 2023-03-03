@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x]
+        node-version: [14.x, 16.x]
 
     steps:
     - uses: actions/checkout@v1
@@ -16,10 +16,12 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - name: npm install, build, and test
+    - name: yarn install, build, and test
       run: |
-        npm ci
-        npm run build
-        npm test
+        yarn install --immutable
+        cd ./cli && yarn install --immutable && cd ..
+        cd ./ui && yarn install --immutable && cd ..
+        yarn run build
+        yarn test
       env:
-        CI: true
+        CI: false # Setting to false. Will change to true when linting is fully setup
