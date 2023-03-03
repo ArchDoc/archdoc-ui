@@ -18,7 +18,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: yarn install, build, and test
       run: |
-        yarn ci
+        yarn install --immutable
         yarn run build
         yarn test
       env:
