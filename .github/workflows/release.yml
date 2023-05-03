@@ -43,8 +43,8 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Install npm packages
-      run: npm ci
+    - name: Install yarn dependencies
+      run: yarn install --immutable
 
     - name: Setup Git
       run: |
