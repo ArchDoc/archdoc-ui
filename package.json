@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/archdoc-ui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Web UI used to visualize and explore ArchDoc models.",
   "files": [
     "cli/dist/",
