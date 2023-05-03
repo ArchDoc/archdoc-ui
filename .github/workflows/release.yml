@@ -1,7 +1,7 @@
 # from node-osc package
 # This is a basic workflow that is manually triggered
 
-name: Bump version
+name: Release
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
@@ -49,8 +49,9 @@ jobs:
     - name: Setup Git
       run: |
         git config user.name 'ARCHDOC RELEASE WORKFLOW'
+
     - name: bump version
-      run: npm version ${{ github.event.inputs.version }}
+      run: npx standard-version --release-as ${{ github.event.inputs.version }}
 
     - name: Push latest version
       run: git push origin main --follow-tags
