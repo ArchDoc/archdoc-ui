@@ -24,6 +24,7 @@ jobs:
           npm publish
         env:
           NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+          CI: false # Setting to false. Will change to true when linting is fully setup
 
   create-github-release:
     name: Create GitHub Release
