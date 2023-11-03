@@ -12,7 +12,7 @@ users:
       other-service: "Asks the other service for stuff"
     documentation: "The user of the application"
 
-services:
+components:
   ui:
     description: "The user of the application"
     repository: "https://github.com/ArchDoc/archdoc-ui"
@@ -30,7 +30,7 @@ services:
       - "other"
     documentation: "Documentation for the other service."
   api:
-    description: "The API gateway of the application. This services provides a REST API to consumers."
+    description: "The API gateway of the application. This components provides a REST API to consumers."
     repository: "https://github.com/ArchDoc/archdoc-ui"
     tags:
       - "my"
@@ -39,7 +39,7 @@ services:
       auth-service: "Generates admin JWTs"
       recipe-service: "Manages users recipes"
       product-service: "Searches grocery store product catalogs"
-    documentation: "The API gateway of the application. This services provides a REST API to consumers."
+    documentation: "The API gateway of the application. This components provides a REST API to consumers."
   auth-service:
     description: "A microservice with the purpose of authenticating and authorizing users. This service signs and returns properly signed JWTs to be reused by clients to access other resources"
     tags:

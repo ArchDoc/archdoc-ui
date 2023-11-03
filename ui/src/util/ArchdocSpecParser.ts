@@ -49,7 +49,7 @@ export class ArchdocSpecParser {
 
         const depedencyList: DependencyMapping[] = [];
 
-        const definedServiceNames = Object.keys(archdocSpec.services);
+        const definedServiceNames = Object.keys(archdocSpec.components);
 
         const userComponents: ArchDocComponent[] = Object.entries(archdocSpec.users)
             .map(([name, componentSpec]): ArchDocComponent => {
@@ -91,7 +91,7 @@ export class ArchdocSpecParser {
                 }
             });
 
-        const serviceComponents: ArchDocComponent[] = Object.entries(archdocSpec.services)
+        const serviceComponents: ArchDocComponent[] = Object.entries(archdocSpec.components)
             .map(([name, componentSpec]): ArchDocComponent => {
                 const { 
                     description, 
