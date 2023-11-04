@@ -13,7 +13,7 @@ users:
       mobile-app: "B"
       driver-ui: "B"
 
-services:
+components:
   mobile-app:
     description: "2"
     dependencies:

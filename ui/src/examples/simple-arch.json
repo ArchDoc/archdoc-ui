@@ -25,7 +25,7 @@
     },
     {
       "name": "api",
-      "description": "The API gateway of the application. This services provides a REST API to consumers.",
+      "description": "The API gateway of the application. This components provides a REST API to consumers.",
       "tags": ["my", "api"],
       "repository": "https://github.com/ArchDoc/archdoc-ui",
       "consumers": [
@@ -36,7 +36,7 @@
         { "sourceId": "api", "targetId": "recipe-service", "description": "Manages users recipes" },
         { "sourceId": "api", "targetId": "product-service", "description": "Searches grocery store product catalogs" }
       ],
-      "documentation": "The API gateway of the application. This services provides a REST API to consumers."
+      "documentation": "The API gateway of the application. This components provides a REST API to consumers."
     },
     {
       "name": "auth-service",

@@ -12,7 +12,7 @@ export interface ArchdocComponentSpec {
 export interface ArchdocSpec {
     archdoc: string
     users: Record<string, ArchdocComponentSpec>
-    services: Record<string, ArchdocComponentSpec>
+    components: Record<string, ArchdocComponentSpec>
 }
 
 export const ArchdocSpecSchema: JSONSchemaType<ArchdocSpec> = {
@@ -50,7 +50,7 @@ export const ArchdocSpecSchema: JSONSchemaType<ArchdocSpec> = {
             required: [],
             additionalProperties: false
         },
-        services: {
+        components: {
             type: "object",
             patternProperties: {
                 "^.*$": {
@@ -82,6 +82,6 @@ export const ArchdocSpecSchema: JSONSchemaType<ArchdocSpec> = {
             additionalProperties: false
         },
     },
-    required: ["archdoc", "users", "services"],
+    required: ["archdoc", "users", "components"],
     additionalProperties: false,
 }
