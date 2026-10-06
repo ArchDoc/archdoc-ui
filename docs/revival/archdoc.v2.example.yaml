@@ -1,38 +1,57 @@
 # Illustrative only: the proposed ArchDoc spec v2 (see 03-target-architecture.md),
 # used to model ArchDoc's own target architecture (dogfooding).
 # Not yet parseable by any tool. The schema doesn't exist yet.
-# Everything is in one file here for readability; rules could also live in .archdoc/rules.yaml.
+# Everything is in one file here for readability. In a real repo, actors, journeys,
+# and rules could live in .archdoc/actors.yaml, journeys/*.yaml, and rules.yaml.
 archdoc: "2.0"
+namespace: archdoc                    # globally unique id when federated with other repos
 name: ArchDoc
 description: >
   Open-source, code-linked architecture model that keeps engineers in control
   of systems that AI agents are modifying.
 
-elements:
+# ── WHO uses the system ────────────────────────────────────────────────
+actors:
   developer:
     kind: person
     description: Engineer of any experience level exploring, reviewing, or learning a system.
     uses:
-      archdoc.web: Explores the model, reviews diffs, follows tours
-      archdoc.cli: Validates, diffs, and checks the model locally
+      web: Explores the model, reviews diffs, follows tours and journeys
+      cli: Validates, diffs, and checks the model locally
+
+  new-contributor:
+    kind: role
+    description: Someone opening their first PR to a repo they don't know yet.
+    uses:
+      web: Follows onboarding tours
+
+  maintainers:
+    kind: team
+    description: ArchDoc maintainers. Own every element and review model changes.
+    members: ["@ArchDoc/maintainers"]
+    uses:
+      github-action: Reads architectural-impact comments on PRs
 
   coding-agent:
     kind: agent
     description: An AI coding agent (Claude Code, Cursor, Copilot, …) editing the codebase.
     uses:
-      archdoc.mcp:
+      mcp:
         description: Locates code in the architecture, checks impact, proposes model changes
         technology: MCP (stdio)
 
+# ── WHAT the software is ───────────────────────────────────────────────
+elements:
   github:
     kind: external
     description: Hosts the repository, pull requests, and Actions.
     uses:
-      archdoc.github-action: Runs on every pull request
+      github-action: Runs on every pull request
 
-  archdoc:
+  toolchain:
     kind: system
     description: The ArchDoc toolchain.
+    owners: [maintainers]
     elements:
       spec:
         kind: container
@@ -128,6 +147,38 @@ elements:
         kind: datastore
         technology: Git working tree
         description: The code the model maps to.
+
+# ── HOW actors use the system ─────────────────────────────────────────
+journeys:
+  review-ai-change:
+    actor: developer
+    goal: Understand what an AI-authored PR changes in the architecture before merging
+    importance: critical
+    steps:
+      - from: coding-agent
+        to: mcp
+        action: Checks impact, then proposes model changes with the code
+      - from: github
+        to: github-action
+        action: Runs on the pull request
+      - from: github-action
+        to: core
+        action: Diffs base vs. head and checks drift, rules, and journeys
+      - from: developer
+        to: web
+        action: Opens the before/after view and accepts or rejects suggested facts
+
+  onboard-contributor:
+    actor: new-contributor
+    goal: Learn how ArchDoc fits together before a first PR
+    importance: normal
+    steps:
+      - from: new-contributor
+        to: web
+        action: Follows the "How ArchDoc works" tour
+      - from: web
+        to: core
+        action: Loads the model and resolves code links for each step
 
 rules:
   - id: core-is-pure

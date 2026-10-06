@@ -13,6 +13,7 @@
 | "propose future state changes" | Model branches, semantic diffs, and visual before/after | ❌ |
 | "map architectural concepts to code" | Element ↔ path/package/symbol mapping, plus evidence for relationships | ❌ (repo URL only) |
 | "devs of any experience level … explore and learn" | Progressive zoom (system → container → component → code), guided tours, request walkthroughs, plain-language explanations | Partial (graph + sidebar) |
+| "interactive software modeling platform" (enterprise scale) | Model **how users and teams use systems**, not just how software connects. Span **many repos and teams** without one central owner. | Partial (users as actors, single file) |
 
 ## The landscape (October 2026)
 
@@ -33,6 +34,11 @@ The opening is in the space between them:
 > **A human-owned, code-linked architecture model that sits in the loop of AI-driven change.** It tells the agent *where it is* and *what the rules are* before it edits. It tells the human *what the change means architecturally* after the edit. And it teaches newcomers the system using the same model.
 
 Three capabilities make that defensible together: **code mapping, change governance (diff/drift/proposals), and learning UX.** No tool above combines them.
+
+Two more properties make the model useful beyond one team:
+
+- **Usage, not just structure.** Actors (people, roles, teams, partner orgs, agents) and the **journeys** they take through the systems are first-class. Impact is then reported in human terms: "this change affects *Book a ride* for passengers". Generated wikis and most diagram tools describe software only.
+- **Federated across repos.** Each team owns its part of the model in its own repo. A landscape repo composes the enterprise view. AI agents see cross-repo consumers and constraints even when they only have one repo checked out.
 
 ---
 
@@ -95,11 +101,35 @@ Three capabilities make that defensible together: **code mapping, change governa
 
 **Recommendation: 6b.** Keep the docs site repo, since org GitHub Pages needs the `archdoc.github.io` name. Upgrade it to Docusaurus 3 (or Starlight), and generate the spec reference pages from the JSON Schema in the monorepo so they can't drift again.
 
+## Decision 7 — How usage is modeled (actors and journeys)
+
+v1 already treated **users as actors who use components**. The question is how far to take it.
+
+| Option | Description | Pros | Cons |
+|---|---|---|---|
+| **7a. Actors as plain elements** | `kind: person` is just another element in the software tree | Simplest schema | Blurs "who" and "what". Teams that own and use systems need two entities. No notion of a goal or flow. |
+| **7b. Top-level actors + journeys** ⭐ | `actors:` (person, role, team, organization, agent) sits beside `elements:`, as v1's `users:` did. `journeys:` describe an actor's goal as ordered steps across elements, validated against declared relationships. | Keeps v1's mental model. Maps how users use systems. Impact reports name affected journeys and actors. Journeys double as tour scripts. A team is one entity that both uses and owns. | Journeys are more for people to maintain (mitigated: `check` flags broken journeys, and agents can draft them) |
+| **7c. Separate usage tool** | Leave usage to product analytics or BPMN tools and link out | No extra model surface | Loses the link between user goals and code. Can't answer "which user flows does this PR affect?" |
+
+**Recommendation: 7b.** `archdoc migrate` maps v1 `users` → `actors` directly. Later, journeys can be checked against OpenTelemetry traces to confirm real usage paths.
+
+## Decision 8 — Multi-repo and enterprise scope
+
+Enterprise architecture spans teams and repos that no single person or agent sees in full.
+
+| Option | Description | Pros | Cons |
+|---|---|---|---|
+| **8a. Central architecture repo** | One repo holds the whole enterprise model, edited by an architecture team | One place to look | Disconnected from code, so it rots. Bottleneck on one team. Can't do code mapping or drift checks per repo. |
+| **8b. Federated: per-repo models + landscape repo** ⭐ | Each repo owns a **namespace** in `.archdoc/` and `archdoc publish`es a versioned bundle. Repos `import` what they depend on, pinned in `archdoc.lock`. A **landscape repo** composes all namespaces and adds enterprise actors, cross-team journeys, and org-wide rules. | Ownership follows code ownership. Works with only git and CI. Reproducible. Enables cross-repo impact in PRs and in agent context. | Version skew between repos (surfaced by `check`). Needs a publish step in each repo's CI. |
+| **8c. Hosted registry service** | A server collects and serves every repo's model | Live enterprise view, search across everything | Requires running and securing a service. Conflicts with "open, git-native, local-first" as a starting point. |
+
+**Recommendation: 8b now, keeping 8c as an optional later convenience.** Design for federation from Phase 1 (namespaced IDs, an `imports:` block in the schema) even though the federation tooling ships later. Retrofitting global identity is the expensive part.
+
 ---
 
 ## Recommended strategy, in one paragraph
 
-Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted development**. A human-owned, YAML-based, **code-mapped** model lives in the repo (`.archdoc/`). A deterministic TypeScript core loads, validates, queries, **diffs**, and **checks** it. Agents get an **MCP server** to locate code in the architecture, assess impact, read rules, and propose changes by editing the model on a branch. Humans get a **PR check** that summarizes the architectural impact of every change and flags drift, plus a modern **explorer UI** that renders current vs. proposed state, maps every box to its code, and offers guided tours for learning. Interoperate with LikeC4 and Structurizr instead of competing with them.
+Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted development**. A human-owned, YAML-based, **code-mapped** model lives in each repo (`.archdoc/`). It describes the software, the **actors** (people, teams, partners, agents) who use it, and the **journeys** they take through it. Repos publish their models, and a landscape repo composes them into an **enterprise view**. A deterministic TypeScript core loads, validates, queries, **diffs**, and **checks** it. Agents get an **MCP server** to locate code in the architecture, assess impact, read rules, and propose changes by editing the model on a branch. Humans get a **PR check** that summarizes the architectural impact of every change (including affected journeys and consumers in other repos) and flags drift, plus a modern **explorer UI** that renders current vs. proposed state, maps every box to its code, and offers guided tours for learning. Interoperate with LikeC4 and Structurizr instead of competing with them.
 
 ## Key risks
 
@@ -110,4 +140,6 @@ Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted
 | **Scope creep** (editor, SaaS, many languages, many analyzers) | Phase gates in the roadmap. Dogfood on ArchDoc itself before generalizing. |
 | **Overlap with LikeC4**, which also has MCP | Differentiate on code mapping, PR governance, and learning. Import LikeC4 models. Consider contributing upstream where it makes sense. |
 | **Graph layout quality at scale** | ELK layered layout with compound nodes. Views and filters by default, never "show everything". |
+| **Journeys go stale** | `check` validates every step against declared relationships. Later, telemetry traces confirm real paths. |
+| **Version skew across repos** | Pinned imports in `archdoc.lock`. `check` flags references to removed or deprecated elements. A landscape CI job reports skew org-wide. |
 | **Solo-maintainer bandwidth** | Small core, plugin interfaces, good first issues, and agents doing much of the implementation (with ArchDoc modeling ArchDoc) |

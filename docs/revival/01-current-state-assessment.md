@@ -117,6 +117,7 @@ archdoc-ui/
 | Keep | Why |
 |---|---|
 | Brand, `@archdoc` npm scope, `archdoc.github.io`, MIT license | Existing identity and distribution |
+| v1's **users as actors who use components** | Kept and expanded in v2 as top-level `actors` (people, roles, teams, orgs, agents) plus `journeys` |
 | Philosophy: plain YAML, no custom DSL; "model, don't diagram" | Even more relevant now: agents edit structured YAML reliably, and JSON Schema gives them precise errors |
 | `examples/*.yaml` | Fixtures for the v1→v2 migrator and layout tests |
 | `ArchdocGraph.test.ts` cases | Reuse as regression cases for the new layout engine |
