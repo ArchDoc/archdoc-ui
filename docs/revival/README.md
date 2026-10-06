@@ -6,6 +6,7 @@ A review of the existing ArchDoc codebase (`archdoc-ui` + `ArchDoc.github.io`) a
 
 | Doc | What's in it |
 |---|---|
+| [plan.html](./plan.html) | **The final plan in one page.** Open it in a browser for the overview, an interactive phase-by-phase build-up, exit tests, decisions, and Phase 0 next actions |
 | [01 — Current State Assessment](./01-current-state-assessment.md) | What exists, how it works, verified health check, defects, what to salvage |
 | [02 — Strategy Options](./02-strategy-options.md) | Mission decomposition, competitive landscape, nine key decisions with options and recommendations, risks |
 | [03 — Target Architecture](./03-target-architecture.md) | Proposed monorepo, spec v2 (actors, elements, journeys, data, code mapping, provenance, rules, tours), multi-repo federation, core API, CLI, MCP tools, PR Action, explorer |
