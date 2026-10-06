@@ -32,16 +32,26 @@ A review of the existing ArchDoc codebase (`archdoc-ui` + `ArchDoc.github.io`) a
 
 **Differentiation:** LikeC4 and Structurizr already cover "architecture DSL + diagrams" (LikeC4 even has an MCP server), and DeepWiki and CodeWiki cover "AI-generated repo docs". None of them combine **code mapping + change governance + learning** on a human-owned model that also captures **how people use the systems**, **what happens to their data**, and **spans many repos**. That gap is ArchDoc's opening. Interoperate with those tools (importers) rather than compete on DSLs.
 
-## Decisions needed
+## Decisions
 
-These are the choices that most change the plan. Recommendations are in [02](./02-strategy-options.md).
+All nine were accepted on **2026-10-06**, each as recommended. Rationale and the rejected alternatives are in [02](./02-strategy-options.md).
 
-1. **Positioning:** architecture control plane for AI-assisted development (recommended), vs. a modernized viewer, vs. an AI wiki generator.
-2. **Model format:** own YAML spec v2 with importers (recommended), vs. adopting LikeC4's DSL as the model.
-3. **Where the AI lives:** bring-your-own agent via MCP with a deterministic core (recommended), vs. built-in LLM calls.
-4. **Future state:** git-native branches + semantic diff (recommended), vs. changeset files.
-5. **Codebase:** fresh monorepo in this repo, renamed to `archdoc` (recommended), vs. incremental refactor, vs. a new repo.
-6. **Analysis depth to start:** declared globs + TS import graph (recommended), vs. broader multi-language analysis up front.
-7. **Usage modeling:** top-level actors + validated journeys (recommended), vs. actors as plain elements, vs. leaving usage to other tools.
-8. **Multi-repo:** federated per-repo models + a landscape repo (recommended), vs. one central architecture repo, vs. a hosted registry.
-9. **Data:** a logical data layer linked to real schemas, with mappings, logic, and journey data (recommended), vs. links to schemas only, vs. a full data catalog.
+| # | Decision | Accepted | Not chosen |
+|---|---|---|---|
+| 1 | Positioning | Architecture control plane for AI-assisted development | Modernized viewer; AI wiki generator |
+| 2 | Model format | Own YAML spec v2 + importers (LikeC4, Structurizr, v1) | Adopt LikeC4 DSL; format-agnostic core up front |
+| 3 | Where the AI lives | Your own agent via MCP; deterministic core with no LLM | Built-in LLM calls (an optional "Ask" panel may come later) |
+| 4 | Future state | Git branches + semantic model diff, with optional proposal notes | Changeset files |
+| 5 | Codebase | Fresh pnpm monorepo in this repo, renamed to `archdoc`; v0 kept on `legacy/v0` | Incremental refactor; new repo |
+| 6 | Analysis depth first | Declared `code:` globs + TS/JS import graph, behind a plugin API | Manifests/infra first; multi-language + network inference |
+| 7 | Usage modeling | Top-level `actors` (person, role, team, organization, agent) + validated `journeys` | Actors as plain elements; leave usage to other tools |
+| 8 | Multi-repo | Federated per-repo namespaces + `archdoc publish` + `archdoc.lock` + a landscape repo | One central architecture repo; hosted registry (possible later convenience) |
+| 9 | Data | Logical data layer linked to real schemas: entities, `stores`, `mappings`, `logic` (CEL), journey data, simulation | Links to schemas only; full data catalog (bridges later) |
+
+## Next step
+
+Phase 0 in [04-roadmap.md](./04-roadmap.md):
+- tag `v0.2.0` and create `legacy/v0`
+- rename the repo
+- scaffold the monorepo with Node 22/24 CI
+- rewrite the README

@@ -1,6 +1,6 @@
 # 03 — Target Architecture (proposal)
 
-> Status: **draft for discussion.** It follows the recommendations in [02-strategy-options.md](./02-strategy-options.md): own YAML spec v2, a deterministic core, bring-your-own agent via MCP, git-native proposals, a fresh monorepo, **actors and journeys as first-class model content**, **data as a first-class construct**, and **federated multi-repo models**.
+> Status: **accepted direction.** Decisions 1–9 in [02-strategy-options.md](./02-strategy-options.md) were accepted on 2026-10-06. Spec details and field names here are still a sketch and will settle during Phases 1–5. The accepted decisions are: own YAML spec v2, a deterministic core, bring-your-own agent via MCP, git-native proposals, a fresh monorepo, **actors and journeys as first-class model content**, **data as a first-class construct**, and **federated multi-repo models**.
 > A dogfood model of this architecture, written in the proposed v2 format, is in [`archdoc.v2.example.yaml`](./archdoc.v2.example.yaml). A multi-repo enterprise example is in [`landscape.example.yaml`](./landscape.example.yaml).
 
 ## 1. System context
