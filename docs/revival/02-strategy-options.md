@@ -13,6 +13,7 @@
 | "propose future state changes" | Model branches, semantic diffs, and visual before/after | ❌ |
 | "map architectural concepts to code" | Element ↔ path/package/symbol mapping, plus evidence for relationships | ❌ (repo URL only) |
 | "devs of any experience level … explore and learn" | Progressive zoom (system → container → component → code), guided tours, request walkthroughs, plain-language explanations | Partial (graph + sidebar) |
+| "understand the systems" (beyond boxes and arrows) | Model **data**: what is sent and stored where, how records map between tables and databases, the logic run on request data, and how records change through a journey | ❌ |
 | "interactive software modeling platform" (enterprise scale) | Model **how users and teams use systems**, not just how software connects. Span **many repos and teams** without one central owner. | Partial (users as actors, single file) |
 
 ## The landscape (October 2026)
@@ -125,11 +126,23 @@ Enterprise architecture spans teams and repos that no single person or agent see
 
 **Recommendation: 8b now, keeping 8c as an optional later convenience.** Design for federation from Phase 1 (namespaced IDs, an `imports:` block in the schema) even though the federation tooling ships later. Retrofitting global identity is the expensive part.
 
+## Decision 9 — Data modeling
+
+Architecture diagrams usually stop at "A calls B". The mission needs more: which records travel, where they're stored, how fields map between tables and databases, which decisions depend on request data, and how records change along a journey.
+
+| Option | Description | Pros | Cons |
+|---|---|---|---|
+| **9a. Link to schemas only** | Elements link to their OpenAPI, Prisma, or SQL files. ArchDoc adds nothing on top. | Cheap. No duplication. | Can't answer lineage, classification, or "what happens to this record" questions. No journey data timeline. |
+| **9b. Logical data layer linked to physical schemas** ⭐ | `data` entities, messages, and events with fields, classification, and lifecycle states, **imported** from existing schema sources. `stores` maps tables to entities. `sends`/`accepts`/`carries` put data on relationships and contracts. `mappings` give field-level lineage across stores and repos. `logic` describes decisions on request data. Journeys annotate data per step. CEL expressions throughout. | Answers the questions engineers and reviewers actually ask. Enables simulation, classification rules (PII/PCI), and schema-drift checks. Stays linked to code and real schemas. | The largest spec addition. Logic and mappings need upkeep (mitigated: `check` validates them, analyzers import fields, agents draft them as `suggested`). |
+| **9c. Full data catalog** | Build or integrate a catalog and lineage platform (DataHub, OpenLineage-style, column-level lineage from query logs) | Very rich lineage for analytics pipelines | Different audience (data platform teams). Heavy. Drifts from the application-architecture focus. |
+
+**Recommendation: 9b, with import/export bridges to 9c tools later.** Keep logic declarative and readable. It's the contract that code, reviewers, and agents check against, not a second implementation. Use CEL for conditions and mappings so expressions can be evaluated (`archdoc simulate`) without inventing a language.
+
 ---
 
 ## Recommended strategy, in one paragraph
 
-Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted development**. A human-owned, YAML-based, **code-mapped** model lives in each repo (`.archdoc/`). It describes the software, the **actors** (people, teams, partners, agents) who use it, and the **journeys** they take through it. Repos publish their models, and a landscape repo composes them into an **enterprise view**. A deterministic TypeScript core loads, validates, queries, **diffs**, and **checks** it. Agents get an **MCP server** to locate code in the architecture, assess impact, read rules, and propose changes by editing the model on a branch. Humans get a **PR check** that summarizes the architectural impact of every change (including affected journeys and consumers in other repos) and flags drift, plus a modern **explorer UI** that renders current vs. proposed state, maps every box to its code, and offers guided tours for learning. Interoperate with LikeC4 and Structurizr instead of competing with them.
+Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted development**. A human-owned, YAML-based, **code-mapped** model lives in each repo (`.archdoc/`). It describes the software, the **actors** (people, teams, partners, agents) who use it, the **journeys** they take through it, and the **data** that flows and is stored along the way. Repos publish their models, and a landscape repo composes them into an **enterprise view**. A deterministic TypeScript core loads, validates, queries, **diffs**, and **checks** it. Agents get an **MCP server** to locate code in the architecture, assess impact, read rules, and propose changes by editing the model on a branch. Humans get a **PR check** that summarizes the architectural impact of every change (including affected journeys and consumers in other repos) and flags drift, plus a modern **explorer UI** that renders current vs. proposed state, maps every box to its code, and offers guided tours for learning. Interoperate with LikeC4 and Structurizr instead of competing with them.
 
 ## Key risks
 
@@ -141,5 +154,6 @@ Re-launch ArchDoc as an **open-source architecture control plane for AI-assisted
 | **Overlap with LikeC4**, which also has MCP | Differentiate on code mapping, PR governance, and learning. Import LikeC4 models. Consider contributing upstream where it makes sense. |
 | **Graph layout quality at scale** | ELK layered layout with compound nodes. Views and filters by default, never "show everything". |
 | **Journeys go stale** | `check` validates every step against declared relationships. Later, telemetry traces confirm real paths. |
+| **Data model becomes a second schema to maintain** | Import fields from real schema sources instead of retyping them. Schema-drift checks catch divergence. Logic is a readable contract linked to code, not a reimplementation. |
 | **Version skew across repos** | Pinned imports in `archdoc.lock`. `check` flags references to removed or deprecated elements. A landscape CI job reports skew org-wide. |
 | **Solo-maintainer bandwidth** | Small core, plugin interfaces, good first issues, and agents doing much of the implementation (with ArchDoc modeling ArchDoc) |

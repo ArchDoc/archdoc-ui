@@ -1,6 +1,6 @@
 # 03 — Target Architecture (proposal)
 
-> Status: **draft for discussion.** It follows the recommendations in [02-strategy-options.md](./02-strategy-options.md): own YAML spec v2, a deterministic core, bring-your-own agent via MCP, git-native proposals, a fresh monorepo, **actors and journeys as first-class model content**, and **federated multi-repo models**.
+> Status: **draft for discussion.** It follows the recommendations in [02-strategy-options.md](./02-strategy-options.md): own YAML spec v2, a deterministic core, bring-your-own agent via MCP, git-native proposals, a fresh monorepo, **actors and journeys as first-class model content**, **data as a first-class construct**, and **federated multi-repo models**.
 > A dogfood model of this architecture, written in the proposed v2 format, is in [`archdoc.v2.example.yaml`](./archdoc.v2.example.yaml). A multi-repo enterprise example is in [`landscape.example.yaml`](./landscape.example.yaml).
 
 ## 1. System context
@@ -47,13 +47,14 @@ Tooling: pnpm workspaces, TypeScript 5.x, Node 22/24 LTS, Vitest, Biome or ESLin
 
 Design goals: **readable by a junior developer, editable by an agent, validated by a JSON Schema, and backward compatible via `archdoc migrate`.**
 
-The model has three kinds of content. They answer different questions:
+The model has four kinds of content. They answer different questions:
 
 | Section | Answers | v1 equivalent |
 |---|---|---|
 | `actors` | **Who** uses or operates the systems: people, roles, teams, partner organizations, AI agents | `users` |
 | `elements` | **What** the software is: systems, containers, components, datastores, queues, external services | `components` |
 | `journeys` | **How** actors use the systems to reach a goal, step by step across elements | (none) |
+| `data` | **With what:** the records and messages that are sent and stored, how fields map between stores, and the logic that runs on them | (none) |
 
 ### 3.1 Files
 
@@ -63,6 +64,7 @@ The model has three kinds of content. They answer different questions:
 ├── actors.yaml           # who uses the system (optional split)
 ├── model/*.yaml          # elements (can be split however the team likes)
 ├── journeys/*.yaml       # how actors use the system (optional)
+├── data/*.yaml           # entities, messages, mappings, and logic (optional)
 ├── rules.yaml            # architectural constraints (optional)
 ├── tours/*.yaml          # guided learning tours (optional)
 ├── proposals/*.md        # ADR-style rationale for future-state branches (optional)
@@ -179,7 +181,131 @@ Journeys are what let ArchDoc map **how users use systems**, not just how softwa
 - **Learning.** Tours can be generated from journeys, so a newcomer learns the system the way its users experience it.
 - **Observed usage (later).** Journeys can be checked against OpenTelemetry traces to confirm real paths and find undocumented ones, the same way analyzers check code dependencies.
 
-### 3.5 Provenance: how humans stay in the driver seat
+### 3.5 Data: what is sent, what is stored, and how it changes
+
+Boxes and arrows say *that* two things talk. Data says *what* they exchange, *where* it lands, and *what happens to it*. That matters to a reviewer ("does this PR start storing card numbers somewhere new?"), to an agent ("which tables does this field end up in?"), and to a newcomer ("what does a refund actually do to the records?").
+
+Data in ArchDoc is a **logical model linked to the physical one**. Teams don't retype schemas. They point at the schema sources they already have, and ArchDoc adds what those sources can't say: classification, where records travel, how fields map between stores, and the decisions made on them.
+
+#### Entities and messages
+
+```yaml
+# data/payments.yaml
+data:
+  RefundRequest:
+    kind: message                      # entity (stored) | message (request/response) | event
+    fields:
+      trip_id:      { type: uuid }
+      amount_cents: { type: int }
+      reason:       { type: enum, values: [overcharge, no_show, safety] }
+      agent_id:     { type: uuid, classification: internal }
+
+  Charge:
+    kind: entity
+    owners: [payments-team]
+    source: { prisma: prisma/schema.prisma#Charge }   # imported from the real schema, not retyped
+    fields:
+      amount_cents: { type: int }
+      card_last4:   { type: string, classification: pci }
+      status:       { type: enum, values: [authorized, captured, partially_refunded, refunded] }
+    states:                            # lifecycle, so journeys can name transitions
+      - authorized -> captured
+      - captured -> partially_refunded | refunded
+```
+
+- **Sources:** SQL migrations, Prisma, TypeORM and other ORMs, OpenAPI and JSON Schema components, Protobuf, and Avro. An analyzer imports fields from the source and flags drift. For example, the model says `Charge.card_last4` is PCI, but a migration renames the column.
+- **Classification** (`pii`, `pci`, `phi`, `internal`, `public`, or custom) is set once on a field and follows it through every mapping.
+
+#### Where data lives and how it moves
+
+```yaml
+elements:
+  ledger:
+    kind: datastore
+    technology: Postgres
+    stores:                              # tables/collections → entities
+      ledger_entries: { entity: LedgerEntry, key: id, retention: 7y }
+  charges:
+    kind: container
+    provides:
+      - { api: proto/charges.proto, accepts: RefundRequest, returns: Refund }
+      - { topic: refund.issued, carries: RefundIssued }
+    uses:
+      ledger: { description: Posts entries, sends: LedgerEntry }
+```
+
+`sends`, `returns`, `accepts`, and `carries` attach data to relationships and contracts. The core can then answer "where does `card_last4` go?" by walking relationships, and "what's in `ledger_entries`?" by reading `stores`.
+
+#### Mappings: records between tables and databases
+
+```yaml
+mappings:
+  refund-to-ledger:
+    from: { refund: payments.Refund, trip: trips.Trip }   # named inputs, can come from other repos
+    to: payments.ledger.ledger_entries                    # can cross datastores and repos
+    code: services/charges/internal/ledger/post.go
+    fields:                                   # target field: CEL expression over the source
+      account:      "'rider:' + trip.rider_id"
+      amount_cents: "-refund.amount_cents"
+      source_ref:   "refund.id"
+      posted_at:    "now()"
+```
+
+Mappings give **field-level lineage**. `archdoc lineage payments.Refund.amount_cents` lists every place a value is copied, renamed, or derived, across datastores and repos. Expressions use **CEL (Common Expression Language)**: small, side-effect-free, standardized, and implemented in JS and Go. An expression is documentation that can also be evaluated.
+
+#### Logic: decisions made on request data
+
+```yaml
+logic:
+  refund-approval:
+    runs-in: payments.charges
+    input: { request: RefundRequest, trip: trips.Trip }
+    code: services/charges/internal/refunds/policy.go#Approve
+    rules:                                  # first match wins
+      - when: "request.reason == 'safety'"
+        then: escalate-to-safety
+      - when: "request.amount_cents <= trip.fare_cents / 2"
+        then: auto-approve
+      - else: needs-finance-approval
+```
+
+Logic blocks describe the business decisions an element makes, in terms of the data it receives, and link to the code that implements them. They are not a second implementation. They're the readable contract that reviewers, agents, and newcomers check the code against.
+
+#### Data through a journey
+
+Journey steps can say what data they send, which logic decides the path, and what changes:
+
+```yaml
+steps:
+  - from: support.admin-console
+    to: payments.charges
+    action: Issues a partial refund
+    sends: RefundRequest
+    decides: refund-approval
+    branches:
+      auto-approve:
+        creates: Refund
+        changes: { Charge.status: captured -> partially_refunded }
+      needs-finance-approval:
+        creates: { Refund: { status: pending_approval } }
+        next: finance-approves-refund       # continues as another journey
+  - from: payments.charges
+    to: payments.ledger
+    sends: LedgerEntry
+    via: refund-to-ledger
+    when: auto-approve
+```
+
+That gives three capabilities:
+
+- **Data timeline.** The explorer shows the record snapshot at every step, highlighting fields that were created, changed, or derived, and the table each record lands in.
+- **Simulation.** `archdoc simulate refund-a-fare --sample request.json` evaluates the logic and mappings against a sample payload. It reports the path taken and the resulting records. It doesn't run the system, only the declared model, so it's safe in CI and lets agents test "what happens if…" questions cheaply.
+- **Checks.**
+  - A step that sends an entity the target doesn't `accept` is flagged.
+  - A state transition that the entity's `states` doesn't allow is flagged.
+  - A classification rule violation is flagged. For example, `pci` fields may only be stored in the `payments` namespace, and `pii` may not be sent to `external` elements without a contract.
+
+### 3.6 Provenance: how humans stay in the driver seat
 
 Every actor, element, relationship, and journey step can carry its origin:
 
@@ -197,7 +323,7 @@ uses:
 - `inferred`: produced by a deterministic analyzer, with evidence.
 - `suggested`: proposed by an AI agent. The UI renders these dashed and labeled, and they only become "real" when a human removes the `provenance` block or flips it to `declared`, which shows up as a reviewable diff.
 
-### 3.6 Rules: guardrails agents read before editing
+### 3.7 Rules: guardrails agents read before editing
 
 ```yaml
 # rules.yaml
@@ -208,6 +334,9 @@ rules:
   - id: payments-boundary
     description: Only the gateway may call payments.
     allow-only: { to: payments.charges, from: [rides.api-gateway] }
+  - id: pci-stays-in-payments
+    description: Fields classified pci are only stored in the payments namespace.
+    data: { classification: pci, stored-in: { namespace: payments } }
   - id: critical-journeys-reviewed
     description: Changes that touch a critical journey need a review from the journey's owning team.
     require-review: { journeys: { importance: critical } }
@@ -215,7 +344,7 @@ rules:
 
 Rules are checked against *declared* relationships (model lint) and *observed* relationships from analyzers (drift and violations). In a federated setup, rules can be defined at the landscape level and apply to every repo.
 
-### 3.7 Tours: learning paths for any experience level
+### 3.8 Tours: learning paths for any experience level
 
 ```yaml
 # tours/request-lifecycle.yaml
@@ -232,7 +361,7 @@ steps:
 
 Agents can draft tours ("write an onboarding tour for the refund journey") through MCP. Humans review them like any other change.
 
-### 3.8 Multi-repo and enterprise architecture
+### 3.9 Multi-repo and enterprise architecture
 
 Enterprise architecture spans many teams and many repos. No single repo, team, or agent session sees all of it. ArchDoc handles this through **federation**: each team owns its piece, and the full picture is composed on top.
 
@@ -283,10 +412,13 @@ Enterprise architecture spans many teams and many repos. No single repo, team, o
 | `query.locate(paths[])` | owning element(s) for each file, most specific wins | "where am I?" for agents, editor integration |
 | `query.impact(target)` | upstream consumers (local and cross-repo), downstream deps, **affected actors and journeys**, applicable rules, owners | pre-edit briefing, PR summary |
 | `journeys.validate(model)` | broken steps (missing relationship, deleted element) | `check` |
-| `diff(modelA, modelB)` | typed semantic diff of actors, elements, relationships, journeys, and code mappings | proposals, PR comment, before/after UI |
+| `diff(modelA, modelB)` | typed semantic diff of actors, elements, relationships, journeys, data (fields, classification, mappings, logic), and code mappings | proposals, PR comment, before/after UI |
+| `data.lineage(field)` | every mapping, relationship, and store a field passes through, with transforms | lineage view, MCP |
+| `data.whereStored(entity \| classification)` | tables and datastores holding it, across repos | governance, MCP |
+| `simulate(journey, sample)` | path taken through logic branches, record snapshots per step | data timeline, MCP, CI |
 | `codemap.resolve(model, tree)` | files per element, **unmapped** files, **stale** globs | coverage, drift |
 | `analyze(tree, analyzers[])` | observed elements and relationships with evidence | bootstrap, drift |
-| `check(model, observed, rules)` | findings: undeclared dependency, rule violation, broken journey, dangling cross-repo reference, stale mapping, orphan element | CI gate, MCP |
+| `check(model, observed, rules)` | findings: undeclared dependency, rule violation, broken journey, dangling cross-repo reference, stale mapping, orphan element, schema drift, classification violation, invalid state transition | CI gate, MCP |
 | `publish(model)` | versioned JSON bundle | multi-repo |
 
 ## 5. Surfaces
@@ -301,6 +433,8 @@ archdoc locate <path...>                                     # which element own
 archdoc impact <element|actor|path>                          # who depends on this, which journeys, which rules
 archdoc diff [base...head]                                   # semantic model diff (text | json | markdown | mermaid)
 archdoc check [--base main]                                  # drift, rules, journeys, cross-repo refs; nonzero exit for CI
+archdoc lineage <entity.field>                               # where a field comes from and goes
+archdoc simulate <journey> --sample <file.json>              # evaluate logic + mappings, print path and records
 archdoc sync                                                 # resolve imports → archdoc.lock
 archdoc publish                                              # emit a versioned model bundle for other repos
 archdoc landscape build                                      # compose all namespaces into an enterprise site
@@ -320,12 +454,15 @@ Every command supports `--json`, so agents without MCP can still use the CLI.
 | `archdoc_locate(paths[])` | "Which part of the architecture am I editing?" |
 | `archdoc_impact(target)` | Blast radius and constraints **before** an edit: consumers across repos, affected journeys and actors, rules |
 | `archdoc_journey(id)` | Steps of a journey, with code entry points per step |
+| `archdoc_data(entity)` | Fields, classification, where it's stored, who sends and receives it |
+| `archdoc_lineage(field)` | Every place a field is copied or derived, with expressions and code links |
+| `archdoc_simulate(journey, sample)` | Path and record changes for a sample request, so agents can test "what happens if…" without running anything |
 | `archdoc_check(base?)` | Run drift, rule, and journey checks on the working tree **after** an edit |
 | `archdoc_diff(base?, head?)` | Architectural summary of the agent's change, for its own PR description |
 | `archdoc_propose(edits, rationale)` | Apply model edits (as `suggested` provenance) and write a proposal note. Never touches `declared` facts silently, and never edits another namespace. Cross-repo changes become a proposal for the owning repo. |
 | `archdoc_validate()` | Schema and reference errors with precise paths, so the agent can self-correct |
 
-Resources: `archdoc://model`, `archdoc://element/{id}`, `archdoc://actor/{id}`, `archdoc://journey/{id}`, `archdoc://rules`, `archdoc://landscape`.
+Resources: `archdoc://data/{entity}`, `archdoc://model`, `archdoc://element/{id}`, `archdoc://actor/{id}`, `archdoc://journey/{id}`, `archdoc://rules`, `archdoc://landscape`.
 
 Shipped next to it: a **Claude Code skill / AGENTS.md snippet** that tells agents the workflow. Call `locate` and `impact` before editing. Call `check` after editing. Call `propose` for any new element or relationship. Put the `diff` output in the PR description.
 
@@ -336,6 +473,7 @@ On every PR, it posts or updates one comment like this:
 > **Architectural impact**: touches `payments.charges` (payments-team)
 > 👥 **Journeys affected:** *Book a ride* (passenger · critical), *Refund a fare* (support-team)
 > 🔗 **Cross-repo consumers:** `rides.api-gateway`, `support.admin-console` (pinned at payments@5.2). The `charges` contract loses field `currency_hint`.
+> 🗄️ **Data:** `Refund.amount_cents` mapping to `ledger_entries` changed (negation removed). `refund-approval` threshold changed from 50% to 75% of fare.
 > ➕ new relationship `charges → ledger` (inferred from `src/ledger-client.ts:12`), **not declared in model**
 > ⚠️ `critical-journeys-reviewed`: needs review from rides-team
 > [Open before/after in ArchDoc ↗]
@@ -350,6 +488,8 @@ It's configurable to warn or to fail. In the landscape repo, a scheduled run can
   - **System:** the C4 levels, from context down to components.
   - **Actor:** everything a person, role, or team uses and owns.
   - **Journey:** the path of one journey, animated step by step across repos.
+  - **Data:** entities and where they're stored. Click a field to see its lineage across tables, databases, and repos.
+  - **Journey data timeline:** the record snapshot at each step, with a sample-request simulator that shows which logic branch runs.
   - **Focus:** an element plus N hops.
   - Tag and owner filters, and search (⌘K).
 - **Diff mode:** overlay of base vs. head. Added is green, removed is red, changed is amber, and `suggested` is dashed. Affected journeys are highlighted.
@@ -364,7 +504,7 @@ It's configurable to warn or to fail. In the landscape repo, a scheduled run can
 1. **Agent pre-flight and post-flight (in the IDE or terminal).** The agent calls `locate` and `impact` and learns that "you're in `trips`, owned by rides-team, used by passengers and drivers in two critical journeys, and the `payments-boundary` rule applies". It edits, then calls `check` and `diff`. If it introduced a new dependency, it calls `propose` so the model change appears in the same PR.
 2. **Human review (in the PR).** The reviewer reads the architectural-impact comment first: affected journeys, cross-repo consumers, drift. They open the before/after view, and accept or reject the `suggested` model changes with the code.
 3. **Cross-repo change (across teams).** A change to `payments.charges` in the payments repo shows the consumers and journeys in other repos *before* merge. After release, consumers' `archdoc sync` picks up the new version, and their `check` flags any reference that no longer resolves.
-4. **Learning (anytime).** A new engineer opens the enterprise explorer and picks their team. They see what the team owns and uses, then follow the "Refund a fare" journey end to end across three repos, clicking through to real code. Follow-up questions go to their agent, grounded in the same model via MCP.
+4. **Learning (anytime).** A new engineer opens the enterprise explorer and picks their team. They see what the team owns and uses, then follow the "Refund a fare" journey end to end across three repos, clicking through to real code. They try a few sample refund requests in the data timeline to see which approval branch runs and which ledger rows get written. Follow-up questions go to their agent, grounded in the same model via MCP.
 
 ## 7. Non-goals (for now)
 

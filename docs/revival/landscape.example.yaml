@@ -1,6 +1,7 @@
-# Illustrative only: proposed ArchDoc spec v2 federation (see 03-target-architecture.md §3.8).
+# Illustrative only: proposed ArchDoc spec v2 federation (see 03-target-architecture.md §3.9).
 # A fictional company, Acme Rides, with four product repos and one landscape repo.
 # Each YAML document below is a different file in a different repo.
+# The payments repo also shows the data layer (§3.5): entities, storage, a mapping, and a logic block.
 # Every journey step follows a declared `uses` relationship, which `archdoc check` would enforce.
 # acme/trips and acme/support-tools aren't shown. Assume they declare trips.api, support.admin-console,
 # and the relationships the journeys rely on.
@@ -21,13 +22,18 @@ elements:
     owners: [payments-team]
     code: [{ path: services/charges/** }]
     provides:
-      - api: proto/charges.proto
+      - { api: proto/charges.proto, accepts: RefundRequest, returns: Refund }
+      - { topic: refund.issued, carries: Refund }
     uses:
-      ledger: Records every charge and refund
+      ledger: { description: Records every charge and refund, sends: LedgerEntry }
   ledger:
     kind: datastore
     technology: Postgres
     owners: [payments-team]
+    stores:
+      charges:        { entity: Charge, key: id }
+      refunds:        { entity: Refund, key: id }
+      ledger_entries: { entity: LedgerEntry, key: id, retention: 7y }
   ledger-reports:
     kind: container
     description: Month-end reporting UI over the ledger.
@@ -35,10 +41,71 @@ elements:
     code: [{ path: apps/reports/** }]
     uses:
       ledger: Reads posted entries
+
+# ── WITH WHAT data ─────────────────────────────────────────────────────
+data:
+  RefundRequest:
+    kind: message
+    fields:
+      trip_id:      { type: uuid }
+      amount_cents: { type: int }
+      reason:       { type: enum, values: [overcharge, no_show, safety] }
+      agent_id:     { type: uuid, classification: internal }
+  Charge:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Charge }    # fields imported from the real schema
+    fields:
+      trip_id:      { type: uuid }
+      amount_cents: { type: int }
+      card_last4:   { type: string, classification: pci }
+      status:       { type: enum, values: [authorized, captured, partially_refunded, refunded] }
+    states:
+      - authorized -> captured
+      - captured -> partially_refunded | refunded
+  Refund:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Refund }
+    fields:
+      charge_id:    { type: uuid }
+      amount_cents: { type: int }
+      status:       { type: enum, values: [approved, pending_approval, escalated] }
+  LedgerEntry:
+    kind: entity
+    source: { sql: migrations/0042_ledger.sql#ledger_entries }
+    fields:
+      account:      { type: string, classification: pii }   # contains the rider id
+      amount_cents: { type: int }
+      source_ref:   { type: uuid }
+
+mappings:
+  refund-to-ledger:
+    from: { refund: Refund, trip: trips.Trip }          # named inputs used in the expressions
+    to: ledger.ledger_entries
+    code: services/charges/internal/ledger/post.go
+    fields:
+      account:      "'rider:' + trip.rider_id"
+      amount_cents: "-refund.amount_cents"
+      source_ref:   "refund.id"
+
+logic:
+  refund-approval:
+    runs-in: charges
+    input: { request: RefundRequest, trip: trips.Trip }    # trips.Trip is published by acme/trips
+    code: services/charges/internal/refunds/policy.go#Approve
+    rules:
+      - when: "request.reason == 'safety'"
+        then: escalate-to-safety
+      - when: "request.amount_cents <= trip.fare_cents / 2"
+        then: auto-approve
+      - else: needs-finance-approval
+
 rules:
   - id: payments-boundary
     description: Only the rides gateway and support console may call charges.
     allow-only: { to: charges, from: [rides.api-gateway, support.admin-console] }
+  - id: pci-stays-here
+    description: Fields classified pci are only stored in this namespace.
+    data: { classification: pci, stored-in: { namespace: payments } }
 
 ---
 # ─────────────────────────────────────────────────────────────────────────
@@ -134,8 +201,25 @@ journeys:                                              # cross-team journeys liv
       - { from: support-team, to: zendesk.ticketing, action: Picks up the complaint }
       - { from: support-team, to: support.admin-console, action: Finds the trip }
       - { from: support.admin-console, to: trips.api, action: Loads trip and fare details }
-      - { from: support.admin-console, to: payments.charges, action: Issues a partial refund }
-      - { from: payments.charges, to: payments.ledger, action: Posts the refund entry }
+      - from: support.admin-console
+        to: payments.charges
+        action: Issues a partial refund
+        sends: payments.RefundRequest
+        decides: payments.refund-approval
+        branches:
+          auto-approve:
+            creates: payments.Refund
+            changes: { payments.Charge.status: captured -> partially_refunded }
+          needs-finance-approval:
+            creates: { payments.Refund: { status: pending_approval } }
+          escalate-to-safety:
+            creates: { payments.Refund: { status: escalated } }
+      - from: payments.charges
+        to: payments.ledger
+        action: Posts the refund entry
+        sends: payments.LedgerEntry
+        via: payments.refund-to-ledger
+        when: auto-approve
   month-end-close:
     actor: finance-team
     goal: Reconcile all charges and refunds for the month
