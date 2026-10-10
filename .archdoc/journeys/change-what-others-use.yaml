@@ -1,0 +1,26 @@
+journey: change-what-others-use
+actor: developer
+goal: Change something other teams depend on, and know whom it breaks before merging
+importance: high
+steps:
+  - from: developer
+    to: cli
+    action: Runs archdoc sync, which brings the landscape with every repo's model
+    code: packages/cli/src/commands/federation.ts
+  - from: cli
+    to: federation
+    action: Reads the landscape at its release tag, with the models it vendors
+    code: packages/federation/src/sync.ts
+  - from: federation
+    to: other-repos
+    action: Fetches the landscape repo
+  - from: github
+    to: github-action
+    action: Runs on the pull request
+  - from: github-action
+    to: cli
+    action: Runs archdoc report against the pull request's base
+  - from: cli
+    to: core
+    action: Lists consumers and journeys in other repos, and the ones the change breaks
+    code: packages/core/src/federation/consumers.ts

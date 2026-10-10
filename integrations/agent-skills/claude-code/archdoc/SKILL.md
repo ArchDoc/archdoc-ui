@@ -10,7 +10,7 @@ description: Use at the start of every coding task in a repository that has an .
 ## Start here, before you search the code
 
 1. **Find where the change belongs.** Call `archdoc_search` with a few words for the area, such as `cli command` or `refund approval`. Without MCP, run `archdoc search <words>`. You get the elements involved and their code paths, so you know which files to read.
-2. **Check the impact.** Call `archdoc_impact` on the element, or on the files you plan to change or create. Without MCP, run `archdoc impact <element-or-path> --json`. You get what depends on it, the affected journeys and actors (critical first), owners, and the rules that mention it.
+2. **Check the impact.** Call `archdoc_impact` on the element, or on the files you plan to change or create. Without MCP, run `archdoc impact <element-or-path> --json`. You get what depends on it, the affected journeys and actors (critical first), owners, and the rules that mention it. With a landscape synced, it also lists who uses it from other repos and their journeys: don't remove or rename anything they use without asking the user first.
 3. **Say what it affects.** Name the affected journeys and actors when you share your plan. Ask the user first if a critical journey is involved or the change would break a rule.
 
 `archdoc_locate` tells you which element owns any file, including files that don't exist yet.
