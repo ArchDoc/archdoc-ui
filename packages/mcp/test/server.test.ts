@@ -28,19 +28,24 @@ describe("archdoc MCP server", () => {
     expect(INSTRUCTIONS).toMatch(/before you grep[\s\S]*archdoc_search[\s\S]*archdoc_impact/);
   });
 
-  it("exposes read-only tools", async () => {
+  it("exposes its tools, all read-only except propose", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "archdoc_check",
+      "archdoc_diff",
       "archdoc_get_actor",
       "archdoc_get_element",
       "archdoc_impact",
       "archdoc_journey",
       "archdoc_locate",
       "archdoc_overview",
+      "archdoc_propose",
       "archdoc_search",
       "archdoc_validate",
     ]);
-    expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+    const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);
+    expect(writers).toEqual(["archdoc_propose"]);
+    expect(tools.find((t) => t.name === "archdoc_propose")?.annotations?.destructiveHint).toBe(false);
   });
 
   it("finds where an area lives", async () => {
