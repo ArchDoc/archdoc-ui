@@ -1,0 +1,27 @@
+journey: depend-on-another-repo
+actor: developer
+goal: Rely on another team's architecture, and learn before merging when their release breaks it
+importance: high
+steps:
+  - from: developer
+    to: cli
+    action: Runs archdoc sync after adding an import, or archdoc sync --update to take a new release
+    code: packages/cli/src/commands/federation.ts
+  - from: cli
+    to: federation
+    action: Resolves each import's version range against the other repo's release tags
+    code: packages/federation/src/sync.ts
+  - from: federation
+    to: other-repos
+    action: Reads the model at the release tag
+    code: packages/federation/src/git.ts
+  - from: federation
+    to: model-files
+    action: Vendors the bundle and pins it in archdoc.lock
+  - from: developer
+    to: cli
+    action: Runs archdoc check (CI runs it on the pull request)
+  - from: cli
+    to: core
+    action: Loads the vendored models and checks every reference, contract, and journey step into them
+    code: packages/core/src/federation/federate.ts

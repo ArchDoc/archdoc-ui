@@ -66,10 +66,12 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 
 ## Phase 4: Multi-repo federation (M–L) ⭐ the "enterprise" milestone
 
-- [ ] `archdoc publish`: versioned, validated model bundle. Default target is a release asset on a git tag. Static URL and OCI are options.
-- [ ] `imports:` resolution, `archdoc sync`, and `archdoc.lock` (pinned, offline-friendly, reproducible in CI).
-- [ ] Cross-repo reference checks: dangling, deprecated, or version-skewed references.
-- [ ] Element `provides:` (OpenAPI, AsyncAPI, topics), so cross-repo relationships can target contracts.
+Decided 2026-10-10: `sync` reads other repos' models at their release tags with git (any host, private repos with existing credentials, no release step), and vendors them as bundles in `.archdoc/vendor/`, committed with `archdoc.lock`, so CI, MCP, and the explorer work offline and model changes from a release show up in review. The demo org lives in [`examples/acme`](../../examples/acme). Phase 4 ships as three PRs: 4a (bundles, sync, lock, cross-repo checks, `provides`), 4b (cross-repo impact), 4c (landscape).
+
+- [x] `archdoc publish`: versioned, validated model bundle (`dist/<namespace>@<version>.json`, for `url:` imports). `git:` and `github:` imports read the model at the release tag, so a tag is enough. OCI is still an option.
+- [x] `imports:` resolution, `archdoc sync` (`--update`, `--frozen` for CI), and `archdoc.lock` with vendored bundles (pinned, offline-friendly, reproducible in CI).
+- [x] Cross-repo reference checks: dangling (with a hint), deprecated, and version-skewed references; journey steps that start in another repo are checked against its model.
+- [x] Element `provides:` (api, topic, event), and `via:` on relationships, so cross-repo relationships can target contracts. A journey step from a publisher to a subscriber follows the message.
 - [ ] Landscape repo template:
   - `archdoc landscape build` composes all namespaces into one enterprise site
   - enterprise actors and teams

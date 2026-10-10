@@ -31,7 +31,7 @@ elements:
       core:
         kind: container
         technology: TypeScript
-        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules.
+        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules, and checks references into other repos.
         code: [{ path: packages/core/** }]
         uses:
           spec: Validates model files against the schema
@@ -44,6 +44,9 @@ elements:
             code: [{ path: packages/core/src/load/** }]
             uses:
               checker: Validates journeys once references resolve
+              imports:
+                description: Loads archdoc.lock and the vendored models of other repos
+                provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
             description: Element, actor, and overview queries, search by words, and impact (consumers, actors, journeys, owners, rules).
@@ -85,6 +88,13 @@ elements:
             kind: component
             description: Semantic diff between two model revisions (actors, elements, relationships, journeys, data, rules).
             code: [{ path: packages/core/src/diff/** }]
+          imports:
+            kind: component
+            description: Other repos' models. Packs and reads bundles, and checks the lockfile and every reference, contract, and journey step into another repo at its pinned version.
+            code: [{ path: packages/core/src/federation/** }]
+            provenance: { source: suggested, by: agent:claude-code }
+            uses:
+              loader: Builds the models inside bundles, and checks contracts the same way
 
       analyzers:
         kind: container
@@ -97,10 +107,22 @@ elements:
             description: Produces core's ObservedDependency records
             provenance: { source: suggested, by: agent:claude-code }
 
+      federation:
+        kind: container
+        technology: Node.js, git, semver
+        description: Shares models across repos. `sync` reads other repos' models at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle.
+        code: [{ path: packages/federation/** }]
+        provenance: { source: suggested, by: agent:claude-code }
+        uses:
+          core: Builds and validates bundles, and reads the current lock
+          spec: Reads and writes the lockfile and bundle formats
+          model-files: Writes archdoc.lock and the bundles in .archdoc/vendor/
+          other-repos: Lists release tags and reads the model at a tag
+
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, sync, publish, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
@@ -109,6 +131,9 @@ elements:
           mcp: Starts the MCP server for `archdoc mcp`
           analyzers:
             description: Runs analyzers for `archdoc check`
+            provenance: { source: suggested, by: agent:claude-code }
+          federation:
+            description: Runs `archdoc sync` and `archdoc publish`
             provenance: { source: suggested, by: agent:claude-code }
         elements:
           commands:
@@ -190,6 +215,11 @@ elements:
         technology: YAML in git (.archdoc/)
         description: The human-owned architecture model, versioned with the code.
         code: [{ path: .archdoc/** }]
+
+      other-repos:
+        kind: external
+        description: Other teams' repositories whose models this one imports, read at their release tags.
+        provenance: { source: suggested, by: agent:claude-code }
 
       source-tree:
         kind: datastore
