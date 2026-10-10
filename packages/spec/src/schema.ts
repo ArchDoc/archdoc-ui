@@ -47,6 +47,12 @@ const OneOrMany = z.union([z.string(), StringList]);
 export const RelationshipSchema = z.strictObject({
   description: z.string().optional(),
   technology: z.string().optional(),
+  via: z
+    .string()
+    .optional()
+    .describe(
+      "The contract this relationship goes through: an api, topic, or event the target provides",
+    ),
   status: StatusSchema.optional(),
   sends: OneOrMany.optional().describe("Data entries sent along this relationship"),
   tags: StringList.optional(),
@@ -90,6 +96,23 @@ export const ActorSchema = z.strictObject({
   provenance: ProvenanceSchema.optional(),
 });
 
+const contract = {
+  description: z.string().optional(),
+  status: StatusSchema.optional(),
+  accepts: OneOrMany.optional().describe("Data entries it accepts"),
+  returns: OneOrMany.optional().describe("Data entries it returns"),
+  carries: OneOrMany.optional().describe("Data entries a topic or event carries"),
+};
+
+/** A contract an element exposes, which relationships from other repos can target with `via`. */
+export const ProvideSchema = z
+  .union([
+    z.strictObject({ api: z.string().min(1).describe("API spec path or name"), ...contract }),
+    z.strictObject({ topic: z.string().min(1).describe("Message topic"), ...contract }),
+    z.strictObject({ event: z.string().min(1).describe("Event name"), ...contract }),
+  ])
+  .describe("An api, topic, or event this element exposes");
+
 export const ElementKindSchema = z.enum([
   "system",
   "container",
@@ -118,7 +141,7 @@ export type ElementSpec = {
   code?: z.infer<typeof CodeSchema> | undefined;
   links?: z.infer<typeof LinkSchema>[] | undefined;
   uses?: z.infer<typeof UsesSchema> | undefined;
-  provides?: Record<string, unknown>[] | undefined;
+  provides?: z.infer<typeof ProvideSchema>[] | undefined;
   stores?: Record<string, z.infer<typeof StoreSchema>> | undefined;
   provenance?: z.infer<typeof ProvenanceSchema> | undefined;
   elements?: Record<string, ElementSpec> | undefined;
@@ -137,10 +160,10 @@ export const ElementSchema: z.ZodType<ElementSpec> = z.strictObject({
   links: z.array(LinkSchema).optional(),
   uses: UsesSchema.optional(),
   provides: z
-    .array(z.looseObject({}))
+    .array(ProvideSchema)
     .optional()
     .describe(
-      "Interfaces this element exposes, such as { api: openapi/trips.yaml } or { topic: trip.completed }",
+      "Contracts this element exposes, such as { api: openapi/trips.yaml } or { topic: trip.completed }",
     ),
   stores: z
     .record(z.string(), StoreSchema)
@@ -214,11 +237,36 @@ export const RuleSchema = z.looseObject({
   description: z.string().optional(),
 });
 
-export const ImportSchema = z.union([
-  z.strictObject({ github: z.string(), version: z.string() }),
-  z.strictObject({ url: z.string(), version: z.string().optional() }),
-  z.strictObject({ file: z.string() }),
-]);
+const importPath = z
+  .string()
+  .optional()
+  .describe("Where the model lives in that repo. Defaults to .archdoc/");
+
+export const ImportSchema = z
+  .union([
+    z.strictObject({
+      github: z.string().describe("owner/repo on GitHub"),
+      version: z.string().describe("Semver range matched against the repo's tags, such as ^5"),
+      path: importPath,
+    }),
+    z.strictObject({
+      git: z.string().describe("Any git URL, or a path relative to the repository root"),
+      version: z.string().describe("Semver range matched against the repo's tags, such as ^5"),
+      path: importPath,
+    }),
+    z.strictObject({
+      url: z.string().describe("URL of a bundle written by archdoc publish"),
+      version: z.string().optional(),
+    }),
+    z.strictObject({
+      file: z
+        .string()
+        .describe(
+          "A model file, model directory, or bundle, relative to the repository root, such as stubs for external systems",
+        ),
+    }),
+  ])
+  .describe("Another repo's model. archdoc sync pins it in archdoc.lock.");
 
 const sections = {
   $schema: z.string().optional(),
@@ -272,5 +320,6 @@ export type JourneySpec = z.infer<typeof JourneySchema>;
 export type DataEntrySpec = z.infer<typeof DataEntrySchema>;
 export type RuleSpec = z.infer<typeof RuleSchema>;
 export type ImportSpec = z.infer<typeof ImportSchema>;
+export type ProvideSpec = z.infer<typeof ProvideSchema>;
 export type ModelFile = z.infer<typeof ModelFileSchema>;
 export type JourneyFile = z.infer<typeof JourneyFileSchema>;

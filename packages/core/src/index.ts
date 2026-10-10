@@ -1,5 +1,6 @@
 export * from "./browser.js";
 export { listRepoFiles, type RepoInfo, repoInfo, webUrlOf } from "./codemap/files.js";
+export { federationDir, integrityOf, readFederationInput } from "./federation/vendor.js";
 export {
   type LoadedModel,
   type LoadOptions,

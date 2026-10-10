@@ -1,5 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
+import { federate } from "../federation/federate.js";
+import { federationDir, readFederationInput } from "../federation/vendor.js";
 import type { Model } from "../model.js";
 import { buildModel, type ModelSource } from "./build.js";
 
@@ -69,6 +71,10 @@ export async function loadModel(target = ".", options: LoadOptions = {}): Promis
     return { ...empty, source: absolute, baseDir: absolute };
   }
   const model = buildModel(read.sources, { root: read.root });
+  // Other repos' models, pinned in archdoc.lock. Repos without imports skip this.
+  if (Object.keys(model.imports).length > 0 || (await hasLock(read.source))) {
+    federate(model, await readFederationInput(await federationDir(read.source), cwd));
+  }
   return { ...model, source: read.source, baseDir: read.baseDir };
 }
 
@@ -108,6 +114,10 @@ async function listYaml(dir: string): Promise<string[]> {
     }
   }
   return out;
+}
+
+async function hasLock(source: string): Promise<boolean> {
+  return isFile(join(await federationDir(source), "archdoc.lock"));
 }
 
 async function isFile(path: string): Promise<boolean> {

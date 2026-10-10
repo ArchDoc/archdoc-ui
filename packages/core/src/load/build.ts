@@ -6,6 +6,7 @@ import {
   type JourneySpec,
   type ModelFile,
   ModelFileSchema,
+  type ProvideSpec,
   type UsesSpec,
 } from "@archdoc/spec";
 import type { z } from "zod";
@@ -145,6 +146,9 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
       model.name = file.name;
       model.description = file.description;
       model.imports = file.imports ?? {};
+      model.importLocations = new Map(
+        Object.keys(model.imports).map((ns) => [ns, parsed.locate(["imports", ns])]),
+      );
     } else {
       for (const key of ROOT_ONLY) {
         if (file[key] !== undefined) {
@@ -228,6 +232,7 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
           ref,
           description: rel.description,
           technology: rel.technology,
+          via: rel.via,
           status: rel.status ?? "active",
           sends: rel.sends === undefined ? [] : [rel.sends].flat(),
           provenance: rel.provenance,
@@ -264,6 +269,7 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
   }
 
   checkDataRefs(model, resolver);
+  checkLocalContracts(model);
   diagnostics.push(...validateJourneys(model, resolver, journeySites));
   return model;
 
@@ -336,6 +342,48 @@ function checkDataRefs(model: Model, resolver: Resolver) {
       });
     }
   }
+}
+
+/** A `via` on a relationship to a local element must name a contract the element provides. */
+function checkLocalContracts(model: Model) {
+  for (const rel of model.relationships) {
+    if (!rel.via || rel.to.type !== "element") continue;
+    const target = model.elements.get(rel.to.id);
+    const diagnostic = contractDiagnostic(rel, target?.spec.provides, rel.to.id);
+    if (diagnostic) model.diagnostics.push(diagnostic);
+  }
+}
+
+/** Checks `via` against what the target provides. Shared with cross-repo checks. */
+export function contractDiagnostic(
+  rel: Relationship,
+  provides: readonly ProvideSpec[] | undefined,
+  target: string,
+): Diagnostic | undefined {
+  const contract = (provides ?? []).find((p) => contractName(p) === rel.via);
+  if (!contract) {
+    const known = (provides ?? []).map(contractName);
+    return {
+      severity: "error",
+      code: "ref/unknown-contract",
+      message: `${rel.from.id} uses ${target} via "${rel.via}", but ${target} doesn't provide it.${known.length ? ` It provides: ${known.join(", ")}.` : " It provides nothing."}`,
+      location: rel.location,
+    };
+  }
+  if (contract.status === "deprecated") {
+    return {
+      severity: "warning",
+      code: "ref/deprecated-contract",
+      message: `${rel.from.id} uses ${target} via "${rel.via}", which is deprecated.`,
+      location: rel.location,
+    };
+  }
+  return undefined;
+}
+
+/** A contract's name: its api, topic, or event. */
+export function contractName(p: ProvideSpec): string {
+  return "api" in p ? p.api : "topic" in p ? p.topic : p.event;
 }
 
 export function normalizeCode(code: CodeSpec | undefined): CodeRef[] {

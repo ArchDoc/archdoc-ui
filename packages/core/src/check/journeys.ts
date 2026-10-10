@@ -11,7 +11,8 @@ import { describeTarget, type Model, type NodeRef, nodeKey, type Target } from "
  * of its descendants), so a journey can be told at a coarser level than the
  * relationships. A step from an element back to an actor is valid when the
  * actor uses that element: it's the response. Steps that start in another repo
- * can't be checked until federation (roadmap Phase 4), and are reported as info.
+ * are reported as info here, and checked against that repo's model by
+ * `federate` once it's synced.
  */
 export function validateJourneys(
   model: Model,
@@ -81,7 +82,7 @@ export function validateJourneys(
         diagnostics.push({
           severity: "info",
           code: "journey/unverified-step",
-          message: `${label}, step ${n}: starts in another repo (${from.ref}), so it can't be checked until federation is available.`,
+          message: `${label}, step ${n}: starts in another repo (${from.ref}), so it's checked against that repo's model once it's synced (archdoc sync).`,
           location: step.location,
         });
         continue;
