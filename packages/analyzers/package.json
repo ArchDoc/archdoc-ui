@@ -1,0 +1,28 @@
+{
+  "name": "@archdoc/analyzers",
+  "version": "0.0.0",
+  "description": "Find the dependencies that code actually has, so ArchDoc can compare them with the model.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchDoc/archdoc.git",
+    "directory": "packages/analyzers"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@archdoc/core": "workspace:*",
+    "typescript": "~5.9.3"
+  }
+}

@@ -2,6 +2,7 @@
 // The explorer imports this entry point so it builds and queries the model
 // with the same engine as the CLI.
 export { validateJourneys } from "./check/journeys.js";
+export { evidenceOf, type ObservedDependency } from "./check/observed.js";
 export {
   type CodeMap,
   type CodeMatch,
