@@ -13,7 +13,8 @@
     "node": ">=22.12"
   },
   "files": [
-    "dist"
+    "dist",
+    "web"
   ],
   "bin": {
     "archdoc": "./dist/bin.js"
@@ -29,5 +30,8 @@
     "@archdoc/spec": "workspace:*",
     "commander": "^14.0.3",
     "yaml": "^2.9.1"
+  },
+  "scripts": {
+    "prepack": "node -e \"const fs=require('node:fs');fs.rmSync('web',{recursive:true,force:true});fs.cpSync('../../apps/web/dist','web',{recursive:true})\""
   }
 }

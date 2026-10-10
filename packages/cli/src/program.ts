@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { migrate } from "./commands/migrate.js";
 import { schema } from "./commands/schema.js";
 import { validate } from "./commands/validate.js";
+import { view } from "./commands/view.js";
 import { type Io, processIo } from "./io.js";
 
 const { version } = JSON.parse(
@@ -35,6 +36,18 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action((path: string, opts: { json?: boolean; strict?: boolean }) =>
       run(validate(path, opts, io)),
     );
+
+  program
+    .command("view")
+    .description("Open the explorer in your browser")
+    .argument("[path]", "repository, .archdoc directory, or model file", ".")
+    .option("-w, --watch", "reload the explorer when model files change")
+    .option("-p, --port <port>", "port to listen on (default: a free port)")
+    .option("--open", "open the explorer in your default browser")
+    .action(async (path: string, opts: { watch?: boolean; port?: string; open?: boolean }) => {
+      const result = await view(path, opts, io);
+      program.exitCode = result.code;
+    });
 
   program
     .command("migrate")
