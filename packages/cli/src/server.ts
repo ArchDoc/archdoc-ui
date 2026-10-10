@@ -11,6 +11,7 @@ import {
   repoInfo,
   type SourcesAtRef,
 } from "@archdoc/core";
+import { landscapePayload, loadLandscape } from "./landscape.js";
 
 export interface ViewServerOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -25,6 +26,8 @@ export interface ViewServerOptions {
   webDir?: string;
   /** Also send the model as it was at this ref, for the explorer's before/after view. */
   base?: string;
+  /** Send the landscape: this model composed with every model it imports. */
+  landscape?: boolean;
 }
 
 export interface ViewServer {
@@ -63,6 +66,10 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     try {
+      if (url.pathname === "/api/model" && options.landscape) {
+        const { model, composed } = await loadLandscape(options.target, options.cwd);
+        return json(res, 200, await landscapePayload(model, composed, watching));
+      }
       if (url.pathname === "/api/model") {
         const read = await readModelSources(options.target, { cwd: options.cwd });
         if (!read) {
@@ -108,7 +115,8 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
       }
       return await serveStatic(webDir, url.pathname, res);
     } catch (err) {
-      if (!res.headersSent) json(res, 500, { error: String(err) });
+      if (!res.headersSent)
+        json(res, 500, { error: err instanceof Error ? err.message : String(err) });
       else res.end();
     }
   });

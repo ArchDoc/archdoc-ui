@@ -18,6 +18,7 @@ elements:
   app:
     kind: container
     technology: React Native
+    tags: [app]
     owners: [rides-team]
     code: apps/rider/**
     uses:

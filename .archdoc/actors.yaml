@@ -20,6 +20,14 @@ actors:
     uses:
       github-action: Reads architectural-impact comments on PRs
 
+  architecture-team:
+    kind: team
+    description: Runs an org's landscape repo, which composes every team's model and adds enterprise teams, cross-team journeys, domains, and org rules.
+    provenance: { source: suggested, by: agent:claude-code }
+    uses:
+      cli: Runs archdoc sync and archdoc landscape build in the landscape repo
+      landscape-template: Starts a landscape repo from the template
+
   coding-agent:
     kind: agent
     description: An AI coding agent (Claude Code, Cursor, Copilot, …) editing the codebase.

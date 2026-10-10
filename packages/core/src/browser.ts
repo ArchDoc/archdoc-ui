@@ -54,6 +54,12 @@ export {
   type VendoredBundle,
 } from "./federation/federate.js";
 export {
+  type ComposedLandscape,
+  composeLandscape,
+  type LandscapeDomain,
+  type LandscapeRepo,
+} from "./federation/landscape.js";
+export {
   type BuildOptions,
   buildModel,
   contractName,

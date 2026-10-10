@@ -185,7 +185,7 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
     <div className="app" style={{ "--panel-width": `${panelWidth}px` } as React.CSSProperties}>
       <header className="topbar">
         <div className="brand">
-          <img src="/favicon.svg" alt="" width={20} height={20} />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={20} height={20} />
           <span>ArchDoc</span>
           <span className="model-name">{model.name ?? model.namespace}</span>
         </div>

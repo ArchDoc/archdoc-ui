@@ -175,6 +175,13 @@ export function federate(model: Model, input: FederationInput): Model {
         });
       }
       model.landscape = { ...land, members };
+      // Teams the landscape defines resolve here, so owners: [payments-team] needs no local copy.
+      for (let i = model.diagnostics.length - 1; i >= 0; i--) {
+        const d = model.diagnostics[i];
+        const owner =
+          d?.code === "ref/unresolved-owner" ? /^Owner "([^"]+)"/.exec(d.message)?.[1] : undefined;
+        if (owner && land.model.actors.has(owner)) model.diagnostics.splice(i, 1);
+      }
     }
   } else if (input.lock?.landscape) {
     diagnostics.push({
@@ -211,6 +218,18 @@ export function federate(model: Model, input: FederationInput): Model {
 
   model.imported = imported;
   checkReferences(model, imported, diagnostics);
+  // Domain members in other repos, now that their models are here.
+  for (const d of model.domains?.values() ?? []) {
+    for (const ref of d.spec.elements ?? []) {
+      if (lookupImported(imported, ref).status !== "missing") continue;
+      diagnostics.push({
+        severity: "warning",
+        code: "ref/unknown-domain-member",
+        message: `Domain "${d.id}" lists "${ref}", which isn't an element here or in an imported namespace.`,
+        location: d.location,
+      });
+    }
+  }
   model.diagnostics.push(...diagnostics);
   return model;
 }

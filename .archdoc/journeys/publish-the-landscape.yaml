@@ -1,0 +1,19 @@
+journey: publish-the-landscape
+actor: architecture-team
+goal: Give everyone one view of the org's architecture, checked across repos
+importance: high
+steps:
+  - from: architecture-team
+    to: cli
+    action: Runs archdoc landscape build in the landscape repo (the template's workflow does it on every push)
+    code: packages/cli/src/commands/landscape.ts
+  - from: cli
+    to: core
+    action: Composes every repo's model into one, and checks journeys, owners, and org rules across repos
+    code: packages/core/src/federation/landscape.ts
+  - from: cli
+    to: web
+    action: Writes the explorer and the composed model as a static site
+  - from: developer
+    to: web
+    action: Opens the landscape and follows a journey across teams' repos

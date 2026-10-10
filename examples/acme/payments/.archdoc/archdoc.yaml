@@ -6,8 +6,8 @@ description: Charges riders' cards, issues refunds, and keeps the ledger.
 # Who uses payments in other repos: the landscape imports every team's model.
 landscape: { git: ../landscape, version: ^1 }
 
+# payments-team is defined in the landscape, so it isn't repeated here.
 actors:
-  payments-team: { kind: team }
   finance:
     kind: role
     description: Reviews refunds and closes the books each month.

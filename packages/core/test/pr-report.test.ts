@@ -27,6 +27,7 @@ const after = model({
     actors:
       rider: { kind: person, uses: { app: Books } }
       mobile-team: { kind: team }
+      ops: { kind: team, provenance: { source: suggested, by: agent:test } }
     elements:
       app: { kind: container, code: apps/mobile/**, owners: [mobile-team], uses: { api: Calls, cache: { description: Caches trips, provenance: { source: suggested, by: agent:test } } } }
       api: { kind: container, code: services/api/** }
@@ -80,7 +81,7 @@ describe("prReport", () => {
   });
 
   it("lists suggested facts for review", () => {
-    expect(r.suggested).toEqual(["`app` → `cache`: Caches trips"]);
+    expect(r.suggested).toEqual(["actor `ops`", "`app` → `cache`: Caches trips"]);
   });
 
   it("separates drift the change introduced from drift already there", () => {

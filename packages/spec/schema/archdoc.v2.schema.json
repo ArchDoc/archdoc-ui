@@ -458,10 +458,56 @@
               },
               "description": {
                 "type": "string"
+              },
+              "scope": {
+                "description": "org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
+                "type": "string",
+                "enum": ["repo", "org"]
               }
             },
             "required": ["id"],
             "additionalProperties": {}
+          }
+        },
+        "domains": {
+          "description": "Business domains, for grouping a landscape by more than repo",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "owners": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "namespaces": {
+                "description": "Repos (by namespace) that belong to this domain",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                }
+              },
+              "elements": {
+                "description": "Elements that belong to it, such as payments.ledger",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
         "namespace": {

@@ -88,6 +88,7 @@ pnpm archdoc diff main                      # what changed in the model since ma
 pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
 pnpm archdoc sync                           # pin imported repos' models in archdoc.lock
 pnpm archdoc publish 1.0.0 --out -          # the bundle other repos would import
+pnpm archdoc landscape build                # in a landscape repo: check it and write the site
 pnpm archdoc validate examples/blog.yaml    # a single-file model
 pnpm archdoc migrate examples/v1/blog.yaml  # convert a v0/v1 model to v2
 pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
@@ -124,6 +125,8 @@ elements:
 `archdoc sync` reads each import's model at the newest release tag its range allows (`v5.2.0`, read straight from git, so private repos work with the credentials you already have) and vendors it in `.archdoc/vendor/`, pinned in `.archdoc/archdoc.lock`. Commit both: `check`, the explorer, MCP, and CI then work offline and reproducibly, and taking a new release shows up as a diff in review. From then on, `validate` and `check` report references into other repos that don't exist at the pinned version, deprecated targets, contracts (`via`) the target doesn't `provide`, journey steps that start in another repo but don't follow its relationships, and imports built against a different major version than yours.
 
 A repo also learns who uses *it* from the landscape: the repo that imports every team's model and adds enterprise actors and cross-team journeys. Point at it with `landscape: { github: acme/architecture, version: ^1 }` and `archdoc sync` brings it with every model it pins. Then `archdoc impact`, `archdoc show`, and the MCP tools list consumers and journeys in other repos, and the pull request report says which consumers a change breaks (an element they use is removed, or a contract they use `via`) before it merges.
+
+The landscape repo itself runs `archdoc landscape build`. It composes every repo's model into one (each repo a system, its elements inside), checks journeys that cross teams, owners (every team must be defined somewhere), and its rules across repos, and writes the explorer as a static site for GitHub Pages; `archdoc view --landscape` shows the same thing live. The landscape also defines `domains:` for grouping, and its rules marked `scope: org` run in every repo that imports it, just as its teams resolve owners there. [`integrations/landscape-template`](./integrations/landscape-template) is a starting point, with a workflow that takes every team's newest release weekly and publishes the site.
 
 `archdoc sync --update` moves to the newest allowed release, and `archdoc sync --frozen` checks the lock in CI. `archdoc publish` writes a validated, versioned bundle (`dist/payments@5.2.0.json`) for repos that import it by `url:`. [`examples/acme`](./examples/acme) is a demo org of four repos that import each other.
 
@@ -167,6 +170,7 @@ apps/
   web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 integrations/
   agent-skills/           Claude Code skill, AGENTS.md snippet, MCP configs
+  landscape-template/     starting point for a landscape repo, with a sync-and-publish workflow
   github-action/          the pull request impact comment and drift gate
 examples/                 example models in v2 (v1 originals in examples/v1), and acme/, a demo org
 docs/revival/             the relaunch plan: assessment, strategy, architecture, roadmap

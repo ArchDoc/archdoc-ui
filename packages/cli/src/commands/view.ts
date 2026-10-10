@@ -7,6 +7,8 @@ export interface ViewOptions {
   watch?: boolean;
   /** Show changes since this ref. */
   base?: string;
+  /** Show the composed landscape. */
+  landscape?: boolean;
   port?: string;
   open?: boolean;
 }
@@ -30,6 +32,7 @@ export async function view(
       port,
       watch: options.watch,
       base: options.base,
+      landscape: options.landscape,
     });
   } catch (err) {
     io.err(`Couldn't start the explorer: ${err instanceof Error ? err.message : String(err)}`);
@@ -43,7 +46,7 @@ export async function view(
 
   const what = relative(io.cwd, server.source) || ".";
   io.out(
-    `ArchDoc explorer: ${server.url}${options.base ? ` (showing changes since ${options.base})` : ""}`,
+    `ArchDoc explorer: ${server.url}${options.landscape ? " (the landscape)" : ""}${options.base ? ` (showing changes since ${options.base})` : ""}`,
   );
   io.out(
     options.watch
