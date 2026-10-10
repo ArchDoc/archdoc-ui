@@ -1,0 +1,27 @@
+name: Bug report
+description: Something in ArchDoc doesn't work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The smallest model (YAML) and command that show the problem.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Output of `archdoc --version` and `node --version`.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options: [CLI, Core / spec, MCP server, Explorer, GitHub Action, Other]

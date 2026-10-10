@@ -1,40 +1,116 @@
-# ArchDoc UI
-ArchDoc UI allows users to define and visualize software systems. With ArchDoc UI, you can increase transparency and clarity of your organization's architecture. **Don't diagram your architecture. Model it.**
+# ArchDoc
 
-![archdoc demo](docs/archdoc-demo.gif "ArchDoc Demo Video")
+**An architecture control plane for AI-assisted development.**
 
-## Why ArchDoc?
+ArchDoc is an interactive software modeling platform that helps engineers understand the systems AI is modifying and stay in the driver's seat. It's open source and AI-first. It analyzes the current state of a system, proposes future-state changes, and maps architectural concepts to code. Developers of any experience level can use it to explore and learn the system they're building.
 
-ArchDoc UI is designed to tackle the problem of miscommunication between developers, architects, and other stakeholders in software development projects. With ArchDoc, you can define and visualize software models, which helps the whole team to know the components, components, and clients of your organization's software system..
+> **Status: v2 is under active development.** The v0 viewer (`@archdoc/archdoc-ui`) is frozen at [`v0.2.0`](https://github.com/ArchDoc/archdoc-ui/releases/tag/v0.2.0) on the [`legacy/v0`](https://github.com/ArchDoc/archdoc-ui/tree/legacy/v0) branch. The plan for v2 is in [`docs/revival/`](./docs/revival/README.md).
 
-## Features
+## Why
 
- - **Intuitive Diagrams**: ArchDoc UI arranges your organization's architecture in a clear, easy-to-understand graph. Powered by [React Flow](https://reactflow.dev/).
- - **Easy-to-use**: No need to learn a new diagram-as-code DSL, simply create a YAML file and use the `archdoc` cli tool to visualize it.
- - **Embedded Documentation**: Define and read documentation for your components, while exploring your architecture.
- - **Open-source**: By the people, for the people.
+- AI agents change code faster than people can follow the architecture.
+- Architecture docs drift away from the code and stop being trusted.
+- Generated repo wikis describe the code, but nobody owns them.
 
-## Getting Started
-To get started with ArchDoc UI, you need to have Node.js v16 installed on your machine. Then, simply run the following command to install ArchDoc globally:
+## What
 
-```bash
-npm i -g @archdoc/archdoc-ui
+A **human-owned model** lives in each repo, in `.archdoc/` next to the code. It describes four things:
+
+| Section | Answers |
+|---|---|
+| **Actors** | *Who* uses the system: people, roles, teams, partner orgs, and AI agents |
+| **Elements** | *What* the system is made of: systems, containers, components, and datastores, each mapped to code paths |
+| **Journeys** | *How* an actor reaches a goal, step by step across elements, checked against real relationships |
+| **Data** | *With what*: what is sent and stored, how fields map between tables, and the logic that runs on request data |
+
+A **deterministic engine** (`@archdoc/core`) answers every question about the model. It contains no LLM, so the same question gets the same answer in the IDE, the browser, and CI. Your own coding agent does the reasoning.
+
+People and agents reach the engine through the surface that fits the moment:
+
+- **AI agents, before editing:** an MCP server and agent skill. *Where am I? What depends on this? Which rules and journeys apply?*
+- **Reviewers, before merging:** a PR impact check. It lists affected journeys, owners, data changes, and consumers in other repos, and flags drift.
+- **Everyone, anytime:** the explorer, with a hierarchy view, actor and journey views, data timelines, tours, and click-through to code.
+- **Enterprises, across teams:** the landscape, which composes every repo's model into one view.
+
+## A taste of the model
+
+```yaml
+# .archdoc/archdoc.yaml
+archdoc: "2.0"
+namespace: rides
+name: Rides Platform
+
+actors:
+  passenger:
+    kind: person
+    description: Books and pays for rides from the mobile app.
+    uses:
+      mobile-app: Requests rides, pays, rates drivers
+
+elements:
+  mobile-app:
+    kind: container
+    technology: React Native
+    code: [{ path: apps/mobile/** }]
+    uses:
+      api-gateway: Calls all backend APIs
+  api-gateway:
+    kind: container
+    code: [{ path: services/gateway/** }]
+
+journeys:
+  book-a-ride:
+    actor: passenger
+    goal: Get a ride to a destination
+    importance: critical
+    steps:
+      - { from: passenger, to: mobile-app, action: Enters destination and confirms }
+      - { from: mobile-app, to: api-gateway, action: POST /trips }
 ```
 
-Next, create an ArchDoc Spec file, following the documentation outlined in the [ArchDoc Documentation](https://github.com/ArchDoc/archdoc-ui/wiki/ArchDoc-Documentation).
+ArchDoc's own model is in [`.archdoc/`](./.archdoc).
 
-After the installation, you can run ArchDoc UI to visualize your ArchDoc Spec file:
+## Roadmap
 
-```bash
-archdoc myarchitecture.yaml
+ArchDoc is built in phases. Each phase ends with an exit test, not a date. The full roadmap is in [`docs/revival/04-roadmap.md`](./docs/revival/04-roadmap.md).
+
+| Phase | Delivers |
+|---|---|
+| 0 · Reset | pnpm monorepo, Node 22/24 CI, this README |
+| 1 · Model core + explorer | Spec v2, `archdoc validate`, `archdoc view`, ArchDoc modeling itself |
+| 2 · Code mapping + MCP | `locate` and `impact` for agents, before they edit |
+| 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a PR impact comment |
+| 4 · Federation | Models published across repos, a landscape repo, cross-repo impact |
+| 5 · Data | Entities, storage, field lineage, logic, and simulation |
+| 6 · Bootstrap + interop | Draft models from code, LikeC4/Structurizr importers |
+| 7 · Learning | Tours, team onboarding pages, a static site |
+| 8 · Reach | VS Code, OpenTelemetry checks, community spec process |
+
+## Repository layout
+
+```
+packages/
+  spec/   @archdoc/spec   v2 schema (Zod), TypeScript types, JSON Schema, v1 migration
+  core/   @archdoc/core   load, validate, and query models (no LLM)
+  cli/    @archdoc/cli    the `archdoc` command
+examples/                 example models (v1 originals in examples/v1)
+docs/revival/             the relaunch plan: assessment, strategy, architecture, roadmap
+.archdoc/                 ArchDoc's own model
 ```
 
-## Contributing
-If you're interested in contributing to the ArchDoc UI project, we welcome your contributions! Here are a few ways you can get involved:
+## Development
 
- - Report bugs and request features using the GitHub issue tracker.
- - Submit pull requests for bug fixes and new features.
- - Help with documentation and sample projects.
- - Share ArchDoc UI with others in the software development community.
+You need Node 22.12+ (or 24) and pnpm 10 (`corepack enable` sets it up).
 
-To get started, simply fork the repository and submit a pull request with your changes. Thank you for your support!
+```bash
+pnpm install
+pnpm lint        # Biome
+pnpm typecheck   # tsc -b, which also builds every package
+pnpm test        # Vitest
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to propose changes.
+
+## License
+
+[MIT](./LICENSE)

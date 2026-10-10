@@ -1,0 +1,24 @@
+{
+  "name": "@archdoc/spec",
+  "version": "0.0.0",
+  "description": "The ArchDoc model format: v2 schema, TypeScript types, JSON Schema, and v1 migration.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchDoc/archdoc-ui.git",
+    "directory": "packages/spec"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest something ArchDoc should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is this for, and what are they trying to do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should ArchDoc do? Which surface (CLI, MCP, explorer, PR check)?
+  - type: input
+    id: phase
+    attributes:
+      label: Roadmap phase
+      description: If it fits a phase in docs/revival/04-roadmap.md, which one?
