@@ -19,39 +19,66 @@ export interface LoadedModel extends Model {
   baseDir: string;
 }
 
+export interface ModelSources {
+  sources: ModelSource[];
+  /** Display path of the root file. */
+  root: string;
+  /** Absolute directory the model files were read from, or the single file. */
+  source: string;
+  /** Absolute repository root that `code:` paths are relative to. */
+  baseDir: string;
+}
+
 /**
- * Loads a model from disk. `target` can be a repository (with a `.archdoc/`
- * directory), a model directory (with `archdoc.yaml`), or a single model file.
+ * Finds and reads model files without building the model. `target` can be a
+ * repository (with a `.archdoc/` directory), a model directory (with
+ * `archdoc.yaml`), or a single model file. Returns undefined when there is no
+ * model there.
  */
+export async function readModelSources(
+  target = ".",
+  options: LoadOptions = {},
+): Promise<ModelSources | undefined> {
+  const cwd = options.cwd ?? process.cwd();
+  const found = await findModel(resolve(cwd, target), cwd);
+  if (!found) return undefined;
+  const display = (p: string) => relative(cwd, p) || basename(p);
+  const sources = await Promise.all(
+    found.files.map(async (file) => ({ path: display(file), text: await readFile(file, "utf8") })),
+  );
+  return {
+    sources,
+    root: display(found.root),
+    source: found.dir ?? found.root,
+    baseDir: found.baseDir,
+  };
+}
+
+/** Loads and builds a model from disk. See {@link readModelSources} for what `target` can be. */
 export async function loadModel(target = ".", options: LoadOptions = {}): Promise<LoadedModel> {
   const cwd = options.cwd ?? process.cwd();
-  const absolute = resolve(cwd, target);
-  const display = (p: string) => relative(cwd, p) || basename(p);
-
-  const found = await findModel(absolute);
-  if (!found) {
+  const read = await readModelSources(target, options);
+  if (!read) {
+    const absolute = resolve(cwd, target);
     const empty = buildModel([]);
     empty.diagnostics.splice(0, empty.diagnostics.length, {
       severity: "error",
       code: "model/not-found",
-      message: `No ArchDoc model at ${display(absolute)}. Expected ${MODEL_DIR}/archdoc.yaml.`,
+      message: `No ArchDoc model at ${relative(cwd, absolute) || "."}. Expected ${MODEL_DIR}/archdoc.yaml.`,
     });
     return { ...empty, source: absolute, baseDir: absolute };
   }
-
-  const sources: ModelSource[] = await Promise.all(
-    found.files.map(async (file) => ({ path: display(file), text: await readFile(file, "utf8") })),
-  );
-  const model = buildModel(sources, { root: display(found.root) });
-  return { ...model, source: found.dir ?? found.root, baseDir: found.baseDir };
+  const model = buildModel(read.sources, { root: read.root });
+  return { ...model, source: read.source, baseDir: read.baseDir };
 }
 
 async function findModel(
   path: string,
+  cwd: string,
 ): Promise<{ root: string; files: string[]; dir?: string; baseDir: string } | undefined> {
   const info = await stat(path).catch(() => undefined);
   if (!info) return undefined;
-  if (info.isFile()) return { root: path, files: [path], baseDir: process.cwd() };
+  if (info.isFile()) return { root: path, files: [path], baseDir: cwd };
 
   for (const [dir, baseDir] of [
     [join(path, MODEL_DIR), path],
