@@ -26,6 +26,7 @@
     }
   },
   "dependencies": {
+    "@archdoc/analyzers": "workspace:*",
     "@archdoc/core": "workspace:*",
     "@archdoc/mcp": "workspace:*",
     "@archdoc/spec": "workspace:*",

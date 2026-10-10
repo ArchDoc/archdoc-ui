@@ -8,3 +8,9 @@ export {
   type ModelSources,
   readModelSources,
 } from "./load/fs.js";
+export {
+  changedFiles,
+  loadModelAtRef,
+  mergeBase,
+  resolveRef as resolveGitRef,
+} from "./load/git.js";

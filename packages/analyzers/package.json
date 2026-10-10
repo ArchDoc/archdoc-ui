@@ -1,13 +1,13 @@
 {
-  "name": "@archdoc/mcp",
+  "name": "@archdoc/analyzers",
   "version": "0.0.0",
-  "description": "MCP server for ArchDoc: lets coding agents ask where they are and what a change affects before they edit.",
+  "description": "Find the dependencies that code actually has, so ArchDoc can compare them with the model.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ArchDoc/archdoc.git",
-    "directory": "packages/mcp"
+    "directory": "packages/analyzers"
   },
   "engines": {
     "node": ">=22.12"
@@ -15,9 +15,6 @@
   "files": [
     "dist"
   ],
-  "bin": {
-    "archdoc-mcp": "./dist/bin.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -26,7 +23,6 @@
   },
   "dependencies": {
     "@archdoc/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "zod": "^4.6.5"
+    "typescript": "~5.9.3"
   }
 }

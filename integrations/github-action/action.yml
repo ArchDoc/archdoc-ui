@@ -1,0 +1,93 @@
+name: ArchDoc architectural impact
+description: Comments on a pull request with its architectural impact (journeys, actors, owners, model changes, drift) and fails on drift it introduces.
+author: ArchDoc
+branding:
+  icon: layers
+  color: blue
+
+inputs:
+  base:
+    description: Branch or commit to compare with. Defaults to the pull request's base commit.
+    default: ${{ github.event.pull_request.base.sha }}
+  model:
+    description: Repository, .archdoc directory, or model file.
+    default: "."
+  fail-on:
+    description: Fail when the pull request introduces findings at this severity or above. error, warning, or never.
+    default: error
+  comment:
+    description: Post the report as a pull request comment, updated on every run. true or false.
+    default: "true"
+  command:
+    description: How to run ArchDoc. Use node path/to/cli/dist/bin.js to run a local build.
+    default: npx -y @archdoc/cli
+  github-token:
+    description: Token for posting the comment.
+    default: ${{ github.token }}
+
+outputs:
+  report:
+    description: Path to the markdown report.
+    value: ${{ steps.report.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Report the architectural impact
+      id: report
+      shell: bash
+      env:
+        ARCHDOC: ${{ inputs.command }}
+        BASE: ${{ inputs.base }}
+        MODEL: ${{ inputs.model }}
+      run: |
+        set -euo pipefail
+        if [ -z "$BASE" ]; then
+          echo "::error::No base to compare with. Set the base input, or run on pull_request events."
+          exit 1
+        fi
+        if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          echo "::error::Base $BASE isn't in the checkout. Use actions/checkout with fetch-depth: 0."
+          exit 1
+        fi
+        out="$RUNNER_TEMP/archdoc-report.md"
+        $ARCHDOC report --base "$BASE" --model "$MODEL" > "$out"
+        cat "$out" >> "$GITHUB_STEP_SUMMARY"
+        echo "path=$out" >> "$GITHUB_OUTPUT"
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event.pull_request
+      # Pull requests from forks get a read-only token; the job summary still has the report.
+      continue-on-error: true
+      uses: actions/github-script@v7
+      env:
+        REPORT: ${{ steps.report.outputs.path }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require("node:fs");
+          const body = fs.readFileSync(process.env.REPORT, "utf8");
+          const marker = "<!-- archdoc-report -->";
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner,
+            repo,
+            issue_number,
+            per_page: 100,
+          });
+          const previous = comments.find((c) => c.body?.startsWith(marker));
+          if (previous) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }
+
+    - name: Fail on drift this change introduced
+      shell: bash
+      env:
+        ARCHDOC: ${{ inputs.command }}
+        BASE: ${{ inputs.base }}
+        MODEL: ${{ inputs.model }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: $ARCHDOC check --base "$BASE" --model "$MODEL" --fail-on "$FAIL_ON"

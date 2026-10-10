@@ -17,8 +17,8 @@ At the start of every coding task, before grepping or reading files:
 After editing:
 
 - If you added, moved, or removed a component, or added a dependency between components, update `.archdoc/` in the same change. Mark additions with `provenance: { source: suggested, by: agent:<your-name> }` so a person reviews them.
-- Run `pnpm -s archdoc validate --strict` and fix what it reports.
-- In the PR description, list the affected journeys and actors.
+- Run `pnpm -s archdoc check --base main` and fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, stale code paths. Declare a new dependency in the model (as a suggestion) only if it's intended; otherwise remove the import.
+- In the PR description, list the affected journeys and actors. `pnpm -s archdoc report --base main` writes this for you.
 
 The MCP server is configured in `.mcp.json` and runs from the build, so run `pnpm build` first.
 
@@ -26,7 +26,7 @@ The MCP server is configured in `.mcp.json` and runs from the build, so run `pnp
 
 - Node 22.12+ and pnpm 10. `pnpm install`, then `pnpm build`.
 - Before pushing: `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm -s archdoc validate --strict`.
-- `@archdoc/core` stays deterministic: no LLM calls, no network. CLI, MCP, and the explorer are thin layers over core, and none of them depends on another, except the CLI serving the explorer and starting the MCP server.
+- `@archdoc/core` stays deterministic: no LLM calls, no network. CLI, MCP, the explorer, and the Action are thin layers over core. MCP, the explorer, and the Action never depend on each other; the CLI serves the explorer and starts MCP, and the Action runs the CLI.
 - Add a changeset (`pnpm changeset`) for changes to published packages. Commit messages follow Conventional Commits.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for more.

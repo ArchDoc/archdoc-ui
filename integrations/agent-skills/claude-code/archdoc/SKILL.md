@@ -36,8 +36,8 @@ uses:
     provenance: { source: suggested, by: agent:claude-code }
 ```
 
-Then call `archdoc_validate` (or run `archdoc validate`) and fix any errors it reports.
+Then run `archdoc check --base main` and fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, and stale code paths. If a new dependency is intended, declare it in the model as a suggestion; if not, remove the import. Use `archdoc_validate` for a quick check of the model alone.
 
 ## In the PR description
 
-Add a short **Architecture** section that names the elements you touched, the affected journeys and actors from `archdoc_impact`, and any model changes you suggested.
+Add a short **Architecture** section that names the elements you touched, the affected journeys and actors, and any model changes you suggested. `archdoc report --base main` writes it for you.

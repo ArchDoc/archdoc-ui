@@ -15,5 +15,5 @@ At the start of every coding task, before grepping or reading files:
 After editing:
 
 - If you added, moved, or removed a component, or added a dependency between components, update `.archdoc/` in the same change. Mark additions with `provenance: { source: suggested, by: agent:<your-name> }` so a person reviews them.
-- Run `archdoc validate` and fix what it reports.
-- In the PR description, list the affected journeys and actors.
+- Run `archdoc check --base main` and fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, stale code paths. Declare a new dependency in the model (as a suggestion) only if it's intended; otherwise remove the import.
+- In the PR description, list the affected journeys and actors. `archdoc report --base main` writes this for you.

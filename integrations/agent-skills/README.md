@@ -35,4 +35,6 @@ All tools are read-only and reload the model on every call.
 | `archdoc_journey` | The steps of a journey, with code entry points |
 | `archdoc_validate` | Is the model valid? Problems with file and line |
 
-Tools that write suggested model changes (`archdoc_propose`) and check drift (`archdoc_check`) come with roadmap Phase 3.
+Tools that check drift (`archdoc_check`), diff the model (`archdoc_diff`), and write suggested model changes (`archdoc_propose`) come next. Until then, agents run `archdoc check` and `archdoc diff` from the CLI.
+
+For pull requests, see the [GitHub Action](../github-action).
