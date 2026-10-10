@@ -36,6 +36,8 @@ export {
 export { type BuildOptions, buildModel, type ModelSource, normalizeCode } from "./load/build.js";
 export { type Resolution, Resolver } from "./load/resolve.js";
 export * from "./model.js";
+export { insertIntoMap } from "./propose/insert.js";
+export { type ProposalEdit, type ProposalPlan, planProposal } from "./propose/propose.js";
 export {
   type AffectedJourney,
   type Impact,

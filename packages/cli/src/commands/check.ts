@@ -1,13 +1,5 @@
-import { analyze, contextFor } from "@archdoc/analyzers";
-import {
-  changedFiles,
-  check as checkModel,
-  formatFindings,
-  listRepoFiles,
-  loadModel,
-  type MarkedFinding,
-  resolveGitRef,
-} from "@archdoc/core";
+import { checkRepository } from "@archdoc/analyzers";
+import { formatFindings, type MarkedFinding } from "@archdoc/core";
 import type { Io } from "../io.js";
 
 export interface CheckOptions {
@@ -21,36 +13,8 @@ export interface CheckOptions {
 }
 
 /** Runs analyzers and checks the model against the code and its rules. */
-export async function runCheck(options: CheckOptions, cwd: string) {
-  const model = await loadModel(options.model ?? ".", { cwd });
-  if (model.diagnostics.some((d) => d.code === "model/not-found")) {
-    throw new Error(model.diagnostics[0]?.message ?? "No model found.");
-  }
-  const files = await listRepoFiles(model.baseDir);
-  const observed = options.code === false ? [] : await analyze(contextFor(model.baseDir, files));
-  const result = checkModel(model, { observed, files });
-
-  let findings: MarkedFinding[] = result.findings;
-  if (options.base) {
-    if (!(await resolveGitRef(model.baseDir, options.base))) {
-      throw new Error(`--base ${options.base} is not a commit, branch, or tag.`);
-    }
-    const changed = new Set(await changedFiles(model.baseDir, options.base));
-    const modelChanged = model.files.some((f) =>
-      changed.has(relativeToRepo(f, cwd, model.baseDir)),
-    );
-    findings = findings.map((f) => ({
-      ...f,
-      introduced:
-        f.files.some((file) => changed.has(relativeToRepo(file, cwd, model.baseDir))) ||
-        // Rule and model findings come from the model itself.
-        (modelChanged &&
-          (f.code.startsWith("rule/") ||
-            f.code.startsWith("model/") ||
-            f.code.startsWith("journey/"))),
-    }));
-  }
-  return { model, result, findings };
+export function runCheck(options: CheckOptions, cwd: string) {
+  return checkRepository({ model: options.model, cwd, base: options.base, code: options.code });
 }
 
 export async function check(options: CheckOptions, io: Io): Promise<number> {
@@ -82,16 +46,4 @@ export async function check(options: CheckOptions, io: Io): Promise<number> {
     (f) => f.severity === "error" || (failOn === "warning" && f.severity === "warning"),
   );
   return failOn !== "never" && failing.length > 0 ? 1 : 0;
-}
-
-/** Diagnostic paths are relative to where the command ran; git paths to the repository root. */
-function relativeToRepo(path: string, cwd: string, baseDir: string): string {
-  const abs = path.startsWith("/") ? path : `${cwd}/${path}`;
-  const norm = abs.split("/").reduce<string[]>((acc, part) => {
-    if (part === "..") acc.pop();
-    else if (part && part !== ".") acc.push(part);
-    return acc;
-  }, []);
-  const base = baseDir.split("/").filter(Boolean);
-  return norm.slice(base.length).join("/");
 }

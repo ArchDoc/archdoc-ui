@@ -14,3 +14,4 @@ export {
   mergeBase,
   resolveRef as resolveGitRef,
 } from "./load/git.js";
+export { type ProposeOptions, type ProposeResult, propose } from "./propose/write.js";

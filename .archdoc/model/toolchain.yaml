@@ -128,13 +128,16 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: Read-only MCP tools for agents (search, overview, locate, impact, element, actor, journey, validate). check, diff, and propose come next.
+        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, check, diff, validate), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
           core: Tool calls delegate to core
-          model-files:
-            description: Writes suggested changes to the model
-            status: planned
+          model-files: Writes suggested additions and proposal notes for archdoc_propose
+          analyzers:
+            description: Runs analyzers for archdoc_check
+            provenance:
+              source: suggested
+              by: agent:claude-code
 
       web:
         kind: container
