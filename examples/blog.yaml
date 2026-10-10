@@ -1,0 +1,36 @@
+# Migrated from v1 by "archdoc migrate".
+archdoc: "2.0"
+namespace: blog
+actors:
+  user:
+    kind: person
+    description: An unauthenticated user.
+    documentation: An unauthenticated user that reads articles.
+    uses:
+      ui: Reads blog posts and articles
+  editor:
+    kind: person
+    description: The admin user of the blog.
+    documentation: The admin user that posts articles.
+    uses:
+      ui: Posts blog articles
+elements:
+  ui:
+    kind: container
+    description: The frontend application that serves the application users
+    documentation: A frontend application written in Next.js that serves all users to the blog.
+    tags:
+      - frontend
+      - Next.js
+    links:
+      - url: https://github.com/example/myblogui
+        title: Repository
+    uses:
+      db: Queries and saves database records
+  db:
+    kind: datastore
+    description: A Postgres database that stores all blog data
+    documentation: A Postgres database that stores entities such as Posts, Users, Comments, etc.
+    tags:
+      - database
+      - Postgres

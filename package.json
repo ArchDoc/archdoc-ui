@@ -21,7 +21,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "changeset": "changeset",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version",
+    "archdoc": "node packages/cli/dist/bin.js"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

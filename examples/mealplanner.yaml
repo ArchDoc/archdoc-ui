@@ -1,0 +1,100 @@
+# Migrated from v1 by "archdoc migrate".
+archdoc: "2.0"
+namespace: mealplanner
+actors:
+  client:
+    kind: person
+    description: The user of the application. Hello!!! 123
+    documentation: The user of the application
+    tags:
+      - my
+      - backend
+      - user
+    uses:
+      ui: Interfaces with the UI
+      other-service: Asks the other service for stuff
+elements:
+  ui:
+    kind: container
+    description: I CHANGED THIS!!!
+    documentation: BLAH BLAH BLAH
+    tags:
+      - my
+      - ui
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository
+    uses:
+      api: Interfaces with the UI
+  other-service:
+    kind: container
+    description: Another service in the model
+    documentation: Documentation for the other service.
+    tags:
+      - my
+      - other
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository
+  api:
+    kind: container
+    description: The API gateway of the application. This components provides a REST API to consumers.
+    documentation: The API gateway of the application. This components provides a REST API to consumers.
+    tags:
+      - my
+      - api
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository
+    uses:
+      auth-service: Generates admin JWTs
+      recipe-service: Manages users recipes
+      product-service: Searches grocery store product catalogs
+  auth-service:
+    kind: container
+    description: A microservice with the purpose of authenticating and authorizing users. This service
+      signs and returns properly signed JWTs to be reused by clients to access other resources
+    documentation: Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et
+      dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo
+      consequat. Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore
+      et dolore magna aliqua. Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo
+      consequat. consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua. Ut
+      enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum
+      dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et dolore magna aliqua.
+      Ut enim ad minim veniam, ullamco laboris nisi ut aliquip ex ea commodo consequat.
+    tags:
+      - my
+      - auth
+  recipe-service:
+    kind: container
+    description: Service that is used to perform queries and operations on recipes.
+    documentation: Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et
+      dolore magna aliqua.
+    tags:
+      - my
+      - recipe
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository
+  product-service:
+    kind: container
+    description: A service that is used to query and search for products.
+    documentation: Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et
+      dolore magna aliqua.
+    tags:
+      - my
+      - widget
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository
+  widget-service:
+    kind: container
+    description: A service that is used to query and search for widgets.
+    documentation: Lorem ipsum dolor sit amet, consectetur adipiscing mod tempor incididunt ut labore et
+      dolore magna aliqua.
+    tags:
+      - my
+      - widget
+    links:
+      - url: https://github.com/ArchDoc/archdoc-ui
+        title: Repository

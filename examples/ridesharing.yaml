@@ -1,0 +1,65 @@
+# Migrated from v1 by "archdoc migrate".
+archdoc: "2.0"
+namespace: ridesharing
+actors:
+  passenger:
+    kind: person
+    description: "1"
+    uses:
+      mobile-app: A
+      passenger-ui: A
+  driver:
+    kind: person
+    description: "2"
+    uses:
+      mobile-app: B
+      driver-ui: B
+elements:
+  mobile-app:
+    kind: container
+    description: "2"
+    uses:
+      api-gateway: C
+  api-gateway:
+    kind: container
+    description: "3"
+    uses:
+      passenger-management: D
+      driver-management: D
+      trip-management: D
+  passenger-ui:
+    kind: container
+    description: "4"
+    uses:
+      passenger-management: E
+      driver-management: E
+  driver-ui:
+    kind: container
+    description: "5"
+    uses:
+      driver-management: F
+  passenger-management:
+    kind: container
+    description: "6"
+    uses:
+      payments: G
+  driver-management:
+    kind: container
+    description: "7"
+    uses:
+      payments: H
+      notifications: H
+  trip-management:
+    kind: container
+    description: "8"
+    uses:
+      billing: I
+  billing:
+    kind: container
+    description: "9"
+  payments:
+    kind: container
+    description: "10"
+  notifications:
+    kind: container
+    description: "11"

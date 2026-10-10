@@ -1,4 +1,6 @@
 #!/usr/bin/env node
-import { SPEC_VERSION } from "./index.js";
+import { createProgram } from "./program.js";
 
-console.log(`archdoc (spec ${SPEC_VERSION})`);
+const program = createProgram();
+await program.parseAsync(process.argv);
+process.exitCode = program.exitCode ?? 0;
