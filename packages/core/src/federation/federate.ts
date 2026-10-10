@@ -218,6 +218,18 @@ export function federate(model: Model, input: FederationInput): Model {
 
   model.imported = imported;
   checkReferences(model, imported, diagnostics);
+  // Domain members in other repos, now that their models are here.
+  for (const d of model.domains?.values() ?? []) {
+    for (const ref of d.spec.elements ?? []) {
+      if (lookupImported(imported, ref).status !== "missing") continue;
+      diagnostics.push({
+        severity: "warning",
+        code: "ref/unknown-domain-member",
+        message: `Domain "${d.id}" lists "${ref}", which isn't an element here or in an imported namespace.`,
+        location: d.location,
+      });
+    }
+  }
   model.diagnostics.push(...diagnostics);
   return model;
 }

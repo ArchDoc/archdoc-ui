@@ -279,7 +279,7 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
       diagnostics.push({
         severity: "warning",
         code: "ref/unresolved-owner",
-        message: `Owner "${owner}" is not an actor in this model. Add it under actors (usually kind: team).`,
+        message: `Owner "${owner}" is not an actor in this model. Add it under actors (usually kind: team), or import a landscape that defines it.`,
         location: site.file.locate([...site.path, "owners", i]),
         path: [...site.path, "owners", i].join("."),
       });

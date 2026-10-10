@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createProgram } from "../src/index.js";
+import { createProgram, startViewServer } from "../src/index.js";
 
 // Phase 4's exit test, on the demo org: a PR that changes a contract in payments
 // lists its consumers and affected journeys in the other repos, before merge.
@@ -66,6 +66,61 @@ describe("the landscape", () => {
     expect(lock).toContain("namespace: acme");
     expect((await run("payments", "sync")).out).toContain("  landscape acme@1.0.0");
     expect((await run("payments", "sync", "--frozen")).code).toBe(0);
+  });
+
+  it("owners resolve against the landscape's teams once it's synced", async () => {
+    const r = await run("payments", "validate", "--strict");
+    expect(r.err).not.toContain("unresolved-owner");
+    expect(r.code).toBe(0);
+  });
+
+  it("landscape build checks the whole and writes a static site", async () => {
+    const r = await run("landscape", "landscape", "build", "--out", "site");
+    expect(r.err).toBe("");
+    expect(r.out).toContain(
+      "✓ Wrote site/: Acme Rides, 3 repos (payments@5.0.0, rides@1.0.0, trips@3.0.0), 11 elements, 6 actors, 3 journeys, 2 domains.",
+    );
+    expect((await stat(join(org, "landscape/site/index.html"))).isFile()).toBe(true);
+    const payload = JSON.parse(await readFile(join(org, "landscape/site/api/model"), "utf8"));
+    expect(payload.landscape.domains).toEqual([
+      expect.objectContaining({ id: "rider-experience", members: ["rides", "trips"] }),
+      expect.objectContaining({ id: "money", members: ["payments"] }),
+    ]);
+    expect(payload.root).toBe("acme.landscape.json");
+    expect(await readFile(join(org, "landscape/site/.nojekyll"), "utf8")).toBe("");
+
+    // In payments, the landscape isn't composed: it imports no repos.
+    const wrong = await run("payments", "landscape", "build");
+    expect(wrong.code).toBe(2);
+    expect(wrong.err).toContain("imports no other repos");
+  });
+
+  it("view --landscape serves the composed model", async () => {
+    const server = await startViewServer({
+      target: ".",
+      cwd: join(org, "landscape"),
+      webDir: join(org, "landscape/site"),
+      landscape: true,
+    });
+    try {
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        landscape: { repos: { namespace: string }[] };
+        sources: { text: string }[];
+      };
+      expect(payload.landscape.repos.map((r) => r.namespace)).toEqual([
+        "payments",
+        "rides",
+        "trips",
+      ]);
+      expect(
+        JSON.parse(payload.sources[0]?.text ?? "{}").journeys["goodwill-refund"].steps[1],
+      ).toMatchObject({
+        from: "rides.api-gateway",
+        to: "payments.charges",
+      });
+    } finally {
+      await server.close();
+    }
   });
 
   it("impact and show name consumers and journeys in other repos", async () => {
