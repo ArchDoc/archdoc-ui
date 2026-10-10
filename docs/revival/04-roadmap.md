@@ -6,12 +6,12 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 
 ## Phase 0: Reset (S)
 
-- [ ] Tag `v0.2.0` and create a `legacy/v0` branch. Note in the README that v0 is frozen.
+- [x] Tag `v0.2.0` and create a `legacy/v0` branch. Note in the README that v0 is frozen.
 - [x] Decide on the open questions. All nine accepted on 2026-10-06 (see [README.md](./README.md#decisions)).
 - [ ] Rename the repo `archdoc-ui` → `archdoc` (optional, GitHub redirects old URLs).
 - [x] Rewrite the README around the new mission.
 - [x] Scaffold the pnpm monorepo, Node 22/24 CI (lint + typecheck + test with `CI=true`), Changesets, CONTRIBUTING, CODE_OF_CONDUCT, and issue templates.
-- [ ] Close or relabel issues #3–#6 (carry #5 and #6 into the new UI requirements).
+- [x] Close or relabel issues #3–#6 (carry #5 and #6 into the new UI requirements).
 
 **Exit:** green CI on an empty monorepo, and a README that states the mission.
 
