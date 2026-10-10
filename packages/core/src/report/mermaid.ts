@@ -18,7 +18,8 @@ interface Box {
 interface Arrow {
   from: string;
   to: string;
-  mark: Mark;
+  /** broken: a consumer in another repo that the change breaks. */
+  mark: Mark | "broken";
   suggested: boolean;
   label?: string | undefined;
 }
@@ -30,6 +31,20 @@ export interface ChangeDiagramInput {
   touched: Map<string, number>;
   /** Most boxes to draw; past this, unchanged neighbors are left out, actors last. Default 14. */
   maxBoxes?: number;
+  /** Consumers in other repos, drawn in a frame per repo. At most 8, breaking ones first. */
+  remote?: RemoteUse[] | undefined;
+}
+
+/** A consumer in another repo, and what the change does to it. */
+export interface RemoteUse {
+  /** Fully qualified, such as rides.api-gateway. */
+  from: string;
+  namespace: string;
+  /** The element of this model it uses. */
+  target: string;
+  effect: "breaks" | "deprecated" | "affected";
+  /** Why it breaks, such as "proto/charges.proto is removed". */
+  why?: string | undefined;
 }
 
 /** Shared by the change diagram and the legend under it. */
@@ -41,6 +56,7 @@ const CLASSES = [
 ];
 
 const LINK = {
+  broken: "stroke:#cf222e,stroke-width:3px",
   added: "stroke:#1a7f37,stroke-width:3px",
   removed: "stroke:#cf222e,stroke-width:2px",
   changed: "stroke:#9a6700,stroke-width:2px",
@@ -203,6 +219,47 @@ export function changeDiagram(input: ChangeDiagramInput): string | undefined {
     if (new Set(a.all).size > 1) a.mark = "changed";
   }
 
+  // Consumers in other repos, framed by repo, breaking ones first.
+  const order = { breaks: 0, deprecated: 1, affected: 2 };
+  const remote = [...(input.remote ?? [])].sort((a, b) => order[a.effect] - order[b.effect]);
+  const shownRemote = new Set<string>();
+  for (const use of remote) {
+    const key = `remote:${use.from}`;
+    if (!boxes.has(key) && shownRemote.size >= 8) continue;
+    shownRemote.add(key);
+    boxes.set(
+      key,
+      boxes.get(key) ?? {
+        key,
+        label: use.from.slice(use.namespace.length + 1),
+        kind: use.namespace,
+        shape: "box",
+        mark: "context",
+        group: `repo:${use.namespace}`,
+        files: 0,
+      },
+    );
+    const to = targetBox({ type: "element", id: use.target }, "context");
+    const arrowKey = `${key}->${to.key}`;
+    const mark =
+      use.effect === "breaks" ? "broken" : use.effect === "deprecated" ? "changed" : "context";
+    const prev = arrows.get(arrowKey);
+    if (prev && prev.mark === "broken") continue;
+    arrows.set(arrowKey, {
+      from: key,
+      to: to.key,
+      mark,
+      all: [mark === "broken" ? "removed" : mark],
+      suggested: false,
+      label:
+        use.effect === "breaks"
+          ? `breaks: ${use.why ?? ""}`
+          : use.effect === "deprecated"
+            ? use.why
+            : undefined,
+    });
+  }
+
   if (boxes.size === 0) return undefined;
   return render([...boxes.values()], [...arrows.values()], model);
 }
@@ -240,9 +297,18 @@ function render(boxes: Box[], arrows: Arrow[], model: Model): string {
     lines.push(`  ${node(b)}`);
   }
   for (const [group, members] of groups) {
+    const id = groupIds.get(group) ?? "";
+    if (group.startsWith("repo:")) {
+      lines.push(`  subgraph ${id}["${label(group.slice(5))} · another repo"]`);
+      for (const b of members) lines.push(`    ${node(b)}`);
+      lines.push(
+        "  end",
+        `  style ${id} fill:none,stroke:#8c959f,stroke-width:1px,stroke-dasharray:4 3`,
+      );
+      continue;
+    }
     const top = model.elements.get(group);
     const own = boxes.find((b) => b.key === `element:${group}`);
-    const id = groupIds.get(group) ?? "";
     lines.push(`  subgraph ${id}["${label(top?.spec.name ?? group)}"]`);
     for (const b of members) lines.push(`    ${node(b)}`);
     lines.push("  end");
