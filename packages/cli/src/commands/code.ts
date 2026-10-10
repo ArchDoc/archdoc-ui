@@ -1,7 +1,10 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import {
   filesUnder,
+  formatActor,
+  formatElement,
   formatImpact,
+  formatJourney,
   formatLocate,
   formatSearch,
   hasErrors,
@@ -13,6 +16,7 @@ import {
   locatedToJSON,
   locate as locateIn,
   resolveCodeMap,
+  resolveRef,
   search as searchModel,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
@@ -140,5 +144,33 @@ export async function map(options: ModelOptions & { unmapped?: boolean }, io: Io
     if (options.unmapped) for (const f of codemap.unmapped) lines.push(`  ${f}`);
   }
   io.out(lines.join("\n"));
+  return 0;
+}
+
+/** Prints the details of an element, actor, or journey by ID. */
+export async function show(id: string, options: ModelOptions, io: Io): Promise<number> {
+  const model = await load(options, io);
+  if (!model) return 1;
+  const journey = model.journeys.get(id);
+  const sections = [
+    formatElement(model, id),
+    formatActor(model, id),
+    journey ? formatJourney(model, journey) : undefined,
+  ].filter((s): s is string => s !== undefined);
+
+  if (sections.length === 0) {
+    const r = resolveRef(model, id);
+    if (r.status === "ambiguous") {
+      io.err(`"${id}" is ambiguous: ${r.candidates.join(", ")}.`);
+    } else {
+      io.err(`No element, actor, or journey "${id}".`);
+      if (r.status === "unresolved" && r.hint) io.err(r.hint);
+      const near = searchModel(model, id.replace(/[._-]+/g, " "), 5);
+      if (near.length) io.err(`Did you mean: ${near.map((h) => h.id).join(", ")}?`);
+      io.err('Find IDs with "archdoc search <words>".');
+    }
+    return 1;
+  }
+  io.out(sections.join("\n\n"));
   return 0;
 }

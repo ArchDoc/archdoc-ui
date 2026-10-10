@@ -75,3 +75,25 @@ describe("archdoc map", () => {
     expect(result.stale).toEqual([]);
   });
 });
+
+describe("archdoc show", () => {
+  it("prints an element, an actor, or a journey by ID", async () => {
+    const element = await run(repo, "show", "toolchain.cli.commands");
+    expect(element.code).toBe(0);
+    expect(element.out).toContain("packages/cli/src/commands/**");
+    expect((await run(repo, "show", "developer")).out).toContain("person");
+    expect((await run(repo, "show", "check-model")).out).toContain("check-model:");
+  });
+
+  it("reads the model given with --model", async () => {
+    const r = await run(`${repo}packages/core`, "show", "check-model", "--model", "../..");
+    expect(r.code).toBe(0);
+  });
+
+  it("fails with suggestions when the ID doesn't exist", async () => {
+    const r = await run(repo, "show", "cli-commands");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('No element, actor, or journey "cli-commands"');
+    expect(r.err).toContain("archdoc search");
+  });
+});
