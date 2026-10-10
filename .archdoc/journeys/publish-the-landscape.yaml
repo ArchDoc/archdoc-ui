@@ -16,4 +16,5 @@ steps:
     action: Writes the explorer and the composed model as a static site
   - from: developer
     to: web
-    action: Opens the landscape and follows a journey across teams' repos
+    action: Opens the landscape, groups it by repo, team, or domain, and follows a journey across teams' repos
+    code: apps/web/src/graph/groups.ts
