@@ -166,12 +166,13 @@ elements:
 
       github-action:
         kind: container
-        status: planned
-        technology: GitHub Actions (Node)
-        description: Posts an architectural-impact comment on PRs and optionally fails on drift.
+        technology: GitHub Actions (composite), actions/github-script
+        description: Posts an architectural-impact comment on pull requests and fails on drift they introduce.
         code: [{ path: integrations/github-action/** }]
         uses:
-          core: Runs diff and check between the base and head revisions
+          cli:
+            description: Runs archdoc report and archdoc check against the pull request's base
+            provenance: { source: suggested, by: agent:claude-code }
 
       agent-skills:
         kind: container

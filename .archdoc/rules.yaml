@@ -4,5 +4,8 @@ rules:
     description: Only core and analyzers read the filesystem directly. Surfaces go through core.
     allow-only: { to: source-tree, from: [core, analyzers] }
   - id: surfaces-dont-talk
-    description: CLI, MCP, web, and the Action never depend on each other, except the CLI serving web and starting MCP.
-    deny: { from: [mcp, web, github-action], to: [cli, mcp, web, github-action] }
+    description: MCP, web, and the Action never depend on each other.
+    deny: { from: [mcp, web, github-action], to: [mcp, web, github-action] }
+  - id: cli-is-the-front-door
+    description: MCP and web never call the CLI. (The CLI serves web and starts MCP; the Action runs the CLI.)
+    deny: { from: [mcp, web], to: cli }
