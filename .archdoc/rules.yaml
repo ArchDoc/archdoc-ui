@@ -1,7 +1,7 @@
 # Architectural guardrails. Evaluated by `archdoc check` from roadmap Phase 3.
 rules:
   - id: core-is-pure
-    description: Only core and analyzers read the filesystem directly. Surfaces go through core.
+    description: Only core and analyzers read the source tree directly. Surfaces go through core.
     allow-only: { to: source-tree, from: [core, analyzers] }
   - id: surfaces-dont-talk
     description: MCP, web, and the Action never depend on each other.

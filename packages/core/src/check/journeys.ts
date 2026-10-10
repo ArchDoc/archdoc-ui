@@ -1,4 +1,5 @@
 import type { Diagnostic } from "../diagnostics.js";
+import { isEventContract } from "../load/build.js";
 import type { Resolution, Resolver } from "../load/resolve.js";
 import type { YamlPath } from "../load/yaml.js";
 import { describeTarget, type Model, type NodeRef, nodeKey, type Target } from "../model.js";
@@ -10,8 +11,11 @@ import { describeTarget, type Model, type NodeRef, nodeKey, type Target } from "
  * A step from A to B is valid when A (or one of its descendants) uses B (or one
  * of its descendants), so a journey can be told at a coarser level than the
  * relationships. A step from an element back to an actor is valid when the
- * actor uses that element: it's the response. Steps that start in another repo
- * can't be checked until federation (roadmap Phase 4), and are reported as info.
+ * actor uses that element: it's the response. A step from a publisher to a
+ * subscriber is valid when the subscriber uses the publisher via a topic or
+ * event the publisher provides. Steps that start in another repo
+ * are reported as info here, and checked against that repo's model by
+ * `federate` once it's synced.
  */
 export function validateJourneys(
   model: Model,
@@ -52,6 +56,21 @@ export function validateJourneys(
     return false;
   };
 
+  // A step from a publisher to a subscriber follows the message: the subscriber
+  // uses the publisher via a topic or event the publisher provides.
+  const subscribed = (from: NodeRef, to: Target): boolean => {
+    if (to.type !== "element" || from.type !== "element") return false;
+    const publishers = selfAndDescendants(from);
+    const subscribers = selfAndDescendants(to);
+    return model.relationships.some(
+      (r) =>
+        subscribers.has(nodeKey(r.from)) &&
+        r.to.type === "element" &&
+        publishers.has(nodeKey(r.to)) &&
+        isEventContract(model.elements.get(r.to.id)?.spec.provides, r.via),
+    );
+  };
+
   for (const journey of model.journeys.values()) {
     const site = sites.get(journey.id);
     const at = (path: YamlPath) => site?.file.locate([...site.path, ...path]);
@@ -81,13 +100,14 @@ export function validateJourneys(
         diagnostics.push({
           severity: "info",
           code: "journey/unverified-step",
-          message: `${label}, step ${n}: starts in another repo (${from.ref}), so it can't be checked until federation is available.`,
+          message: `${label}, step ${n}: starts in another repo (${from.ref}), so it's checked against that repo's model once it's synced (archdoc sync).`,
           location: step.location,
         });
         continue;
       }
       if (declared(from, to)) continue;
       if (to.type === "actor" && declared(to, from)) continue;
+      if (subscribed(from, to)) continue;
 
       diagnostics.push({
         severity: "error",

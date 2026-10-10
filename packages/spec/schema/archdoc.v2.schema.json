@@ -76,6 +76,10 @@
                         "technology": {
                           "type": "string"
                         },
+                        "via": {
+                          "description": "The contract this relationship goes through: an api, topic, or event the target provides",
+                          "type": "string"
+                        },
                         "status": {
                           "type": "string",
                           "enum": ["active", "planned", "deprecated"],
@@ -482,9 +486,15 @@
                 "type": "object",
                 "properties": {
                   "github": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "owner/repo on GitHub"
                   },
                   "version": {
+                    "type": "string",
+                    "description": "Semver range matched against the repo's tags, such as ^5"
+                  },
+                  "path": {
+                    "description": "Where the model lives in that repo. Defaults to .archdoc/",
                     "type": "string"
                   }
                 },
@@ -494,8 +504,28 @@
               {
                 "type": "object",
                 "properties": {
-                  "url": {
+                  "git": {
+                    "type": "string",
+                    "description": "Any git URL, or a path relative to the repository root"
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "Semver range matched against the repo's tags, such as ^5"
+                  },
+                  "path": {
+                    "description": "Where the model lives in that repo. Defaults to .archdoc/",
                     "type": "string"
+                  }
+                },
+                "required": ["git", "version"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "URL of a bundle written by archdoc publish"
                   },
                   "version": {
                     "type": "string"
@@ -508,13 +538,15 @@
                 "type": "object",
                 "properties": {
                   "file": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A model file, model directory, or bundle, relative to the repository root, such as stubs for external systems"
                   }
                 },
                 "required": ["file"],
                 "additionalProperties": false
               }
-            ]
+            ],
+            "description": "Another repo's model. archdoc sync pins it in archdoc.lock."
           }
         }
       },
@@ -792,6 +824,10 @@
                   "technology": {
                     "type": "string"
                   },
+                  "via": {
+                    "description": "The contract this relationship goes through: an api, topic, or event the target provides",
+                    "type": "string"
+                  },
                   "status": {
                     "type": "string",
                     "enum": ["active", "planned", "deprecated"],
@@ -858,12 +894,198 @@
           "description": "Outgoing relationships, keyed by the target's reference"
         },
         "provides": {
-          "description": "Interfaces this element exposes, such as { api: openapi/trips.yaml } or { topic: trip.completed }",
+          "description": "Contracts this element exposes, such as { api: openapi/trips.yaml } or { topic: trip.completed }",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": {}
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "api": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "API spec path or name"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "planned", "deprecated"],
+                    "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+                  },
+                  "accepts": {
+                    "description": "Data entries it accepts",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "returns": {
+                    "description": "Data entries it returns",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "carries": {
+                    "description": "Data entries a topic or event carries",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Message topic"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "planned", "deprecated"],
+                    "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+                  },
+                  "accepts": {
+                    "description": "Data entries it accepts",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "returns": {
+                    "description": "Data entries it returns",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "carries": {
+                    "description": "Data entries a topic or event carries",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["topic"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Event name"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "planned", "deprecated"],
+                    "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+                  },
+                  "accepts": {
+                    "description": "Data entries it accepts",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "returns": {
+                    "description": "Data entries it returns",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "carries": {
+                    "description": "Data entries a topic or event carries",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["event"],
+                "additionalProperties": false
+              }
+            ],
+            "description": "An api, topic, or event this element exposes"
           }
         },
         "stores": {

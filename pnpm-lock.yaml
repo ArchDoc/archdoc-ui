@@ -75,6 +75,9 @@ importers:
       '@archdoc/core':
         specifier: workspace:*
         version: link:../core
+      '@archdoc/federation':
+        specifier: workspace:*
+        version: link:../federation
       '@archdoc/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -99,6 +102,25 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/federation:
+    dependencies:
+      '@archdoc/core':
+        specifier: workspace:*
+        version: link:../core
+      '@archdoc/spec':
+        specifier: workspace:*
+        version: link:../spec
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
+    devDependencies:
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
 
   packages/mcp:
     dependencies:
@@ -424,6 +446,9 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@vitejs/plugin-react@6.1.2':
     resolution: {integrity: sha512-fhJNGUdscQa4HkI0xFxwonWyhnVReCPDbXI7FH7jmzpnVCrFQI7PRrhWecO263610vOrs9tr2Y4xcf8uAdFxbw==}
@@ -1507,6 +1532,8 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
+
+  '@types/semver@7.8.0': {}
 
   '@vitejs/plugin-react@6.1.2(vite@8.3.4(@types/node@22.20.5)(yaml@2.9.1))':
     dependencies:

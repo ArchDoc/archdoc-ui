@@ -33,7 +33,26 @@ export {
   type RelationshipView,
   type StepChange,
 } from "./diff/diff.js";
-export { type BuildOptions, buildModel, type ModelSource, normalizeCode } from "./load/build.js";
+export {
+  type BundleMeta,
+  createBundle,
+  modelFromBundle,
+  parseBundle,
+  serializeBundle,
+} from "./federation/bundle.js";
+export {
+  type FederationInput,
+  federate,
+  lookupImported,
+  type VendoredBundle,
+} from "./federation/federate.js";
+export {
+  type BuildOptions,
+  buildModel,
+  contractName,
+  type ModelSource,
+  normalizeCode,
+} from "./load/build.js";
 export { type Resolution, Resolver } from "./load/resolve.js";
 export * from "./model.js";
 export { insertIntoMap } from "./propose/insert.js";

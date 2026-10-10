@@ -86,6 +86,8 @@ pnpm archdoc map                            # how the repo's files map onto the 
 pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
 pnpm archdoc diff main                      # what changed in the model since main
 pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
+pnpm archdoc sync                           # pin imported repos' models in archdoc.lock
+pnpm archdoc publish 1.0.0 --out -          # the bundle other repos would import
 pnpm archdoc validate examples/blog.yaml    # a single-file model
 pnpm archdoc migrate examples/v1/blog.yaml  # convert a v0/v1 model to v2
 pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
@@ -102,6 +104,26 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 `archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it marks what your change introduced and fails only on that, so it works as a CI gate from day one.
 
 `archdoc diff` shows what changed in the model itself, by element, relationship, actor, and journey rather than by line.
+
+## Share models across repos
+
+Each repo owns its namespace and models its own part. When it depends on another team's repo, it imports that repo's model and refers to its elements by namespace:
+
+```yaml
+# .archdoc/archdoc.yaml in the rides repo
+namespace: rides
+imports:
+  payments: { github: acme/payments, version: ^5 }
+elements:
+  api-gateway:
+    kind: container
+    uses:
+      payments.charges: { description: Asks for a refund, via: proto/charges.proto }
+```
+
+`archdoc sync` reads each import's model at the newest release tag its range allows (`v5.2.0`, read straight from git, so private repos work with the credentials you already have) and vendors it in `.archdoc/vendor/`, pinned in `.archdoc/archdoc.lock`. Commit both: `check`, the explorer, MCP, and CI then work offline and reproducibly, and taking a new release shows up as a diff in review. From then on, `validate` and `check` report references into other repos that don't exist at the pinned version, deprecated targets, contracts (`via`) the target doesn't `provide`, journey steps that start in another repo but don't follow its relationships, and imports built against a different major version than yours.
+
+`archdoc sync --update` moves to the newest allowed release, and `archdoc sync --frozen` checks the lock in CI. `archdoc publish` writes a validated, versioned bundle (`dist/payments@5.2.0.json`) for repos that import it by `url:`. [`examples/acme`](./examples/acme) is a demo org of four repos that import each other.
 
 ## Review pull requests
 
@@ -138,12 +160,13 @@ packages/
   cli/    @archdoc/cli    the `archdoc` command, including the `view` server
   mcp/    @archdoc/mcp    MCP server for coding agents
   analyzers/ @archdoc/analyzers  find the dependencies code actually has (manifests, TS/JS imports)
+  federation/ @archdoc/federation  share models across repos: sync, archdoc.lock, publish
 apps/
   web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 integrations/
   agent-skills/           Claude Code skill, AGENTS.md snippet, MCP configs
   github-action/          the pull request impact comment and drift gate
-examples/                 example models in v2 (v1 originals in examples/v1)
+examples/                 example models in v2 (v1 originals in examples/v1), and acme/, a demo org
 docs/revival/             the relaunch plan: assessment, strategy, architecture, roadmap
 .archdoc/                 ArchDoc's own model
 ```

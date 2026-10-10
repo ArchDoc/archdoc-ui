@@ -1,0 +1,50 @@
+archdoc: "2.0"
+namespace: payments
+name: Payments
+description: Charges riders' cards, issues refunds, and keeps the ledger.
+
+actors:
+  payments-team: { kind: team }
+  finance:
+    kind: role
+    description: Reviews refunds and closes the books each month.
+    uses:
+      ledger-reports: Reviews refunds and month-end totals
+
+elements:
+  charges:
+    kind: container
+    technology: Go, gRPC
+    description: Authorizes, captures, and refunds card charges.
+    owners: [payments-team]
+    code: services/charges/**
+    provides:
+      - { api: proto/charges.proto, description: "Charge a card, and refund a charge" }
+      - { topic: refund.issued, description: A refund was approved and sent to the card network }
+    uses:
+      ledger: Records every charge and refund
+    elements:
+      refunds:
+        kind: component
+        description: Decides whether a refund is approved automatically.
+        code: services/charges/internal/refunds/**
+  ledger:
+    kind: datastore
+    technology: Postgres
+    owners: [payments-team]
+  ledger-reports:
+    kind: container
+    description: Month-end reporting over the ledger.
+    owners: [payments-team]
+    code: apps/reports/**
+    uses:
+      ledger: Reads posted entries
+
+journeys:
+  month-end:
+    actor: finance
+    goal: Close the books for the month
+    importance: high
+    steps:
+      - { from: finance, to: ledger-reports, action: Opens the month-end report }
+      - { from: ledger-reports, to: ledger, action: Totals posted charges and refunds }

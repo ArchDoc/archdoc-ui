@@ -1,5 +1,6 @@
 import type {
   ActorSpec,
+  Bundle,
   DataEntrySpec,
   ElementSpec,
   ImportSpec,
@@ -61,6 +62,8 @@ export interface Relationship {
   ref: string;
   description?: string | undefined;
   technology?: string | undefined;
+  /** The target's contract this goes through, such as an api path or a topic. */
+  via?: string | undefined;
   status: Status;
   sends: string[];
   provenance?: Provenance | undefined;
@@ -103,6 +106,20 @@ export interface Model {
   /** Model files that were read, in load order. */
   files: string[];
   diagnostics: Diagnostic[];
+  /** Where each import is written in the root file. */
+  importLocations?: Map<string, SourceLocation> | undefined;
+  /** Other repos' models, from the vendored bundles in archdoc.lock. Empty until synced. */
+  imported?: Map<string, ImportedModel> | undefined;
+}
+
+/** Another repo's model, as pinned in archdoc.lock. */
+export interface ImportedModel {
+  namespace: string;
+  version?: string | undefined;
+  commit?: string | undefined;
+  source?: string | undefined;
+  bundle: Bundle;
+  model: Model;
 }
 
 export function nodeKey(ref: NodeRef | ExternalRef): string {

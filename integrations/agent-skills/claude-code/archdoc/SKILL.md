@@ -18,6 +18,7 @@ description: Use at the start of every coding task in a repository that has an .
 ## While you edit
 
 - Stay inside the element boundaries you found. If the change needs code in one element to depend on another element and the model doesn't declare that relationship (`uses`), say so. Don't add the dependency silently.
+- Elements in other repos are referenced by namespace, such as `payments.charges`. To depend on a repo the model doesn't import yet, add it to `imports` in `archdoc.yaml` and run `archdoc sync`. Never edit `.archdoc/archdoc.lock` or `.archdoc/vendor/` by hand.
 
 ## After you edit
 

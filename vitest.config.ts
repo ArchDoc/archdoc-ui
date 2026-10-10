@@ -10,6 +10,7 @@ export default defineConfig({
       "@archdoc/spec": src("spec/src/index.ts"),
       "@archdoc/core/browser": src("core/src/browser.ts"),
       "@archdoc/core": src("core/src/index.ts"),
+      "@archdoc/federation": src("federation/src/index.ts"),
     },
   },
   test: {

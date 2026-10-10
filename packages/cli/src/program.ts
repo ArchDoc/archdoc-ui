@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
 import { diff } from "./commands/diff.js";
+import { publish, sync } from "./commands/federation.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
@@ -159,6 +160,31 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action(
       (range: string | undefined, opts: { model?: string; format?: string; exitCode?: boolean }) =>
         run(diff(range, opts, io)),
+    );
+
+  program
+    .command("sync")
+    .description(
+      "Pin the model's imports in archdoc.lock and vendor other repos' models, then check references into them",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option(
+      "-u, --update [namespaces...]",
+      "move imports (all, or the ones named) to the newest version their range allows",
+    )
+    .option("--frozen", "change nothing; fail if archdoc.lock doesn't match imports (for CI)")
+    .action((opts: { model?: string; update?: boolean | string[]; frozen?: boolean }) =>
+      run(sync(opts, io)),
+    );
+
+  program
+    .command("publish")
+    .description("Write a versioned, validated bundle of the model for other repos to import")
+    .argument("[version]", "release version, such as 5.2.0 (default: the release tag on HEAD)")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-o, --out <dir>", "directory to write the bundle to, or - for stdout", "dist")
+    .action((version: string | undefined, opts: { model?: string; out?: string }) =>
+      run(publish({ ...opts, version }, io)),
     );
 
   program
