@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { buildModel, type Model } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
 import { buildGraph, defaultExpanded, type Graph } from "../src/graph/graph.js";
+import { groupLandscape } from "../src/graph/groups.js";
 import { type Box, layoutGraph, NODE_HEIGHT, NODE_WIDTH } from "../src/graph/layout.js";
-import { ridesModel } from "./fixtures.js";
+import { landscapeInfo, landscapeModel, ridesModel } from "./fixtures.js";
 
 const example = (name: string): Model =>
   buildModel([
@@ -42,23 +43,33 @@ describe.each([
   ["ridesharing example", example("ridesharing")],
 ])("layoutGraph: %s", (_name, model) => {
   it("places every node at a finite position, with no sibling overlaps", async () => {
-    const graph = buildGraph(model, { expanded: defaultExpanded(model) });
-    const boxes = await layoutGraph(graph);
-    expect(boxes.size).toBe(graph.nodes.length);
-    for (const box of boxes.values()) {
-      for (const v of [box.x, box.y, box.width, box.height]) expect(Number.isFinite(v)).toBe(true);
-    }
-    const abs = absolute(graph, boxes);
-    for (const a of graph.nodes) {
-      for (const b of graph.nodes) {
-        if (a.id >= b.id || a.parentId !== b.parentId) continue;
-        expect(overlaps(abs.get(a.id) as Box, abs.get(b.id) as Box), `${a.id} / ${b.id}`).toBe(
-          false,
-        );
-      }
-    }
+    await expectClean(buildGraph(model, { expanded: defaultExpanded(model) }));
   });
 });
+
+describe.each(["repo", "team", "domain"] as const)("layoutGraph: a landscape by %s", (by) => {
+  it("places every node at a finite position, with no sibling overlaps", async () => {
+    const model = landscapeModel();
+    const grouping = groupLandscape(model, landscapeInfo, by);
+    await expectClean(buildGraph(model, { expanded: defaultExpanded(model), grouping }));
+  });
+});
+
+/** Every node at a finite position, with no overlapping siblings. */
+async function expectClean(graph: Graph) {
+  const boxes = await layoutGraph(graph);
+  expect(boxes.size).toBe(graph.nodes.length);
+  for (const box of boxes.values()) {
+    for (const v of [box.x, box.y, box.width, box.height]) expect(Number.isFinite(v)).toBe(true);
+  }
+  const abs = absolute(graph, boxes);
+  for (const a of graph.nodes) {
+    for (const b of graph.nodes) {
+      if (a.id >= b.id || a.parentId !== b.parentId) continue;
+      expect(overlaps(abs.get(a.id) as Box, abs.get(b.id) as Box), `${a.id} / ${b.id}`).toBe(false);
+    }
+  }
+}
 
 describe("layoutGraph: groups", () => {
   it("keeps children inside their group, below its header", async () => {

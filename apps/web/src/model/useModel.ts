@@ -50,6 +50,8 @@ export type ModelState =
       repo: RepoLinks;
       /** The model at the base ref, for the before/after view. */
       base?: { ref: string; model: Model } | undefined;
+      /** Set when the model is a composed landscape. */
+      landscape?: LandscapeInfo | undefined;
       loadedAt: number;
       reloads: number;
     };
@@ -84,6 +86,7 @@ export function useModel(): ModelState {
             ? buildModel(payload.base.sources, { root: payload.base.root })
             : buildModel([]),
         },
+        landscape: payload.landscape,
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

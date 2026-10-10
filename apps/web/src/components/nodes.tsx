@@ -4,12 +4,14 @@ import type { MouseEvent } from "react";
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
 export interface CardData extends Record<string, unknown> {
-  family: "actor" | "element" | "external";
+  family: "actor" | "element" | "external" | "group";
   label: string;
   kind: string;
   detail?: string | undefined;
   status?: string | undefined;
   suggested?: boolean;
+  /** A repo's release, for a repo's box in a landscape. */
+  version?: string | undefined;
   hiddenChildren: number;
   isGroup: boolean;
   /** In the before/after view: how this changed. */
@@ -18,6 +20,8 @@ export interface CardData extends Record<string, unknown> {
   containsChanges?: boolean | undefined;
   emphasis: Emphasis;
   selected: boolean;
+  /** The box the current journey step crosses into. */
+  entered?: boolean | undefined;
   onToggle?: (() => void) | undefined;
 }
 
@@ -29,6 +33,8 @@ const ACTOR_ICONS: Record<string, string> = {
   team: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20a6 6 0 0 1 12 0m-2 0a6 6 0 0 1 10 0",
   organization: "M4 21V5l8-3 8 3v16M9 21v-5h6v5M8 8h2m4 0h2M8 12h2m4 0h2",
   agent: "M5 9h14v10H5zM12 5v4M9 13h.01M15 13h.01M9 16h6M3 13h2m14 0h2",
+  repo: "M6 3h10l3 3v15H6zM6 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2M10 8h5M10 12h5",
+  domain: "M12 3l9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5",
 };
 
 function Icon({ kind }: { kind: string }) {
@@ -54,6 +60,7 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.change ? `change-${data.change}` : "",
     data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
+    data.entered ? "is-entered" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -69,6 +76,7 @@ export function Card({ data }: NodeProps<CardNode>) {
       <div className="card-head">
         <Icon kind={data.kind} />
         <span className="card-kind">{data.kind}</span>
+        {data.version ? <span className="card-version">{data.version}</span> : null}
         {data.change ? (
           <span className={`card-change change-${data.change}`}>{data.change}</span>
         ) : null}
@@ -92,7 +100,10 @@ export function Card({ data }: NodeProps<CardNode>) {
           </button>
         ) : null}
       </div>
-      <div className="card-label" title={data.label}>
+      <div
+        className="card-label"
+        title={data.detail && data.isGroup ? `${data.label}: ${data.detail}` : data.label}
+      >
         {data.label}
       </div>
       {data.detail && !data.isGroup ? (

@@ -22,6 +22,8 @@
   --k-queue: #b26a00;
   --k-external: #7a8699;
   --k-actor: #c2410c;
+  --k-group: #c2410c;
+  --k-domain: #8a4fd0;
 
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -53,6 +55,8 @@
     --k-queue: #e9a63e;
     --k-external: #8b97aa;
     --k-actor: #fb923c;
+    --k-group: #fb923c;
+    --k-domain: #c08bff;
     color-scheme: dark;
   }
 }
@@ -1114,4 +1118,99 @@ kbd {
 .change-note.change-removed {
   border-color: var(--chg-removed);
   background: var(--chg-removed-soft);
+}
+
+/* ---------- Landscape ---------- */
+
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.segmented legend {
+  float: left;
+  margin-right: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.card.kind-repo {
+  --accent: var(--k-system);
+}
+
+.card.family-group {
+  --accent: var(--k-group);
+  cursor: default;
+}
+
+.card.family-group.kind-team,
+.card.family-group.kind-domain {
+  cursor: pointer;
+}
+
+.card.family-group.kind-domain {
+  --accent: var(--k-domain);
+}
+
+.card.family-group.is-group {
+  border-style: dashed;
+  border-top-style: solid;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.card-version {
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 0 6px;
+}
+
+/* The box the current journey step crosses into. */
+.card.is-entered {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+  animation: enter 0.9s ease-out;
+}
+
+@keyframes enter {
+  from {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 3px var(--brand-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.is-entered {
+    animation: none;
+  }
+}
+
+.react-flow__edge.journey.is-crossing path {
+  stroke-dasharray: 10 4;
+}
+
+.react-flow__edge.journey.is-current.is-crossing path {
+  stroke-width: 4;
+}
+
+.journey-bar-crossing {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--brand);
+}
+
+.journey-bar-crossing::before {
+  content: "↪ ";
+}
+
+.cross-mark {
+  color: var(--brand);
 }

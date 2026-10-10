@@ -1,6 +1,8 @@
 import type { Model } from "@archdoc/core/browser";
 import { forwardRef, type ReactNode, useMemo } from "react";
 import type { Compare } from "../App.js";
+import type { GroupBy } from "../graph/groups.js";
+import type { LandscapeInfo } from "../model/useModel.js";
 
 export interface SidebarProps {
   model: Model;
@@ -13,6 +15,8 @@ export interface SidebarProps {
   onToggle: (elementId: string) => void;
   onJourney: (id: string) => void;
   compare?: Compare | undefined;
+  landscape?: LandscapeInfo | undefined;
+  onGroupBy?: ((by: GroupBy) => void) | undefined;
 }
 
 interface Hit {
@@ -57,6 +61,7 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
       ) : (
         <>
           {props.compare ? <Changes {...props} compare={props.compare} /> : null}
+          {props.landscape ? <Landscape {...props} landscape={props.landscape} /> : null}
           <Section title="Journeys">
             {[...model.journeys.values()].map((j) => (
               <Item
@@ -69,6 +74,12 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
                 hintClass={`importance-${j.spec.importance ?? "normal"}${props.compare?.journeys.has(j.id) ? " is-affected" : ""}`}
               >
                 {j.spec.name ?? j.id}
+                {props.landscape && crossesRepos(model, j.id) ? (
+                  <span className="cross-mark" title="Goes through more than one repo">
+                    {" "}
+                    ⇄
+                  </span>
+                ) : null}
               </Item>
             ))}
             {model.journeys.size === 0 ? <p className="empty">No journeys yet.</p> : null}
@@ -102,6 +113,58 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
     else props.onSelect(key);
   }
 });
+
+/** A landscape's repos and domains. */
+function Landscape(props: SidebarProps & { landscape: LandscapeInfo }) {
+  const { landscape } = props;
+  return (
+    <>
+      <Section title="Repos">
+        {landscape.repos.map((r) => (
+          <Item
+            key={r.namespace}
+            active={props.selected === `element:${r.namespace}`}
+            onClick={() => {
+              props.onGroupBy?.("repo");
+              props.onSelect(`element:${r.namespace}`);
+            }}
+            hint={r.version ?? r.commit?.slice(0, 7)}
+          >
+            {r.name ?? r.namespace}
+          </Item>
+        ))}
+      </Section>
+      {landscape.domains.length ? (
+        <Section title="Domains">
+          {landscape.domains.map((d) => (
+            <Item
+              key={d.id}
+              active={props.selected === `domain:${d.id}`}
+              onClick={() => props.onSelect(`domain:${d.id}`)}
+              hint={`${d.members.length} member${d.members.length === 1 ? "" : "s"}`}
+            >
+              {d.name ?? d.id}
+            </Item>
+          ))}
+        </Section>
+      ) : null}
+    </>
+  );
+}
+
+/** True when a journey's steps touch more than one repo. */
+function crossesRepos(model: Model, journeyId: string): boolean {
+  const repos = new Set<string>();
+  for (const s of model.journeys.get(journeyId)?.steps ?? []) {
+    for (const t of [s.from, s.to]) {
+      if (t?.type !== "element") continue;
+      let top = model.elements.get(t.id);
+      while (top?.parentId) top = model.elements.get(top.parentId);
+      if (top?.spec.tags?.includes("repo")) repos.add(top.id);
+    }
+  }
+  return repos.size > 1;
+}
 
 const MARK = { added: "+", removed: "−", changed: "~", moved: "→" } as const;
 

@@ -1,5 +1,6 @@
 import type { JourneyNode, Model, Relationship, Target } from "@archdoc/core/browser";
 import { nodeKey } from "@archdoc/core/browser";
+import type { Grouping } from "./groups.js";
 
 /** What the canvas shows: which elements are open, and an optional focus. */
 export interface ViewState {
@@ -7,12 +8,14 @@ export interface ViewState {
   expanded: ReadonlySet<string>;
   /** Node key (`actor:x`, `element:y`) whose neighborhood is the only thing shown. */
   focus?: string | undefined;
+  /** For a landscape: the team or domain boxes elements are drawn in. */
+  grouping?: Grouping | undefined;
 }
 
-export type GraphNodeKind = "actor" | "element" | "external";
+export type GraphNodeKind = "actor" | "element" | "external" | "group";
 
 export interface GraphNode {
-  /** Node key: `actor:<id>`, `element:<id>`, or `external:<ref>`. */
+  /** Node key: `actor:<id>`, `element:<id>`, `external:<ref>`, or `group:<by>:<id>`. */
   id: string;
   kind: GraphNodeKind;
   /** Node key of the enclosing group, if any. */
@@ -53,7 +56,7 @@ export function liftKey(model: Model, state: ViewState, target: Target): string 
   const chain = ancestorsOf(model, target.id);
   // The first collapsed ancestor (from the top) hides everything below it.
   for (const id of chain) {
-    if (!state.expanded.has(id)) return `element:${id}`;
+    if (!isOpen(state, id)) return `element:${id}`;
   }
   return `element:${target.id}`;
 }
@@ -67,8 +70,18 @@ export function ancestorsOf(model: Model, id: string): string[] {
   return out;
 }
 
+/** Open in the view: expanded, or a repo taken apart to group its elements. */
+function isOpen(state: ViewState, id: string): boolean {
+  return state.expanded.has(id) || (state.grouping?.dissolved.has(id) ?? false);
+}
+
 export function buildGraph(model: Model, state: ViewState): Graph {
   const nodes = new Map<string, GraphNode>();
+  const grouping = state.grouping;
+
+  for (const g of grouping?.groups.values() ?? []) {
+    nodes.set(g.key, { id: g.key, kind: "group", isGroup: true, hiddenChildren: 0, depth: 0 });
+  }
 
   for (const actor of model.actors.values()) {
     nodes.set(`actor:${actor.id}`, {
@@ -81,13 +94,15 @@ export function buildGraph(model: Model, state: ViewState): Graph {
   }
 
   for (const el of model.elements.values()) {
+    if (grouping?.dissolved.has(el.id)) continue;
     const ancestors = ancestorsOf(model, el.id);
-    if (!ancestors.every((a) => state.expanded.has(a))) continue;
+    if (!ancestors.every((a) => isOpen(state, a))) continue;
     const open = state.expanded.has(el.id) && el.childIds.length > 0;
     nodes.set(`element:${el.id}`, {
       id: `element:${el.id}`,
       kind: "element",
-      parentId: el.parentId ? `element:${el.parentId}` : undefined,
+      parentId:
+        grouping?.parentOf.get(el.id) ?? (el.parentId ? `element:${el.parentId}` : undefined),
       isGroup: open,
       hiddenChildren: open ? 0 : el.childIds.length,
       depth: el.depth,
@@ -100,6 +115,9 @@ export function buildGraph(model: Model, state: ViewState): Graph {
     const target = liftKey(model, state, rel.to);
     if (
       source === target ||
+      // A repo taken apart has no box to point at.
+      (source.startsWith("element:") && !nodes.has(source)) ||
+      (target.startsWith("element:") && !nodes.has(target)) ||
       isAncestorKey(nodes, target, source) ||
       isAncestorKey(nodes, source, target)
     ) {
