@@ -3,6 +3,7 @@ import { formatDiagnostic } from "../diagnostics.js";
 import type { ElementNode, JourneyNode, Model, Relationship, Target } from "../model.js";
 import type { Impact } from "../query/impact.js";
 import { getActor, getElement, overview } from "../query/index.js";
+import type { SearchHit } from "../query/search.js";
 
 // Plain-text reports shared by the CLI and the MCP server, so a person in a
 // terminal and an agent over MCP read the same answer in the same words.
@@ -154,6 +155,24 @@ export function formatOverview(model: Model, maxDepth = 1): string {
   }
   out.push("", "Journeys");
   for (const j of o.journeys) out.push(`  ${j.id} (${j.importance}) · ${j.actor}: ${j.goal}`);
+  return out.join("\n");
+}
+
+export function formatSearch(query: string, hits: SearchHit[]): string {
+  if (hits.length === 0) {
+    return `Nothing in the model matches "${query}". Try other words, or call archdoc_overview.`;
+  }
+  const out = [`Matches for "${query}", best first:`];
+  for (const h of hits) {
+    out.push(
+      `  ${h.id} (${h.type === "element" ? h.kind : `${h.type}, ${h.kind}`})${h.description ? `: ${h.description}` : ""}`,
+    );
+    if (h.code.length) out.push(`    code: ${h.code.join(", ")}`);
+  }
+  out.push(
+    "",
+    "Next: check the impact of the element or the files you plan to change (archdoc_impact, or archdoc impact).",
+  );
   return out.join("\n");
 }
 

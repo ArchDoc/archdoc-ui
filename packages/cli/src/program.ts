@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
-import { impact, locate, map } from "./commands/code.js";
+import { impact, locate, map, search } from "./commands/code.js";
 import { migrate } from "./commands/migrate.js";
 import { schema } from "./commands/schema.js";
 import { validate } from "./commands/validate.js";
@@ -49,6 +49,16 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       const result = await view(path, opts, io);
       program.exitCode = result.code;
     });
+
+  program
+    .command("search")
+    .description("Find the elements, actors, and journeys for an area, with their code paths")
+    .argument("<words...>", "a few words, such as: cli command")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((words: string[], opts: { model?: string; json?: boolean }) =>
+      run(search(words, opts, io)),
+    );
 
   program
     .command("locate")

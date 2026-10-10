@@ -49,7 +49,7 @@ elements:
               checker: Validates journeys once references resolve
           query:
             kind: component
-            description: Element, actor, and overview queries, and impact (consumers, actors, journeys, owners, rules).
+            description: Element, actor, and overview queries, search by words, and impact (consumers, actors, journeys, owners, rules).
             code: [{ path: packages/core/src/query/** }]
             uses:
               loader: Resolves references the same way the model does
@@ -86,7 +86,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, locate, impact, map, mcp, migrate, and schema; diff and check next."
+        description: "`archdoc` command: validate, view, search, locate, impact, map, mcp, migrate, and schema; diff and check next."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
@@ -107,7 +107,7 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: Read-only MCP tools for agents (overview, locate, impact, element, actor, journey, validate). check, diff, and propose come next.
+        description: Read-only MCP tools for agents (search, overview, locate, impact, element, actor, journey, validate). check, diff, and propose come next.
         code: [{ path: packages/mcp/** }]
         uses:
           core: Tool calls delegate to core
@@ -152,7 +152,7 @@ elements:
       agent-skills:
         kind: container
         technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflow. Locate and check impact before editing, update the model with suggested facts, validate.
+        description: Teaches coding agents the workflow. At the start of a task, search the model and check impact; afterwards, update the model with suggested facts and validate.
         code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools

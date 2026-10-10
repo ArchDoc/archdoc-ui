@@ -13,6 +13,14 @@ async function run(cwd: string, ...args: string[]) {
   return { code: program.exitCode ?? 0, out: out.join("\n"), err: err.join("\n") };
 }
 
+describe("archdoc search", () => {
+  it("finds elements for a few words, and fails when nothing matches", async () => {
+    const r = await run(repo, "search", "cli", "command", "--json");
+    expect(JSON.parse(r.out)[0]).toMatchObject({ id: "toolchain.cli.commands", type: "element" });
+    expect((await run(repo, "search", "kubernetes")).code).toBe(1);
+  });
+});
+
 describe("archdoc locate", () => {
   it("finds the owning element, relative to where it runs", async () => {
     const r = await run(

@@ -3,6 +3,7 @@ import {
   filesUnder,
   formatImpact,
   formatLocate,
+  formatSearch,
   hasErrors,
   impact as impactOf,
   impactToJSON,
@@ -12,6 +13,7 @@ import {
   locatedToJSON,
   locate as locateIn,
   resolveCodeMap,
+  search as searchModel,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
 
@@ -37,6 +39,15 @@ async function load(options: ModelOptions, io: Io): Promise<LoadedModel | undefi
 function repoPath(model: LoadedModel, io: Io, path: string): string {
   const absolute = isAbsolute(path) ? path : resolve(io.cwd, path);
   return relative(model.baseDir, absolute).replace(/\\/g, "/");
+}
+
+export async function search(words: string[], options: ModelOptions, io: Io): Promise<number> {
+  const model = await load(options, io);
+  if (!model) return 1;
+  const query = words.join(" ");
+  const hits = searchModel(model, query, 10);
+  io.out(options.json ? JSON.stringify(hits, null, 2) : formatSearch(query, hits));
+  return hits.length ? 0 : 1;
 }
 
 export async function locate(paths: string[], options: ModelOptions, io: Io): Promise<number> {

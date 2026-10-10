@@ -2,15 +2,17 @@
 
 ArchDoc models its own architecture in `.archdoc/`. Use it the way ArchDoc asks every user's agent to.
 
-## Architecture model (ArchDoc)
+## Architecture model (ArchDoc): start here
 
-This repository's architecture is modeled in `.archdoc/`: actors (who uses the system), elements (what it's made of, mapped to code paths), and journeys (how actors reach their goals). People own the model.
+This repository's architecture is modeled in `.archdoc/`: actors (who uses the system), elements (what it's made of, each mapped to code paths), and journeys (how actors reach their goals). People own the model. It's the fastest way to find where code lives and what a change affects, so use it before you search the code.
 
-Before editing code:
+At the start of every coding task, before grepping or reading files:
 
-1. Find where the files sit: the `archdoc_locate` MCP tool, or `pnpm -s archdoc locate <paths...> --json`.
-2. Check the impact: `archdoc_impact`, or `pnpm -s archdoc impact <path-or-element> --json`. Note the affected journeys, actors, owners, and rules.
-3. Before a large change, tell the user which journeys and actors it affects. Ask first if a critical journey is involved.
+1. Find where the change belongs: the `archdoc_search` MCP tool with a few words (for example "cli command"), or `pnpm -s archdoc search <words>`. It returns the elements involved and their code paths.
+2. Check what the change affects: `archdoc_impact` on the element or the files you'll change, or `pnpm -s archdoc impact <element-or-path>`. It lists what depends on them, the affected journeys and actors (most important first), owners, and rules.
+3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
+
+`archdoc_locate` (or `pnpm -s archdoc locate <paths>`) tells you which element owns any file, including files you're about to create.
 
 After editing:
 

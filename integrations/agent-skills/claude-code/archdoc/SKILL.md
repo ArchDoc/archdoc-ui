@@ -1,22 +1,23 @@
 ---
 name: archdoc
-description: Use before changing code in a repository that has an .archdoc/ directory. Finds where the files you're about to edit sit in the architecture model and what the change affects (consumers, actors, journeys, owners, rules), and keeps the model up to date when you add, move, or connect components.
+description: Use at the start of every coding task in a repository that has an .archdoc/ directory, before searching or reading code. Finds where the change belongs in the architecture model and what it affects (consumers, actors, journeys, owners, rules). Also use when adding, moving, or connecting components, to keep the model up to date.
 ---
 
 # Working in a repository with an ArchDoc model
 
-`.archdoc/` holds the architecture the team agreed on: who uses the system (actors), what it's made of (elements, mapped to code paths), and how people use it (journeys). People own it. Your job is to work inside it, say what your change affects, and propose model changes rather than make them silently.
+`.archdoc/` holds the architecture the team agreed on: who uses the system (actors), what it's made of (elements, each mapped to code paths), and how people use it (journeys). People own it. It's the fastest way to find where code lives and what a change affects, so start with it, before you grep.
 
-## Before you edit
+## Start here, before you search the code
 
-1. **Locate.** Call `archdoc_locate` with every file you plan to change or create. Without MCP, run `archdoc locate <paths...> --json`.
-2. **Check the impact.** Call `archdoc_impact` on those files or their elements. Without MCP, run `archdoc impact <path-or-element> --json`.
-3. **Read what comes back.** It lists who uses the element, which actors and journeys the change affects (critical ones first), who owns it, and the rules that mention it.
-4. **Tell the user** which journeys and actors are affected before a large change, and ask first if a critical journey is involved or if the change would break a rule.
+1. **Find where the change belongs.** Call `archdoc_search` with a few words for the area, such as `cli command` or `refund approval`. Without MCP, run `archdoc search <words>`. You get the elements involved and their code paths, so you know which files to read.
+2. **Check the impact.** Call `archdoc_impact` on the element, or on the files you plan to change or create. Without MCP, run `archdoc impact <element-or-path> --json`. You get what depends on it, the affected journeys and actors (critical first), owners, and the rules that mention it.
+3. **Say what it affects.** Name the affected journeys and actors when you share your plan. Ask the user first if a critical journey is involved or the change would break a rule.
+
+`archdoc_locate` tells you which element owns any file, including files that don't exist yet.
 
 ## While you edit
 
-- Stay inside the element boundaries you located. If the change needs code in one element to depend on another element and the model doesn't declare that relationship (`uses`), say so. Don't add the dependency silently.
+- Stay inside the element boundaries you found. If the change needs code in one element to depend on another element and the model doesn't declare that relationship (`uses`), say so. Don't add the dependency silently.
 
 ## After you edit
 

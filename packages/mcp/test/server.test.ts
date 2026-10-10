@@ -25,7 +25,7 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 describe("archdoc MCP server", () => {
   it("tells agents to check before editing", () => {
     expect(client.getInstructions()).toBe(INSTRUCTIONS);
-    expect(INSTRUCTIONS).toMatch(/archdoc_locate[\s\S]*archdoc_impact/);
+    expect(INSTRUCTIONS).toMatch(/before you grep[\s\S]*archdoc_search[\s\S]*archdoc_impact/);
   });
 
   it("exposes read-only tools", async () => {
@@ -37,9 +37,18 @@ describe("archdoc MCP server", () => {
       "archdoc_journey",
       "archdoc_locate",
       "archdoc_overview",
+      "archdoc_search",
       "archdoc_validate",
     ]);
     expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+  });
+
+  it("finds where an area lives", async () => {
+    const r = await call("archdoc_search", { query: "cli command" });
+    expect(r.text).toMatch(
+      /^Matches for "cli command", best first:\n {2}toolchain\.cli\.commands \(component\)/,
+    );
+    expect(r.text).toContain("code: packages/cli/src/commands/**");
   });
 
   it("locates relative and absolute paths", async () => {

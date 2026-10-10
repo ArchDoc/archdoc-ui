@@ -78,6 +78,7 @@ The packages aren't published yet, so run the CLI from a clone:
 pnpm install && pnpm build
 pnpm archdoc view --watch --open            # explore ArchDoc's own model in your browser
 pnpm archdoc validate                       # check it
+pnpm archdoc search cli command             # where does this live?
 pnpm archdoc locate packages/core/src/load/fs.ts   # which element owns this file?
 pnpm archdoc impact packages/cli/src/commands      # what would changing it affect?
 pnpm archdoc map                            # how the repo's files map onto the model
@@ -90,11 +91,11 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
-`locate` and `impact` answer the questions an agent should ask before it edits: which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+`search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
 
 ## Use it with your coding agent
 
-`archdoc mcp` starts an MCP server with read-only tools: `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_get_actor`, `archdoc_journey`, and `archdoc_validate`. [`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflow: locate and check impact before editing, update the model with suggested facts, and validate. This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
+`archdoc mcp` starts an MCP server with read-only tools: `archdoc_search`, `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_get_actor`, `archdoc_journey`, and `archdoc_validate`. [`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflow: at the start of a task, search the model for where the change belongs and check its impact, update the model with suggested facts, and validate. This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
 
 ## Roadmap
 

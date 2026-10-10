@@ -14,8 +14,8 @@ describe("agent integrations", () => {
     const shipped = read("../AGENTS.md");
     const own = read("../../../AGENTS.md");
     for (const line of [
-      "## Architecture model (ArchDoc)",
-      "Before editing code:",
+      "## Architecture model (ArchDoc): start here",
+      "At the start of every coding task, before grepping or reading files:",
       "After editing:",
     ]) {
       expect(shipped).toContain(line);

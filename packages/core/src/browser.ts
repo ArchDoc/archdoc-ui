@@ -23,4 +23,5 @@ export {
   impact,
 } from "./query/impact.js";
 export * from "./query/index.js";
+export { type SearchHit, search } from "./query/search.js";
 export * from "./report/report.js";

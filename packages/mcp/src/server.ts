@@ -7,11 +7,13 @@ import {
   formatJourney,
   formatLocate,
   formatOverview,
+  formatSearch,
   impact,
   type LoadedModel,
   loadModel,
   locate,
   resolveRef,
+  search,
 } from "@archdoc/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -24,14 +26,14 @@ export interface ArchdocServerOptions {
   version?: string;
 }
 
-export const INSTRUCTIONS = `ArchDoc holds a human-owned architecture model of this repository: who uses the system (actors), what it's made of (elements, mapped to code paths), and how people use it (journeys).
+export const INSTRUCTIONS = `This repository has an ArchDoc architecture model in .archdoc/: who uses the system (actors), what it's made of (elements, each mapped to code paths), and how people use it (journeys). People own it. It's the fastest way to find where code lives and what a change affects.
 
-Before you edit code:
-1. Call archdoc_locate with the files you plan to change, to learn which part of the architecture they belong to.
-2. Call archdoc_impact on those files (or their elements) to learn who depends on them, which actors and journeys a change affects, who owns them, and which rules apply.
-Mention the affected journeys and actors when you describe your change.
+Start every coding task here, before you grep or read files:
+1. Call archdoc_search with a few words for the area you're changing (for example "cli command"). It returns the elements involved and their code paths, so you know where to look.
+2. Call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules.
+3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
-After you edit: if you added, removed, or moved a component, or added a dependency between components, update the model in .archdoc/ and call archdoc_validate.`;
+archdoc_locate tells you which element owns a file. After you change the architecture (a new component, moved code, a new dependency between components), update .archdoc/ and call archdoc_validate.`;
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 
@@ -86,11 +88,25 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
   );
 
   server.registerTool(
+    "archdoc_search",
+    {
+      title: "Find where something lives",
+      description:
+        'Find the elements, actors, and journeys for an area of the system, with their code paths. Use this at the start of a task, before grepping, to learn where a change belongs. Pass a few words, such as "cli command" or "payment refunds".',
+      inputSchema: {
+        query: z.string().min(1).describe("A few words naming the feature or area"),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ query }) => withModel((m) => formatSearch(query, search(m, query, 8))),
+  );
+
+  server.registerTool(
     "archdoc_locate",
     {
       title: "Locate files in the architecture",
       description:
-        "Which element owns each file: its place in the hierarchy and its owners. Call this before editing. Files don't need to exist yet.",
+        "Which element owns each file: its place in the hierarchy and its owners. Use it on files you plan to change or create; they don't need to exist yet.",
       inputSchema: {
         paths: z
           .array(z.string())
@@ -113,7 +129,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     {
       title: "Impact of a change",
       description:
-        "The blast radius of changing an element, actor, or file: what uses it (directly and indirectly), which actors and journeys are affected (most important first), what it depends on, owners, and rules that mention it. Call this before editing.",
+        "The blast radius of changing an element, actor, or file: what uses it (directly and indirectly), which actors and journeys are affected (most important first), what it depends on, owners, and rules that mention it. Call it while planning, before you edit.",
       inputSchema: {
         target: z.string().describe("Element ID (e.g. core.loader), actor ID, or file path"),
       },

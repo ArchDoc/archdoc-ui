@@ -1,10 +1,10 @@
 # Agent integrations
 
-ArchDoc is most useful when your coding agent checks the architecture before it edits. This folder has what you need to set that up:
+ArchDoc is most useful when your coding agent starts each task with the architecture: it finds where a change belongs and what it affects before it searches the code. This folder has what you need to set that up:
 
 | File | What it's for |
 |---|---|
-| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: locate, check impact, edit, update the model, validate |
+| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: search, check impact, edit, update the model, validate |
 | [`AGENTS.md`](./AGENTS.md) | The same workflow as a snippet for `AGENTS.md`, read by Codex, Cursor, Copilot, and others |
 | [`mcp/claude-code.mcp.json`](./mcp/claude-code.mcp.json) | MCP server config for Claude Code (`.mcp.json` at the repository root) |
 | [`mcp/cursor.mcp.json`](./mcp/cursor.mcp.json) | MCP server config for Cursor (`.cursor/mcp.json`) |
@@ -26,6 +26,7 @@ All tools are read-only and reload the model on every call.
 
 | Tool | Answers |
 |---|---|
+| `archdoc_search` | Where does this live? Elements, actors, and journeys for a few words, with code paths |
 | `archdoc_overview` | What is this system? Actors, elements, journeys |
 | `archdoc_locate` | Which element owns these files? |
 | `archdoc_impact` | What does changing this affect? Consumers, actors, journeys, owners, rules |
