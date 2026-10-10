@@ -42,10 +42,10 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 
 ## Phase 2: Code mapping + MCP (M) ⭐ first "AI-first" milestone
 
-- [ ] `codemap.resolve`: files per element, unmapped files, stale globs. `archdoc locate`, `archdoc impact` (including affected actors and journeys).
-- [ ] `@archdoc/mcp`: `overview`, `get_element`, `get_actor`, `journey`, `locate`, `impact`, `validate` (read-only tools first).
-- [ ] `integrations/agent-skills`: Claude Code skill and AGENTS.md snippet with the pre-flight/post-flight workflow.
-- [ ] Explorer code panel: mapped files, plus GitHub/`vscode://` links and code entry points per journey step.
+- [x] `codemap.resolve`: files per element, unmapped files, stale globs. `archdoc locate`, `archdoc impact` (including affected actors and journeys).
+- [x] `@archdoc/mcp`: `overview`, `get_element`, `get_actor`, `journey`, `locate`, `impact`, `validate` (read-only tools first).
+- [x] `integrations/agent-skills`: Claude Code skill and AGENTS.md snippet with the pre-flight/post-flight workflow.
+- [x] Explorer code panel: mapped files, plus GitHub/`vscode://` links and code entry points per journey step.
 
 **Exit:** in this repo, an agent asked to "add a command to the CLI" calls `locate` and `impact` first, without being told, because of the skill or snippet. It can say which actors and journeys the change affects. A human can click any box and land in its code.
 

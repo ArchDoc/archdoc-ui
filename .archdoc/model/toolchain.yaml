@@ -36,6 +36,7 @@ elements:
         uses:
           spec: Validates model files against the schema
           model-files: Reads the model
+          source-tree: Lists repository files to map them to elements (git ls-files)
           analyzers:
             description: Collects observed architecture from source
             status: planned
@@ -48,10 +49,21 @@ elements:
               checker: Validates journeys once references resolve
           query:
             kind: component
-            description: Element, actor, and overview queries. locate and impact come next.
+            description: Element, actor, and overview queries, and impact (consumers, actors, journeys, owners, rules).
             code: [{ path: packages/core/src/query/** }]
             uses:
               loader: Resolves references the same way the model does
+              codemap: Turns a file path into its owning element
+          codemap:
+            kind: component
+            description: Maps code to elements. locate (most specific owner wins), files per element, unmapped files, stale paths.
+            code: [{ path: packages/core/src/codemap/** }]
+          report:
+            kind: component
+            description: Text and JSON answers shared by the CLI and MCP, so people and agents read the same words.
+            code: [{ path: packages/core/src/report/** }]
+            uses:
+              query: Formats element, actor, overview, and impact results
           checker:
             kind: component
             description: Journey validation today. Drift detection and rule evaluation next.
@@ -74,12 +86,13 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, migrate, and schema today; locate, impact, diff, check, and mcp next."
+        description: "`archdoc` command: validate, view, locate, impact, map, mcp, migrate, and schema; diff and check next."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
           spec: Migrates v1 files and prints the JSON Schema
           web: Serves the explorer, the raw model files, and change events for `archdoc view`
+          mcp: Starts the MCP server for `archdoc mcp`
         elements:
           commands:
             kind: component
@@ -93,9 +106,8 @@ elements:
 
       mcp:
         kind: container
-        status: planned
-        technology: Node.js, @modelcontextprotocol/sdk
-        description: Exposes core queries and proposals as MCP tools and resources for agents.
+        technology: Node.js, @modelcontextprotocol/sdk (stdio)
+        description: Read-only MCP tools for agents (overview, locate, impact, element, actor, journey, validate). check, diff, and propose come next.
         code: [{ path: packages/mcp/** }]
         uses:
           core: Tool calls delegate to core
@@ -106,7 +118,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views today; diff overlay, code panel, and tours next.
+        description: Explorer. Hierarchy, actor, and journey views and a code panel with links; diff overlay and tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)
@@ -123,7 +135,7 @@ elements:
             code: [{ path: apps/web/src/graph/** }]
           ui:
             kind: component
-            description: Canvas, sidebar, details panel, and journey stepper.
+            description: Canvas, sidebar, details panel with code links, and journey stepper.
             code: [{ path: apps/web/src/components/**, description: Components }, apps/web/src/App.tsx]
             uses:
               graph: Renders the laid-out graph
@@ -136,6 +148,14 @@ elements:
         code: [{ path: integrations/github-action/** }]
         uses:
           core: Runs diff and check between the base and head revisions
+
+      agent-skills:
+        kind: container
+        technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
+        description: Teaches coding agents the workflow. Locate and check impact before editing, update the model with suggested facts, validate.
+        code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
+        uses:
+          mcp: Points agents at the MCP tools
 
       model-files:
         kind: datastore

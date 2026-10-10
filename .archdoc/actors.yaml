@@ -24,6 +24,7 @@ actors:
     kind: agent
     description: An AI coding agent (Claude Code, Cursor, Copilot, …) editing the codebase.
     uses:
+      agent-skills: Reads the workflow from the skill or AGENTS.md
       mcp:
         description: Locates code in the architecture, checks impact, proposes model changes
         technology: MCP (stdio)

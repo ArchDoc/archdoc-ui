@@ -1,0 +1,27 @@
+journey: agent-preflight
+actor: coding-agent
+goal: Know where a change sits in the architecture and what it affects, before editing
+importance: critical
+steps:
+  - from: coding-agent
+    to: agent-skills
+    action: Reads the workflow from the skill, CLAUDE.md, or AGENTS.md
+    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+  - from: coding-agent
+    to: mcp
+    action: Calls archdoc_locate with the files it plans to change
+    code: packages/mcp/src/server.ts
+  - from: mcp
+    to: core
+    action: Reloads the model and finds the most specific owning element
+    code: packages/core/src/codemap/codemap.ts
+  - from: coding-agent
+    to: mcp
+    action: Calls archdoc_impact on those files
+  - from: mcp
+    to: core
+    action: Walks consumers, actors, and journeys, and finds owners and rules
+    code: packages/core/src/query/impact.ts
+  - from: mcp
+    to: coding-agent
+    action: Returns the affected journeys and actors, which the agent names before editing
