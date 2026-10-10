@@ -4,7 +4,7 @@ ArchDoc is most useful when your coding agent starts each task with the architec
 
 | File | What it's for |
 |---|---|
-| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: search, check impact, edit, update the model, validate |
+| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: search, check impact, edit, check drift, propose model changes |
 | [`AGENTS.md`](./AGENTS.md) | The same workflow as a snippet for `AGENTS.md`, read by Codex, Cursor, Copilot, and others |
 | [`mcp/claude-code.mcp.json`](./mcp/claude-code.mcp.json) | MCP server config for Claude Code (`.mcp.json` at the repository root) |
 | [`mcp/cursor.mcp.json`](./mcp/cursor.mcp.json) | MCP server config for Cursor (`.cursor/mcp.json`) |
@@ -22,7 +22,7 @@ ArchDoc is most useful when your coding agent starts each task with the architec
 
 ## MCP tools
 
-All tools are read-only and reload the model on every call.
+Every tool reloads the model on every call. All of them are read-only except `archdoc_propose`, which only adds.
 
 | Tool | Answers |
 |---|---|
@@ -34,7 +34,8 @@ All tools are read-only and reload the model on every call.
 | `archdoc_get_actor` | What an actor uses, owns, and takes part in |
 | `archdoc_journey` | The steps of a journey, with code entry points |
 | `archdoc_validate` | Is the model valid? Problems with file and line |
-
-Tools that check drift (`archdoc_check`), diff the model (`archdoc_diff`), and write suggested model changes (`archdoc_propose`) come next. Until then, agents run `archdoc check` and `archdoc diff` from the CLI.
+| `archdoc_check` | Did my change drift? Undeclared imports, broken rules and journeys, stale paths; with `base`, what the change introduced |
+| `archdoc_diff` | What changed in the model since a ref? |
+| `archdoc_propose` | Add elements and relationships as suggestions (`provenance: suggested`) with a rationale note in `.archdoc/proposals/`. Additions only: it never changes or removes what's there, never edits another repo's namespace, and writes nothing if the result wouldn't validate. `dryRun` checks without writing |
 
 For pull requests, see the [GitHub Action](../github-action).

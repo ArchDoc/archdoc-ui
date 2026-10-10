@@ -21,13 +21,9 @@ description: Use at the start of every coding task in a repository that has an .
 
 ## After you edit
 
-Update `.archdoc/` in the same change when you:
-
-- add, remove, rename, or move a package, service, or module that is (or should be) an element
-- add a dependency between elements that the model doesn't declare
-- move code so that an element's `code:` paths no longer match it
-
-Mark what you add as a suggestion, so a person reviews it:
+1. **Check for drift.** Call `archdoc_check` with base `main` (or the branch you started from). Without MCP, run `archdoc check --base main`. Fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, and stale code paths. If a new dependency isn't intended, remove the import.
+2. **Propose what's intended.** If your change adds a component, or a dependency the model doesn't declare, and that's intended, call `archdoc_propose` with the additions and a one-line rationale. It adds them to `.archdoc/` as suggestions, keeps the files' formatting, writes a note to `.archdoc/proposals/`, and refuses anything that changes what's there or wouldn't validate. Try it with `dryRun: true` first if you're unsure.
+3. **Edit the model by hand for the rest.** `archdoc_propose` only adds. When you remove, rename, or move a package, service, or module, or move code so an element's `code:` paths no longer match, edit `.archdoc/` in the same change, and mark what you add as a suggestion so a person reviews it:
 
 ```yaml
 uses:
@@ -36,8 +32,8 @@ uses:
     provenance: { source: suggested, by: agent:claude-code }
 ```
 
-Then run `archdoc check --base main` and fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, and stale code paths. If a new dependency is intended, declare it in the model as a suggestion; if not, remove the import. Use `archdoc_validate` for a quick check of the model alone.
+Then call `archdoc_validate` (or run `archdoc validate`) and `archdoc_check` again.
 
 ## In the PR description
 
-Add a short **Architecture** section that names the elements you touched, the affected journeys and actors, and any model changes you suggested. `archdoc report --base main` writes it for you.
+Add a short **Architecture** section that names the elements you touched, the affected journeys and actors, and the model changes you suggested, so a person accepts or rejects them. `archdoc report --base main` writes it for you; `archdoc_diff` with base `main` lists the model changes.

@@ -105,7 +105,7 @@ elements:
         uses:
           core: Commands delegate to core
           spec: Migrates v1 files and prints the JSON Schema
-          web: Serves the explorer, the raw model files, and change events for `archdoc view`
+          web: Serves the explorer, the raw model files (and with --base, the files at a ref), and change events for `archdoc view`
           mcp: Starts the MCP server for `archdoc mcp`
           analyzers:
             description: Runs analyzers for `archdoc check`
@@ -142,7 +142,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views and a code panel with links; diff overlay and tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)

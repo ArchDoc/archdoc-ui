@@ -16,9 +16,9 @@ At the start of every coding task, before grepping or reading files:
 
 After editing:
 
-- If you added, moved, or removed a component, or added a dependency between components, update `.archdoc/` in the same change. Mark additions with `provenance: { source: suggested, by: agent:<your-name> }` so a person reviews them.
-- Run `pnpm -s archdoc check --base main` and fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, stale code paths. Declare a new dependency in the model (as a suggestion) only if it's intended; otherwise remove the import.
-- In the PR description, list the affected journeys and actors. `pnpm -s archdoc report --base main` writes this for you.
+- Check for drift: the `archdoc_check` MCP tool with base "main", or `pnpm -s archdoc check --base main`. Fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, stale code paths. If a new dependency isn't intended, remove the import.
+- If you added a component or a dependency between components on purpose, add it to `.archdoc/` as a suggestion: `archdoc_propose` does this without touching anything else, or edit the files and mark additions with `provenance: { source: suggested, by: agent:<your-name> }`. Update `.archdoc/` by hand in the same change if you moved or removed a component.
+- In the PR description, list the affected journeys and actors and the model changes you suggested. `pnpm -s archdoc report --base main` writes this for you.
 
 The MCP server is configured in `.mcp.json` and runs from the build, so run `pnpm build` first.
 

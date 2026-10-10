@@ -113,16 +113,18 @@ describe("against a git history", () => {
   it("view --base serves the model at the ref beside the working tree", async () => {
     const server = await startViewServer({ target: ".", cwd: repo, webDir: repo, base: "main" });
     try {
-      const payload = await (await fetch(`${server.url}/api/model`)).json();
-      expect(payload.sources.map((s: { path: string }) => s.path)).toContain(".archdoc/more.yaml");
+      type Sources = { path: string }[];
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        sources: Sources;
+        base: { sources: Sources };
+      };
+      expect(payload.sources.map((s) => s.path)).toContain(".archdoc/more.yaml");
       expect(payload.base).toMatchObject({
         ref: "main",
         commit: git("rev-parse", "main").trim(),
         root: "main:.archdoc/archdoc.yaml",
       });
-      expect(payload.base.sources.map((s: { path: string }) => s.path)).toEqual([
-        "main:.archdoc/archdoc.yaml",
-      ]);
+      expect(payload.base.sources.map((s) => s.path)).toEqual(["main:.archdoc/archdoc.yaml"]);
     } finally {
       await server.close();
     }

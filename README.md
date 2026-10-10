@@ -91,7 +91,7 @@ pnpm archdoc migrate examples/v1/blog.yaml  # convert a v0/v1 model to v2
 pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 ```
 
-`view` opens the explorer. Click a box to see what it is, what it uses, who uses it, and which journeys pass through it. Open a box to see what's inside. Focus on an actor to see what it uses and owns, or pick a journey and step through it. With `--watch`, the explorer updates as you save model files, and shows any problems at the top.
+`view` opens the explorer. Click a box to see what it is, what it uses, who uses it, and which journeys pass through it. Open a box to see what's inside. Focus on an actor to see what it uses and owns, or pick a journey and step through it. With `--watch`, the explorer updates as you save model files, and shows any problems at the top. With `--base main`, it also shows what changed since that ref: new and changed boxes and relationships are marked, removed ones appear as ghosts, suggested facts are dashed, and the journeys the change affects are flagged.
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
@@ -109,7 +109,9 @@ The [GitHub Action](./integrations/github-action) comments on every pull request
 
 ## Use it with your coding agent
 
-`archdoc mcp` starts an MCP server with read-only tools: `archdoc_search`, `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_get_actor`, `archdoc_journey`, and `archdoc_validate`. [`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflow: at the start of a task, search the model for where the change belongs and check its impact, update the model with suggested facts, and validate. This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
+`archdoc mcp` starts an MCP server. Its read-only tools answer the questions an agent should ask: `archdoc_search`, `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_get_actor`, `archdoc_journey`, `archdoc_validate`, `archdoc_check`, and `archdoc_diff`. One tool writes: `archdoc_propose` adds elements and relationships to the model as suggestions for a person to review, with a rationale note in `.archdoc/proposals/`. It only adds, and writes nothing that wouldn't validate.
+
+[`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflow: at the start of a task, search the model for where the change belongs and check its impact; after editing, check for drift and propose the model changes the code needs. This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
 
 ## Roadmap
 
@@ -120,7 +122,7 @@ ArchDoc is built in phases. Each phase ends with an exit test, not a date. The f
 | 0 · Reset | pnpm monorepo, Node 22/24 CI, this README |
 | 1 · Model core + explorer | Spec v2, `archdoc validate`, `archdoc view`, ArchDoc modeling itself |
 | 2 · Code mapping + MCP | `locate` and `impact` for agents, before they edit |
-| 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a PR impact comment |
+| 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a PR impact comment, a before/after view, agents proposing model changes |
 | 4 · Federation | Models published across repos, a landscape repo, cross-repo impact |
 | 5 · Data | Entities, storage, field lineage, logic, and simulation |
 | 6 · Bootstrap + interop | Draft models from code, LikeC4/Structurizr importers |
