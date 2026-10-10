@@ -205,11 +205,14 @@ function describe(t: Target): string {
 /** True when any string in the rule names one of the IDs. */
 function mentions(rule: RuleSpec, names: ReadonlySet<string>): boolean {
   const strings: string[] = [];
-  const walk = (v: unknown) => {
-    if (typeof v === "string") strings.push(v);
-    else if (Array.isArray(v)) v.forEach(walk);
-    else if (v && typeof v === "object")
-      Object.entries(v).forEach(([k, x]) => k !== "description" && walk(x));
+  const walk = (v: unknown): void => {
+    if (typeof v === "string") {
+      strings.push(v);
+    } else if (Array.isArray(v)) {
+      for (const x of v) walk(x);
+    } else if (v && typeof v === "object") {
+      for (const [k, x] of Object.entries(v)) if (k !== "description") walk(x);
+    }
   };
   walk(rule);
   return strings.some((s) => names.has(s));

@@ -10,7 +10,7 @@
 export function compileGlob(pattern: string): RegExp {
   const glob = normalizePath(pattern).replace(/\/+$/, "");
   if (!/[*?{]/.test(glob)) {
-    return new RegExp(`^${escape(glob)}(?:/.*)?$`);
+    return new RegExp(`^${escapeRegex(glob)}(?:/.*)?$`);
   }
   let re = "";
   for (let i = 0; i < glob.length; i++) {
@@ -35,11 +35,11 @@ export function compileGlob(pattern: string): RegExp {
       re += `(?:${glob
         .slice(i + 1, end)
         .split(",")
-        .map(escape)
+        .map(escapeRegex)
         .join("|")})`;
       i = end;
     } else {
-      re += escape(c);
+      re += escapeRegex(c);
     }
   }
   // "dir/**" also matches "dir" itself.
@@ -59,6 +59,6 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "");
 }
 
-function escape(s: string): string {
+function escapeRegex(s: string): string {
   return s.replace(/[.+^$()|[\]\\]/g, "\\$&");
 }

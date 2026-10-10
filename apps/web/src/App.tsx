@@ -1,11 +1,11 @@
-import { formatDiagnostic, type Model } from "@archdoc/core/browser";
+import { formatDiagnostic, type Model, resolveCodeMap } from "@archdoc/core/browser";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
-import { useModel } from "./model/useModel.js";
+import { type RepoLinks, useModel } from "./model/useModel.js";
 
 export function App() {
   const state = useModel();
@@ -21,12 +21,26 @@ export function App() {
   }
   return (
     <ReactFlowProvider>
-      <Explorer model={state.model} watch={state.watch} reloads={state.reloads} />
+      <Explorer
+        model={state.model}
+        watch={state.watch}
+        reloads={state.reloads}
+        files={state.files}
+        repo={state.repo}
+      />
     </ReactFlowProvider>
   );
 }
 
-function Explorer({ model, watch, reloads }: { model: Model; watch: boolean; reloads: number }) {
+interface ExplorerProps {
+  model: Model;
+  watch: boolean;
+  reloads: number;
+  files: string[];
+  repo: RepoLinks;
+}
+
+function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
@@ -39,6 +53,10 @@ function Explorer({ model, watch, reloads }: { model: Model; watch: boolean; rel
   const search = useRef<HTMLInputElement>(null);
 
   const journey = journeyId ? model.journeys.get(journeyId) : undefined;
+  const code = useMemo(
+    () => ({ codemap: resolveCodeMap(model, files), repo, files: new Set(files) }),
+    [model, files, repo],
+  );
 
   // After a live reload, drop references to things that no longer exist.
   useEffect(() => {
@@ -267,6 +285,7 @@ function Explorer({ model, watch, reloads }: { model: Model; watch: boolean; rel
           }}
           onFocus={setFocused}
           onToggle={toggle}
+          code={code}
         />
       </aside>
     </div>
