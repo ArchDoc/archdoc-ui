@@ -1,0 +1,21 @@
+journey: explore-architecture
+actor: developer
+goal: See how a system fits together, and watch it change while editing the model
+importance: high
+steps:
+  - from: developer
+    to: cli
+    action: Runs archdoc view --watch
+    code: packages/cli/src/commands/view.ts
+  - from: cli
+    to: web
+    action: Serves the explorer and the raw model files, then sends a change event on every save
+    code: packages/cli/src/server.ts
+  - from: web
+    to: core
+    action: Builds the model in the browser with the same engine as the CLI
+    code: apps/web/src/model/useModel.ts
+  - from: developer
+    to: web
+    action: Opens boxes, focuses on an actor, and steps through journeys
+    code: apps/web/src/App.tsx

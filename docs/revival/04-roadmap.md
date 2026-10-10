@@ -28,14 +28,14 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 - [x] `@archdoc/core`: multi-file loader, reference resolution, diagnostics with file and line, `query.element` / `query.actor` / `usedBy` (including "which actors use me").
 - [x] Journey validation: every step must follow a declared relationship.
 - [x] `archdoc validate`.
-- [ ] `archdoc view --watch` (no fixed port; live reload).
-- [ ] `apps/web`: Vite + React 19 + xyflow 12 + ELK. Includes:
+- [x] `archdoc view --watch` (no fixed port; live reload).
+- [x] `apps/web`: Vite + React 19 + xyflow 12 + ELK. Includes:
   - compound nodes, expand/collapse
   - actor view ("what does this team use and own?")
   - journey view (step-through highlight)
   - focus mode, search, resizable details panel, center on select
 - [x] Migrate `examples/*.yaml` (v1 originals kept in `examples/v1/`).
-- [ ] Port the v0 ranking tests as layout regression fixtures, including the orphan-node and no-deps-user cases from the assessment.
+- [x] Port the v0 ranking tests as layout regression fixtures, including the orphan-node and no-deps-user cases from the assessment.
 - [x] **Dogfood:** write `.archdoc/` for ArchDoc itself, starting from [`archdoc.v2.example.yaml`](./archdoc.v2.example.yaml).
 
 **Exit:** `npx @archdoc/cli view` renders a 3-level model of ArchDoc with its actors, and steps through at least one journey. v1 files migrate cleanly.
