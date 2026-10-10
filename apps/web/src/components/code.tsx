@@ -12,10 +12,9 @@ export interface CodeContext {
 export function webLink(repo: RepoLinks, path: string, isFile: boolean): string | undefined {
   const ref = repo.branch ?? repo.commit;
   if (!repo.webUrl || !ref) return undefined;
-  return `${repo.webUrl}/${isFile ? "blob" : "tree"}/${encodeURIComponent(ref)}/${path
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}`;
+  const encode = (p: string) => p.split("/").map(encodeURIComponent).join("/");
+  // Branch names can contain slashes; GitHub and GitLab take them as is.
+  return `${repo.webUrl}/${isFile ? "blob" : "tree"}/${encode(ref)}/${encode(path)}`;
 }
 
 /** A link that opens the path in VS Code on this machine. */

@@ -904,8 +904,10 @@ kbd {
 
 .path-links {
   display: inline-flex;
+  flex: none;
   gap: 8px;
   font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .path-links a {
@@ -949,6 +951,8 @@ kbd {
 }
 
 .file-name {
+  flex: 1;
+  min-width: 0;
   font-family: var(--f-mono);
   font-size: 0.76rem;
   overflow: hidden;
