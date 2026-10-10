@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "archdoc": {
+      "command": "node",
+      "args": ["packages/cli/dist/bin.js", "mcp"]
+    }
+  }
+}
