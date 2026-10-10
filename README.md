@@ -76,11 +76,14 @@ The packages aren't published yet, so run the CLI from a clone:
 
 ```bash
 pnpm install && pnpm build
-pnpm archdoc validate                       # ArchDoc's own model in .archdoc/
+pnpm archdoc view --watch --open            # explore ArchDoc's own model in your browser
+pnpm archdoc validate                       # check it
 pnpm archdoc validate examples/blog.yaml    # a single-file model
 pnpm archdoc migrate examples/v1/blog.yaml  # convert a v0/v1 model to v2
 pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 ```
+
+`view` opens the explorer. Click a box to see what it is, what it uses, who uses it, and which journeys pass through it. Open a box to see what's inside. Focus on an actor to see what it uses and owns, or pick a journey and step through it. With `--watch`, the explorer updates as you save model files, and shows any problems at the top.
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
@@ -106,7 +109,9 @@ ArchDoc is built in phases. Each phase ends with an exit test, not a date. The f
 packages/
   spec/   @archdoc/spec   v2 schema (Zod), TypeScript types, JSON Schema, v1 migration
   core/   @archdoc/core   load, validate, and query models (no LLM)
-  cli/    @archdoc/cli    the `archdoc` command
+  cli/    @archdoc/cli    the `archdoc` command, including the `view` server
+apps/
+  web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 examples/                 example models in v2 (v1 originals in examples/v1)
 docs/revival/             the relaunch plan: assessment, strategy, architecture, roadmap
 .archdoc/                 ArchDoc's own model

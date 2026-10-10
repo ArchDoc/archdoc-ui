@@ -22,10 +22,23 @@ pnpm install
 |---|---|
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Apply Biome fixes and formatting |
-| `pnpm typecheck` | `tsc -b` for every package (also builds `dist/`), then typechecks tests |
+| `pnpm typecheck` | `tsc -b` for every package (also builds `dist/`), then typechecks tests and the explorer |
+| `pnpm build` | Builds the packages and the explorer (`apps/web/dist`) |
 | `pnpm test` | Vitest, run against package sources |
 
 CI runs lint, typecheck, and test on Node 22 and 24 with `CI=true`.
+
+### Working on the explorer
+
+Run the model server and the Vite dev server side by side. Vite proxies `/api` to the CLI and hot-reloads the UI:
+
+```bash
+pnpm build
+pnpm archdoc view --watch --port 4321     # terminal 1
+pnpm -F @archdoc/web dev                  # terminal 2, then open the URL it prints
+```
+
+The graph logic in `apps/web/src/graph/` is plain TypeScript with tests in `apps/web/test/`. Keep decisions about what's visible there, not in components.
 
 ## Making a change
 

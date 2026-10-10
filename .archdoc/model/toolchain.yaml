@@ -74,14 +74,22 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, migrate, and schema today; view, locate, impact, diff, check, and mcp next."
+        description: "`archdoc` command: validate, view, migrate, and schema today; locate, impact, diff, check, and mcp next."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
           spec: Migrates v1 files and prints the JSON Schema
-          web:
-            description: Serves the explorer for `archdoc view`
-            status: planned
+          web: Serves the explorer, the raw model files, and change events for `archdoc view`
+        elements:
+          commands:
+            kind: component
+            description: One module per command.
+            code: [{ path: packages/cli/src/commands/** }]
+          view-server:
+            kind: component
+            technology: node:http, fs.watch, server-sent events
+            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself.
+            code: [packages/cli/src/server.ts]
 
       mcp:
         kind: container
@@ -97,12 +105,28 @@ elements:
 
       web:
         kind: container
-        status: planned
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchical views, diff overlay, code panel, guided tours.
+        description: Explorer. Hierarchy, actor, and journey views today; diff overlay, code panel, and tours next.
         code: [{ path: apps/web/** }]
         uses:
-          core: Loads and queries the model in the browser
+          core: Builds and queries the model in the browser (@archdoc/core/browser)
+        elements:
+          model-loader:
+            kind: component
+            description: Fetches the model files and rebuilds the model on every change event.
+            code: [{ path: apps/web/src/model/** }]
+            uses:
+              graph: Hands the model to the canvas
+          graph:
+            kind: component
+            description: Decides what's visible (expand, focus, journeys), lifts relationships to visible boxes, and lays them out with ELK.
+            code: [{ path: apps/web/src/graph/** }]
+          ui:
+            kind: component
+            description: Canvas, sidebar, details panel, and journey stepper.
+            code: [{ path: apps/web/src/components/**, description: Components }, apps/web/src/App.tsx]
+            uses:
+              graph: Renders the laid-out graph
 
       github-action:
         kind: container
