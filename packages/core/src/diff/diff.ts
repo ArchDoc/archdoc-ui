@@ -188,10 +188,14 @@ function stable(v: unknown): string {
 
 /** Indexes kept on each side by a longest common subsequence. */
 function lcs(a: string[], b: string[]): { left: Set<number>; right: Set<number> } {
-  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  const width = b.length + 1;
+  // dp[i * width + j]: LCS length of a[i..] and b[j..].
+  const dp = new Uint32Array((a.length + 1) * width);
+  const at = (i: number, j: number) => dp[i * width + j] ?? 0;
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      dp[i]![j] = a[i] === b[j] ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
+      dp[i * width + j] =
+        a[i] === b[j] ? at(i + 1, j + 1) + 1 : Math.max(at(i + 1, j), at(i, j + 1));
     }
   }
   const left = new Set<number>();
@@ -200,8 +204,11 @@ function lcs(a: string[], b: string[]): { left: Set<number>; right: Set<number> 
     if (a[i] === b[j]) {
       left.add(i++);
       right.add(j++);
-    } else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) i++;
-    else j++;
+    } else if (at(i + 1, j) >= at(i, j + 1)) {
+      i++;
+    } else {
+      j++;
+    }
   }
   return { left, right };
 }
