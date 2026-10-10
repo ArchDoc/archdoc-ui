@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "@archdoc/core": "workspace:*",
-    "@archdoc/spec": "workspace:*"
+    "@archdoc/spec": "workspace:*",
+    "commander": "^14.0.3",
+    "yaml": "^2.9.1"
   }
 }
