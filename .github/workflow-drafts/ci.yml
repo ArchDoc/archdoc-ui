@@ -36,3 +36,5 @@ jobs:
         run: pnpm typecheck
       - name: Test
         run: pnpm test
+      - name: Validate ArchDoc's own model
+        run: pnpm archdoc validate --strict
