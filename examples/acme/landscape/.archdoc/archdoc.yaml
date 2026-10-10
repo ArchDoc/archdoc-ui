@@ -1,0 +1,26 @@
+archdoc: "2.0"
+namespace: acme
+name: Acme Rides
+description: "The landscape: every team's model, plus what no single team owns."
+
+imports:
+  payments: { git: ../payments, version: ^5 }
+  trips: { git: ../trips, version: ^3 }
+  rides: { git: ../rides, version: ^1 }
+
+actors:
+  support-agent:
+    kind: role
+    description: Handles rider complaints.
+    uses:
+      rides.api-gateway: Issues goodwill refunds from the support console
+
+journeys:
+  goodwill-refund:
+    actor: support-agent
+    goal: Make a rider whole after a bad trip
+    importance: critical
+    steps:
+      - { from: support-agent, to: rides.api-gateway, action: Issues a goodwill refund }
+      - { from: rides.api-gateway, to: payments.charges, action: Refunds the charge }
+      - { from: payments.charges, to: payments.ledger, action: Records the refund }

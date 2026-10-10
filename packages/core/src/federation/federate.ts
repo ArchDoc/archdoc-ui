@@ -1,6 +1,6 @@
 import { importRange, importSource, type Lock } from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
-import { contractDiagnostic } from "../load/build.js";
+import { contractDiagnostic, isEventContract } from "../load/build.js";
 import type {
   ActorNode,
   ElementNode,
@@ -251,15 +251,27 @@ function checkReferences(
         missing ||= lookupImported(imported, end.ref).status === "missing";
       }
       const from = step.from;
-      if (from?.type !== "external" || !step.to) continue;
+      if (!from || !step.to) continue;
+      const noteAt = (code: string) =>
+        model.diagnostics.findIndex((d) => d.code === code && d.location === step.location);
+      // A step from a synced repo is checked here: drop the "unverified" note.
+      if (from.type === "external" && imported.has(from.namespace)) {
+        const i = noteAt("journey/unverified-step");
+        if (i >= 0) model.diagnostics.splice(i, 1);
+      }
+      // A missing end is already reported, and an import that didn't load has its own diagnostic.
+      const unloaded = (t: Target) =>
+        t.type === "external" && model.imports[t.namespace] && !imported.has(t.namespace);
+      if (missing || unloaded(from) || unloaded(step.to)) continue;
+      if (from.type !== "external") {
+        // A local publisher and a subscriber in another repo: that repo declares the subscription.
+        const i = noteAt("journey/broken-step");
+        if (i >= 0 && subscribed(model, imported, from, step.to)) model.diagnostics.splice(i, 1);
+        continue;
+      }
       const dep = imported.get(from.namespace);
       if (!dep) continue;
-      // Checked here instead: drop the "unverified" note.
-      const i = model.diagnostics.findIndex(
-        (d) => d.code === "journey/unverified-step" && d.location === step.location,
-      );
-      if (i >= 0) model.diagnostics.splice(i, 1);
-      if (!missing && !declaredIn(model, dep, from, step.to)) {
+      if (!declaredIn(model, dep, from, step.to) && !subscribed(model, imported, from, step.to)) {
         diagnostics.push({
           severity: "error",
           code: "journey/broken-step",
@@ -316,6 +328,44 @@ function declaredIn(model: Model, dep: ImportedModel, from: ExternalRef, to: Tar
     );
   }
   return false;
+}
+
+/**
+ * True when `to` subscribes to `from`: something in `to` uses something in
+ * `from` via a topic or event that it provides. Each side may be in this
+ * model or in an imported one; the subscription is declared where `to` lives.
+ */
+function subscribed(
+  model: Model,
+  imported: ReadonlyMap<string, ImportedModel>,
+  from: Target,
+  to: Target,
+): boolean {
+  const owner = (t: Target): { m: Model; node: NodeRef } | undefined => {
+    if (t.type !== "external") return t.type === "element" ? { m: model, node: t } : undefined;
+    const dep = imported.get(t.namespace);
+    const id = t.ref.slice(t.namespace.length + 1);
+    return dep?.model.elements.has(id)
+      ? { m: dep.model, node: { type: "element", id } }
+      : undefined;
+  };
+  const element = (ref: string) => {
+    const [ns] = ref.split(".");
+    const rest = ref.slice((ns?.length ?? 0) + 1);
+    return ns === model.namespace
+      ? model.elements.get(rest)
+      : imported.get(ns ?? "")?.model.elements.get(rest);
+  };
+  const sub = owner(to);
+  if (!sub) return false;
+  const publisher = refOf(from, model.namespace);
+  const subscribers = selfAndDescendants(sub.m, sub.node);
+  return sub.m.relationships.some((r) => {
+    if (!r.via || !subscribers.has(nodeKey(r.from))) return false;
+    const target = refOf(r.to, sub.m.namespace);
+    if (target !== publisher && !target.startsWith(`${publisher}.`)) return false;
+    return isEventContract(element(target)?.spec.provides, r.via);
+  });
 }
 
 function selfAndDescendants(m: Model, ref: NodeRef): Set<string> {

@@ -1,0 +1,49 @@
+archdoc: "2.0"
+namespace: rides
+name: Rides
+description: The rider app and the gateway behind it.
+
+imports:
+  payments: { git: ../payments, version: ^5 }
+  trips: { git: ../trips, version: ^3 }
+
+actors:
+  rides-team: { kind: team }
+  rider:
+    kind: person
+    uses:
+      app: Requests rides and refunds
+
+elements:
+  app:
+    kind: container
+    technology: React Native
+    owners: [rides-team]
+    code: apps/rider/**
+    uses:
+      api-gateway: Calls
+  api-gateway:
+    kind: container
+    technology: Node.js
+    owners: [rides-team]
+    code: services/gateway/**
+    uses:
+      trips.trips-api:
+        description: Looks up the trip
+        via: openapi/trips.yaml
+      payments.charges:
+        description: Asks for a refund
+        via: proto/charges.proto
+
+journeys:
+  request-refund:
+    actor: rider
+    goal: Get money back for a bad trip
+    importance: critical
+    steps:
+      - { from: rider, to: app, action: Taps "Report a problem" on the trip }
+      - { from: app, to: api-gateway, action: Sends the refund request }
+      - { from: api-gateway, to: trips.trips-api, action: Checks the trip and its fare }
+      - { from: api-gateway, to: payments.charges, action: Asks for a refund }
+      - { from: payments.charges, to: payments.ledger, action: Records the refund }
+      - { from: payments.charges, to: trips.trips-api, action: Publishes refund.issued; the trip is marked refunded }

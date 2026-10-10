@@ -11,6 +11,9 @@
       "path": "packages/analyzers"
     },
     {
+      "path": "packages/federation"
+    },
+    {
       "path": "packages/mcp"
     },
     {

@@ -1,0 +1,28 @@
+archdoc: "2.0"
+namespace: trips
+name: Trips
+description: Records every trip and what the rider paid for it.
+
+imports:
+  payments: { git: ../payments, version: ^5 }
+
+actors:
+  trips-team: { kind: team }
+
+elements:
+  trips-api:
+    kind: container
+    technology: Kotlin
+    owners: [trips-team]
+    code: services/trips/**
+    provides:
+      - { api: openapi/trips.yaml, description: Look up trips and their fares }
+    uses:
+      trips-db: Reads and writes trips
+      payments.charges:
+        description: Marks the trip refunded when a refund is issued
+        via: refund.issued
+  trips-db:
+    kind: datastore
+    technology: Postgres
+    owners: [trips-team]

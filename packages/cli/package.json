@@ -28,6 +28,7 @@
   "dependencies": {
     "@archdoc/analyzers": "workspace:*",
     "@archdoc/core": "workspace:*",
+    "@archdoc/federation": "workspace:*",
     "@archdoc/mcp": "workspace:*",
     "@archdoc/spec": "workspace:*",
     "commander": "^14.0.3",

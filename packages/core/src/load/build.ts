@@ -381,6 +381,14 @@ export function contractDiagnostic(
   return undefined;
 }
 
+/** True when `via` names a topic or event among `provides`: a subscription. */
+export function isEventContract(
+  provides: readonly ProvideSpec[] | undefined,
+  via: string | undefined,
+): boolean {
+  return (provides ?? []).some((p) => contractName(p) === via && ("topic" in p || "event" in p));
+}
+
 /** A contract's name: its api, topic, or event. */
 export function contractName(p: ProvideSpec): string {
   return "api" in p ? p.api : "topic" in p ? p.topic : p.event;
