@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
+import { impact, locate, map } from "./commands/code.js";
 import { migrate } from "./commands/migrate.js";
 import { schema } from "./commands/schema.js";
 import { validate } from "./commands/validate.js";
@@ -47,6 +48,45 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action(async (path: string, opts: { watch?: boolean; port?: string; open?: boolean }) => {
       const result = await view(path, opts, io);
       program.exitCode = result.code;
+    });
+
+  program
+    .command("locate")
+    .description("Which element owns these files? (They don't need to exist yet.)")
+    .argument("<paths...>", "files or directories")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((paths: string[], opts: { model?: string; json?: boolean }) =>
+      run(locate(paths, opts, io)),
+    );
+
+  program
+    .command("impact")
+    .description("What a change affects: consumers, actors, journeys, owners, and rules")
+    .argument("<target>", "element, actor, or file path")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((target: string, opts: { model?: string; json?: boolean }) =>
+      run(impact(target, opts, io)),
+    );
+
+  program
+    .command("map")
+    .description(
+      "How the repository's files map onto the model: coverage, unmapped files, stale paths",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--unmapped", "list every unmapped file")
+    .option("--json", "print the result as JSON")
+    .action((opts: { model?: string; json?: boolean; unmapped?: boolean }) => run(map(opts, io)));
+
+  program
+    .command("mcp")
+    .description("Start the MCP server on stdio, for coding agents")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .action(async (opts: { model?: string }) => {
+      const { runStdio } = await import("@archdoc/mcp");
+      await runStdio({ model: opts.model, cwd: io.cwd, version });
     });
 
   program

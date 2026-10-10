@@ -5,15 +5,5 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [
-    {
-      "path": "../spec"
-    },
-    {
-      "path": "../core"
-    },
-    {
-      "path": "../mcp"
-    }
-  ]
+  "references": [{ "path": "../spec" }, { "path": "../core" }]
 }
