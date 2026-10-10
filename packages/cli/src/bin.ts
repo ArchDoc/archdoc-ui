@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+import { createProgram } from "./program.js";
+
+const program = createProgram();
+await program.parseAsync(process.argv);
+process.exitCode = program.exitCode ?? 0;

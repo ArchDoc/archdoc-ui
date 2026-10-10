@@ -1,0 +1,29 @@
+{
+  "name": "@archdoc/core",
+  "version": "0.0.0",
+  "description": "The deterministic ArchDoc engine: load, validate, and query architecture models.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArchDoc/archdoc.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@archdoc/spec": "workspace:*",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  }
+}

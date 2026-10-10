@@ -1,0 +1,23 @@
+journey: check-model
+actor: developer
+goal: Find out whether a model change is valid before committing it
+importance: high
+steps:
+  - from: developer
+    to: cli
+    action: Runs archdoc validate
+    code: packages/cli/src/commands/validate.ts
+  - from: cli
+    to: core
+    action: Loads the model directory
+  - from: core
+    to: model-files
+    action: Reads every YAML file under .archdoc/
+    code: packages/core/src/load/fs.ts
+  - from: core
+    to: spec
+    action: Checks each file against the schema, then resolves references and journeys
+    code: packages/core/src/load/build.ts
+  - from: cli
+    to: developer
+    action: Prints diagnostics with file and line, and exits nonzero on errors

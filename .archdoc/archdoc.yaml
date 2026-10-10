@@ -1,0 +1,8 @@
+# ArchDoc's own architecture, in spec v2. Validate it with `pnpm archdoc validate`.
+# Elements marked `status: planned` are on the roadmap (docs/revival/04-roadmap.md).
+archdoc: "2.0"
+namespace: archdoc
+name: ArchDoc
+description: >
+  Open-source, code-linked architecture model that keeps engineers in control
+  of systems that AI agents are modifying.

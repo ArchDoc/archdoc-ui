@@ -1,0 +1,24 @@
+name: Spec change
+description: Propose a change to the ArchDoc model format (spec v2).
+labels: [spec]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What can't you express in the model today?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: The YAML you'd like to write.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: compat
+    attributes:
+      label: Compatibility
+      description: Does this break existing models? How would `archdoc migrate` handle it?

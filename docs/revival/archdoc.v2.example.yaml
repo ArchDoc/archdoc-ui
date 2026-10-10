@@ -1,0 +1,189 @@
+# Illustrative only: the proposed ArchDoc spec v2 (see 03-target-architecture.md),
+# used to model ArchDoc's own target architecture (dogfooding).
+# Not yet parseable by any tool. The schema doesn't exist yet.
+# Everything is in one file here for readability. In a real repo, actors, journeys,
+# and rules could live in .archdoc/actors.yaml, journeys/*.yaml, and rules.yaml.
+archdoc: "2.0"
+namespace: archdoc                    # globally unique id when federated with other repos
+name: ArchDoc
+description: >
+  Open-source, code-linked architecture model that keeps engineers in control
+  of systems that AI agents are modifying.
+
+# ── WHO uses the system ────────────────────────────────────────────────
+actors:
+  developer:
+    kind: person
+    description: Engineer of any experience level exploring, reviewing, or learning a system.
+    uses:
+      web: Explores the model, reviews diffs, follows tours and journeys
+      cli: Validates, diffs, and checks the model locally
+
+  new-contributor:
+    kind: role
+    description: Someone opening their first PR to a repo they don't know yet.
+    uses:
+      web: Follows onboarding tours
+
+  maintainers:
+    kind: team
+    description: ArchDoc maintainers. Own every element and review model changes.
+    members: ["@ArchDoc/maintainers"]
+    uses:
+      github-action: Reads architectural-impact comments on PRs
+
+  coding-agent:
+    kind: agent
+    description: An AI coding agent (Claude Code, Cursor, Copilot, …) editing the codebase.
+    uses:
+      mcp:
+        description: Locates code in the architecture, checks impact, proposes model changes
+        technology: MCP (stdio)
+
+# ── WHAT the software is ───────────────────────────────────────────────
+elements:
+  github:
+    kind: external
+    description: Hosts the repository, pull requests, and Actions.
+    uses:
+      github-action: Runs on every pull request
+
+  toolchain:
+    kind: system
+    description: The ArchDoc toolchain.
+    owners: [maintainers]
+    elements:
+      spec:
+        kind: container
+        technology: TypeScript, Zod, JSON Schema
+        description: Source of truth for the model format; v1→v2 migration.
+        code:
+          - path: packages/spec/**
+
+      core:
+        kind: container
+        technology: TypeScript
+        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules.
+        code:
+          - path: packages/core/**
+        uses:
+          spec: Validates model files against the schema
+          analyzers: Collects observed architecture from source
+          model-files: Reads the model
+        elements:
+          loader:
+            kind: component
+            description: Multi-file loading, reference resolution, diagnostics.
+            code: [{ path: packages/core/src/load/** }]
+          query:
+            kind: component
+            description: element / locate / impact queries.
+            code: [{ path: packages/core/src/query/** }]
+          differ:
+            kind: component
+            description: Semantic diff between two model revisions.
+            code: [{ path: packages/core/src/diff/** }]
+          checker:
+            kind: component
+            description: Drift detection and rule evaluation.
+            code: [{ path: packages/core/src/check/** }]
+
+      analyzers:
+        kind: container
+        technology: TypeScript, dependency-cruiser
+        description: Pluggable extractors of observed elements and dependencies.
+        code:
+          - path: packages/analyzers/**
+        uses:
+          source-tree: Reads manifests, imports, and infra files
+
+      cli:
+        kind: container
+        technology: Node.js
+        description: "`archdoc` command: init, validate, view, locate, impact, diff, check, mcp, migrate."
+        code:
+          - path: packages/cli/**
+        uses:
+          core: All commands delegate to core
+          web: Serves the explorer for `archdoc view`
+
+      mcp:
+        kind: container
+        technology: Node.js, @modelcontextprotocol/sdk
+        description: Exposes core queries and proposals as MCP tools and resources for agents.
+        code:
+          - path: packages/mcp/**
+        uses:
+          core: Tool calls delegate to core
+          model-files:
+            description: Writes suggested changes to the model
+            status: planned
+
+      web:
+        kind: container
+        technology: React 19, Vite, @xyflow/react, elkjs
+        description: Explorer. Hierarchical views, diff overlay, code panel, guided tours.
+        code:
+          - path: apps/web/**
+        uses:
+          core: Loads and queries the model in the browser
+
+      github-action:
+        kind: container
+        technology: GitHub Actions (Node)
+        description: Posts an architectural-impact comment on PRs and optionally fails on drift.
+        status: planned
+        code:
+          - path: integrations/github-action/**
+        uses:
+          core: Runs diff and check between the base and head revisions
+
+      model-files:
+        kind: datastore
+        technology: YAML in git (.archdoc/)
+        description: The human-owned architecture model, versioned with the code.
+
+      source-tree:
+        kind: datastore
+        technology: Git working tree
+        description: The code the model maps to.
+
+# ── HOW actors use the system ─────────────────────────────────────────
+journeys:
+  review-ai-change:
+    actor: developer
+    goal: Understand what an AI-authored PR changes in the architecture before merging
+    importance: critical
+    steps:
+      - from: coding-agent
+        to: mcp
+        action: Checks impact, then proposes model changes with the code
+      - from: github
+        to: github-action
+        action: Runs on the pull request
+      - from: github-action
+        to: core
+        action: Diffs base vs. head and checks drift, rules, and journeys
+      - from: developer
+        to: web
+        action: Opens the before/after view and accepts or rejects suggested facts
+
+  onboard-contributor:
+    actor: new-contributor
+    goal: Learn how ArchDoc fits together before a first PR
+    importance: normal
+    steps:
+      - from: new-contributor
+        to: web
+        action: Follows the "How ArchDoc works" tour
+      - from: web
+        to: core
+        action: Loads the model and resolves code links for each step
+
+rules:
+  - id: core-is-pure
+    description: Only core and analyzers read the filesystem directly. Surfaces go through core.
+    allow-only: { to: source-tree, from: [analyzers] }
+  - id: surfaces-dont-talk
+    description: CLI, MCP, web, and the Action never depend on each other, except CLI serving web.
+    deny: { from: [mcp, web, github-action], to: [cli, mcp, web, github-action] }

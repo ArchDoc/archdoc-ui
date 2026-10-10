@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ArchDoc Relaunch Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single filed plan, ~1080px column. One working surface (the build-up board) breaks wide; everything else reads top to bottom. */
+:root {
+  --paper: #F2F5F9;
+  --surface: #FFFFFF;
+  --ink: #0E1A2C;
+  --muted: #566376;
+  --line: #D6DEE9;
+  --line-strong: #A6B3C5;
+  --brand: #056CF2;
+  --brand-2: #05B0D8;
+  --brand-soft: #E1ECFD;
+  --brand-ink: #0A3E8C;
+  --ok: #18865A;
+  --ok-soft: #E1F3EA;
+  --warn: #B26A00;
+  --warn-soft: #FBEFD9;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0A0F18; --surface: #111A28; --ink: #E6ECF5; --muted: #97A4B8; --line: #223046; --line-strong: #4A5B74;
+    --brand: #4C99FF; --brand-2: #38D0F0; --brand-soft: #14294A; --brand-ink: #9CC4FF;
+    --ok: #3DC486; --ok-soft: #0F2A20; --warn: #E9A63E; --warn-soft: #2D2210;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0A0F18; --surface: #111A28; --ink: #E6ECF5; --muted: #97A4B8; --line: #223046; --line-strong: #4A5B74;
+  --brand: #4C99FF; --brand-2: #38D0F0; --brand-soft: #14294A; --brand-ink: #9CC4FF;
+  --ok: #3DC486; --ok-soft: #0F2A20; --warn: #E9A63E; --warn-soft: #2D2210;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 0 72px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.1rem, 5.2vw, 3.4rem); line-height: 1.04; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.95rem); line-height: 1.15; }
+h3 { font-size: 1.08rem; line-height: 1.25; }
+p { margin: 0; }
+code { font-family: var(--f-mono); font-size: 0.86em; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.lede { color: var(--muted); max-width: 64ch; font-size: 1.05rem; }
+section { padding-block: 60px 0; display: grid; gap: 22px; scroll-margin-top: 60px; }
+.sec-head { display: grid; gap: 8px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; min-width: 0; }
+
+/* nav */
+.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.topnav .inner { max-width: 1080px; margin: 0 auto; padding-inline: 20px; height: 48px; display: flex; gap: 18px; align-items: center; overflow-x: auto; scrollbar-width: none; }
+.topnav b { font-family: var(--f-display); white-space: nowrap; display: flex; gap: 8px; align-items: center; }
+.topnav a { color: var(--muted); text-decoration: none; font-size: 0.88rem; white-space: nowrap; }
+.topnav a:hover { color: var(--ink); }
+
+/* hero */
+.hero { padding-block: 52px 0; display: grid; gap: 20px; }
+.mission { border-left: 3px solid var(--brand); padding: 4px 0 4px 16px; color: var(--muted); max-width: 72ch; font-size: 0.98rem; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-family: var(--f-mono); font-size: 0.78rem; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); white-space: nowrap; }
+.chip.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: var(--ok-soft); }
+.chip.next { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 40%, transparent); background: var(--brand-soft); }
+.minute { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 820px) { .minute { grid-template-columns: 1fr; } }
+.minute .panel { display: grid; gap: 8px; align-content: start; }
+.minute .k { font-family: var(--f-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--brand); }
+.minute ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 0.93rem; }
+
+/* what we're building */
+.build { display: grid; grid-template-columns: minmax(0, 1.15fr) 40px minmax(0, 0.8fr) 40px minmax(0, 1.15fr); align-items: stretch; }
+@media (max-width: 900px) { .build { grid-template-columns: 1fr; gap: 6px; } .build .conn { transform: rotate(90deg); height: 34px; } }
+.col { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.col > .eyebrow { margin-bottom: 2px; }
+.conn { display: grid; place-items: center; color: var(--line-strong); font-family: var(--f-mono); font-size: 1.3rem; }
+.mtile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.mtile b { font-family: var(--f-display); font-size: 1.02rem; }
+.mtile span { font-size: 0.86rem; color: var(--muted); }
+.mtile i { font-style: normal; font-family: var(--f-mono); font-size: 0.7rem; color: var(--brand); display: block; text-transform: uppercase; letter-spacing: .06em; }
+.corebox { background: var(--brand-ink); color: var(--paper); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; align-content: center; height: 100%; }
+.corebox b { font-family: var(--f-display); font-size: 1.15rem; }
+.corebox ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-family: var(--f-mono); font-size: 0.82rem; }
+.corebox p { font-size: 0.82rem; opacity: .85; }
+.stile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.stile .who { font-family: var(--f-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--brand-2); }
+.stile b { font-size: 0.98rem; }
+.stile span { font-size: 0.85rem; color: var(--muted); }
+
+/* build-up */
+.trackwrap { overflow-x: auto; padding-bottom: 4px; }
+.track { position: relative; display: grid; grid-template-columns: repeat(9, minmax(86px, 1fr)); min-width: 780px; }
+.track::before, .track .fill { content: ""; position: absolute; top: 15px; left: calc(100% / 18); height: 4px; border-radius: 2px; }
+.track::before { right: calc(100% / 18); background: var(--line); }
+.track .fill { background: var(--brand); width: 0; transition: width .35s ease; }
+.station { position: relative; z-index: 1; background: none; border: 0; padding: 0 4px; cursor: pointer; display: grid; justify-items: center; gap: 6px; text-align: center; }
+.station .dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-mono); font-size: 0.82rem; font-weight: 500; background: var(--surface); border: 3px solid var(--line-strong); color: var(--muted); transition: background .2s, border-color .2s, color .2s; }
+.station.past .dot { background: var(--brand); border-color: var(--brand); color: #FFFFFF; }
+.station.cur .dot { background: var(--surface); border-color: var(--brand); color: var(--brand); box-shadow: 0 0 0 5px var(--brand-soft); }
+.station .nm { font-size: 0.8rem; font-weight: 600; line-height: 1.2; }
+.station .sz { font-family: var(--f-mono); font-size: 0.68rem; color: var(--muted); }
+.station .star { color: var(--brand-2); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 0.88rem; }
+.btn:hover { border-color: var(--brand); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #FFFFFF; }
+.btn:disabled { opacity: .45; cursor: default; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+@media (max-width: 920px) { .stage { grid-template-columns: 1fr; } }
+.board { display: grid; gap: 10px; }
+.lane { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: start; }
+@media (max-width: 560px) { .lane { grid-template-columns: 1fr; gap: 6px; } }
+.lane > .eyebrow { padding-top: 10px; }
+.blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.blk { border-radius: 8px; padding: 9px 10px; border: 1px dashed var(--line-strong); background: transparent; display: grid; gap: 2px; min-width: 0; transition: background .25s, border-color .25s, opacity .25s; opacity: .55; }
+.blk b { font-size: 0.86rem; line-height: 1.25; }
+.blk span { font-size: 0.75rem; color: var(--muted); line-height: 1.3; }
+.blk .ph { font-family: var(--f-mono); font-size: 0.66rem; color: var(--muted); }
+.blk.done { opacity: 1; border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line)); background: var(--surface); }
+.blk.done .ph { color: var(--brand); }
+.blk.new { opacity: 1; border: 1.5px solid var(--brand); background: var(--brand-soft); animation: pop .45s ease-out; }
+.blk.new .ph { color: var(--brand); font-weight: 500; }
+@keyframes pop { from { transform: scale(.96); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .blk.new { animation: none; } .track .fill { transition: none; } }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.detail { display: grid; gap: 12px; position: sticky; top: 64px; }
+.detail .unlock { font-family: var(--f-display); font-size: 1.15rem; line-height: 1.3; }
+.detail ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.88rem; }
+.exit { border-left: 3px solid var(--ok); background: var(--ok-soft); padding: 9px 12px; border-radius: 0 8px 8px 0; font-size: 0.88rem; }
+.exit b { display: block; font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.ms { font-family: var(--f-mono); font-size: 0.72rem; color: var(--brand-2); }
+
+/* timeline */
+.tl { display: grid; gap: 0; }
+.ph-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 16px; }
+.ph-rail { display: grid; justify-items: center; grid-template-rows: auto 1fr; }
+.ph-rail .n { width: 38px; height: 38px; border-radius: 50%; background: var(--surface); border: 3px solid var(--brand); color: var(--brand); display: grid; place-items: center; font-family: var(--f-mono); font-weight: 500; }
+.ph-rail .ln { width: 3px; background: var(--line); }
+.ph-row:last-child .ph-rail .ln { background: transparent; }
+.ph-body { padding-bottom: 22px; display: grid; gap: 8px; min-width: 0; }
+.ph-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+.effort { display: inline-block; height: 8px; border-radius: 4px; background: var(--brand-2); vertical-align: middle; }
+.effort.og { background: repeating-linear-gradient(90deg, var(--brand-2) 0 6px, transparent 6px 10px); }
+.ph-cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 760px) { .ph-cols { grid-template-columns: 1fr; } }
+.ph-cols ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 0.9rem; }
+.ph-goal { color: var(--muted); font-size: 0.95rem; }
+
+/* slice, decisions, guardrails, next */
+.slice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px dashed var(--brand-2); border-radius: var(--r); overflow: hidden; }
+@media (max-width: 760px) { .slice { grid-template-columns: 1fr; } }
+.slice > div { padding: 16px; display: grid; gap: 6px; align-content: start; background: var(--surface); }
+.slice > div + div { border-left: 1px dashed var(--line-strong); }
+@media (max-width: 760px) { .slice > div + div { border-left: 0; border-top: 1px dashed var(--line-strong); } }
+.slice .k { font-family: var(--f-mono); font-size: 0.72rem; color: var(--brand); text-transform: uppercase; letter-spacing: .06em; }
+.slice p { font-size: 0.9rem; color: var(--muted); }
+.decs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 860px) { .decs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .decs { grid-template-columns: 1fr; } }
+.dec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.dec .q { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.dec .q::after { content: " · accepted"; color: var(--ok); }
+.dec b { font-size: 0.95rem; line-height: 1.3; }
+.dec span { font-size: 0.83rem; color: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+.principles { display: grid; gap: 10px; }
+.principles div { display: grid; gap: 2px; }
+.principles b { font-size: 0.95rem; }
+.principles span { font-size: 0.88rem; color: var(--muted); }
+.risks { display: grid; gap: 8px; font-size: 0.88rem; }
+.risks div { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr); gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.risks div:last-child { border-bottom: 0; padding-bottom: 0; }
+.risks b { font-weight: 600; }
+.risks span { color: var(--muted); }
+.checklist { display: grid; gap: 6px; }
+.checklist label { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; font-size: 0.93rem; }
+.checklist input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--ok); }
+.checklist .who { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); white-space: nowrap; padding-top: 3px; }
+.checklist label.is-done span:first-of-type { color: var(--muted); text-decoration: line-through; }
+.progress { font-size: 0.9rem; color: var(--muted); }
+.progress b { color: var(--ink); font-variant-numeric: tabular-nums; }
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; display: grid; gap: 6px; }
+</style>
+</head>
+<body>
+
+<nav class="topnav" aria-label="Sections">
+  <div class="inner">
+    <b><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="var(--brand-2)"/><circle cx="18" cy="12" r="4" fill="var(--brand)"/><circle cx="8" cy="19" r="3" fill="var(--brand)"/><path d="M9.5 7.5 14.5 10.5M15 14.5 10.5 17.5" stroke="var(--line-strong)" stroke-width="1.6"/></svg>ArchDoc</b>
+    <a href="#overview">Overview</a>
+    <a href="#building">What we're building</a>
+    <a href="#buildup">Build-up</a>
+    <a href="#phases">Phases</a>
+    <a href="#slice">First slice</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#guardrails">Guardrails</a>
+    <a href="#next">Next actions</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero" id="overview">
+  <div class="eyebrow">ArchDoc relaunch plan · direction accepted 6 Oct 2026</div>
+  <h1>An architecture control plane for AI-assisted development</h1>
+  <p class="mission">ArchDoc is an interactive software modeling platform that empowers engineers to understand the systems AI is modifying and stay in control of the driver seat. Open-source, AI-first, analyze current state, propose future state changes, map architectural concepts to code, and help developers of any experience level explore and learn the system they're building.</p>
+  <div class="status">
+    <span class="chip ok">9 of 9 decisions accepted</span>
+    <span class="chip">9 phases, gated by exit criteria</span>
+    <span class="chip">4 milestones</span>
+    <span class="chip next">Next: Phase 0 · Reset</span>
+  </div>
+  <div class="minute">
+    <div class="panel">
+      <span class="k">Why</span>
+      <ul>
+        <li>AI agents change code faster than people can follow the architecture.</li>
+        <li>Architecture docs drift from code and stop being trusted.</li>
+        <li>Generated repo wikis describe code but aren't owned by anyone.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <span class="k">What</span>
+      <ul>
+        <li>A human-owned model in each repo: who uses the system, what it's made of, how people use it, and what happens to the data.</li>
+        <li>Linked to code, checked in CI, queried by agents.</li>
+        <li>Federated across repos into one enterprise view.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <span class="k">How</span>
+      <ul>
+        <li>A fresh TypeScript monorepo, built in 9 phases.</li>
+        <li>ArchDoc models itself from Phase 1 on.</li>
+        <li>A thin first slice proves the loop before the rest is built.</li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<section id="building">
+  <div class="sec-head">
+    <div class="eyebrow">What we're building</div>
+    <h2>One model, one engine, four ways in</h2>
+    <p class="lede">The model lives in <code>.archdoc/</code> next to the code. A deterministic engine answers every question. People and agents reach it through the surface that fits their moment. The engine contains no LLM: your own agent does the reasoning.</p>
+  </div>
+  <div class="build">
+    <div class="col">
+      <span class="eyebrow">The model · YAML in git</span>
+      <div class="mtile"><div><i>Who</i><b>Actors</b></div><span>People, roles, teams, partner orgs, and AI agents that use the systems.</span></div>
+      <div class="mtile"><div><i>What</i><b>Elements</b></div><span>Systems, containers, components, and datastores, each mapped to code paths.</span></div>
+      <div class="mtile"><div><i>How</i><b>Journeys</b></div><span>An actor's goal as steps across elements, checked against real relationships.</span></div>
+      <div class="mtile"><div><i>With what</i><b>Data</b></div><span>What is sent and stored, field mappings between tables, and logic on request data.</span></div>
+    </div>
+    <div class="conn" aria-hidden="true">→</div>
+    <div class="col">
+      <span class="eyebrow">The engine</span>
+      <div class="corebox">
+        <b>@archdoc/core</b>
+        <ul><li>load · validate</li><li>locate · impact</li><li>diff · check</li><li>lineage · simulate</li><li>publish · import</li></ul>
+        <p>Deterministic, so the same question gets the same answer in the IDE, the browser, and CI.</p>
+      </div>
+    </div>
+    <div class="conn" aria-hidden="true">→</div>
+    <div class="col">
+      <span class="eyebrow">The ways in</span>
+      <div class="stile"><span class="who">AI agents · before editing</span><b>MCP server + agent skill</b><span>Where am I, what depends on this, which rules and journeys apply?</span></div>
+      <div class="stile"><span class="who">Reviewers · before merging</span><b>PR impact check</b><span>Affected journeys, owners, data changes, and consumers in other repos. Drift flagged.</span></div>
+      <div class="stile"><span class="who">Everyone · anytime</span><b>Explorer</b><span>Hierarchy, actor and journey views, data timelines, tours, and click-through to code.</span></div>
+      <div class="stile"><span class="who">Enterprise · across teams</span><b>Landscape</b><span>Every repo's model composed into one view, with cross-team journeys and org-wide rules.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="buildup">
+  <div class="sec-head">
+    <div class="eyebrow">How we'll build it</div>
+    <h2>Watch the system assemble, phase by phase</h2>
+    <p class="lede">Pick a phase or press play. Blocks light up as they land. Each phase ends with something usable and a test that proves it.</p>
+  </div>
+  <div class="trackwrap"><div class="track" id="track"><span class="fill" id="fill"></span></div></div>
+  <div class="controls">
+    <button class="btn" id="prev" type="button">Back</button>
+    <button class="btn primary" id="play" type="button">Play all phases</button>
+    <button class="btn" id="next-btn" type="button">Next phase</button>
+    <div class="legend" style="margin-left:auto"><span><i style="background:var(--brand-soft);border:1.5px solid var(--brand)"></i>lands this phase</span><span><i style="background:var(--surface);border:1px solid var(--line-strong)"></i>already built</span><span><i style="border:1px dashed var(--line-strong)"></i>still ahead</span></div>
+  </div>
+  <div class="stage">
+    <div class="board" id="board" aria-live="polite"></div>
+    <aside class="panel detail" id="detail" aria-live="polite"></aside>
+  </div>
+</section>
+
+<section id="phases">
+  <div class="sec-head">
+    <div class="eyebrow">All phases at a glance</div>
+    <h2>Nine phases, each gated by an exit test</h2>
+    <p class="lede">Bars show relative effort. S is a few focused sessions, M a couple of weeks part-time, M–L about a month. Phases end when the exit test passes, not on a date.</p>
+  </div>
+  <div class="tl" id="timeline"></div>
+</section>
+
+<section id="slice">
+  <div class="sec-head">
+    <div class="eyebrow">The first slice</div>
+    <h2>Prove the loop on ArchDoc itself, before building the rest</h2>
+    <p class="lede">A thin cut through Phases 1–3 that needs no new UI. If it helps in daily AI-assisted work, the rest of the roadmap has earned its place.</p>
+  </div>
+  <div class="slice">
+    <div><span class="k">Phase 1 · model</span><b>Model ArchDoc in v2</b><p>Actors, one journey, a namespace, minimal data references, and <code>code:</code> globs for each package.</p></div>
+    <div><span class="k">Phase 2 · brief the agent</span><b>locate + impact over MCP</b><p>An agent asks where it is and what its change affects, including the journey, before it edits.</p></div>
+    <div><span class="k">Phase 3 · inform the reviewer</span><b>diff + check on the PR</b><p>The PR comment shows the architectural diff and flags an undeclared TS import the agent added.</p></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="sec-head">
+    <div class="eyebrow">Decisions locked in</div>
+    <h2>Nine decisions, all accepted 6 Oct 2026</h2>
+  </div>
+  <div class="decs" id="decs"></div>
+</section>
+
+<section id="guardrails">
+  <div class="sec-head">
+    <div class="eyebrow">Guardrails</div>
+    <h2>How we'll work, and what could go wrong</h2>
+  </div>
+  <div class="two">
+    <div class="panel principles">
+      <h3>Working principles</h3>
+      <div><b>Dogfood from Phase 1.</b><span>ArchDoc's own repo is the first and hardest test of every feature.</span></div>
+      <div><b>Exit tests, not dates.</b><span>A phase is done when its exit test passes on a real repo.</span></div>
+      <div><b>People approve, agents suggest.</b><span>Every fact carries its origin. AI suggestions only become real through a reviewed diff.</span></div>
+      <div><b>Design for later, build for now.</b><span>Namespaces and data references are in the schema from day one, so federation and the data layer are additive.</span></div>
+      <div><b>Interoperate, don't compete on syntax.</b><span>Import LikeC4 and Structurizr. Win on code mapping, change review, and learning.</span></div>
+    </div>
+    <div class="panel risks">
+      <h3 style="margin-bottom:4px">Risks and mitigations</h3>
+      <div><b>The model drifts from the code</b><span>Drift checks in CI are a core feature, and code mappings make staleness visible.</span></div>
+      <div><b>AI invents architecture</b><span>Analyzers before inference. Suggested facts render dashed until accepted.</span></div>
+      <div><b>Journeys and data rules go stale</b><span>check validates every step, mapping, and state transition. Schemas are imported, not retyped.</span></div>
+      <div><b>Version skew across repos</b><span>Pinned imports in archdoc.lock, plus dangling-reference checks.</span></div>
+      <div><b>Scope creep for a small team</b><span>Phase gates, plugin APIs for languages, and agents doing much of the build.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="next">
+  <div class="sec-head">
+    <div class="eyebrow">Next actions · Phase 0</div>
+    <h2>Start clean</h2>
+    <p class="lede">Tick items as they're done. Ticks are saved in this browser only.</p>
+  </div>
+  <div class="progress" id="progress"></div>
+  <div class="checklist" id="checklist"></div>
+</section>
+
+<footer>
+  <span>Source of record: <code>docs/revival/</code> on branch <code>claude/archdoc-review-revival-c21l1o</code> in ArchDoc/archdoc-ui. It covers the assessment, strategy options, target architecture, roadmap, and example models.</span>
+  <span>Prepared October 2026.</span>
+</footer>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('archdoc-plan:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('archdoc-plan:' + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+  const PHASES = [
+    { t: 'Reset', size: 'S', w: 1, goal: 'Start clean, with v0 preserved.', unlock: 'A green monorepo, and v0 kept safe on its own branch.',
+      items: ['v0.2.0 tag (exists) and a legacy/v0 branch', 'Rename archdoc-ui to archdoc', 'pnpm monorepo with Node 22/24 CI', 'README rewritten around the mission', 'Triage open issues #3–#6'],
+      exit: 'Green CI on an empty monorepo, and a README that states the mission.' },
+    { t: 'Model core + explorer', size: 'M', w: 2, goal: 'Write a model and see it.', unlock: 'Model a system\'s actors, elements, and journeys in YAML, and explore it.',
+      items: ['Spec v2: actors, elements, journeys, namespaces, minimal data refs', 'Core loader, queries, and journey validation', 'archdoc validate and archdoc view --watch', 'Explorer with ELK layout, actor and journey views', 'ArchDoc models itself in .archdoc/'],
+      exit: 'archdoc view renders a 3-level model of ArchDoc with its actors and steps through a journey. v1 files migrate cleanly.' },
+    { t: 'Code mapping + MCP', size: 'M', w: 2, ms: 'AI-first', goal: 'Brief the agent before it edits.', unlock: 'Agents know where they are and what a change affects before they edit.',
+      items: ['Code map: files per element, unmapped files, stale paths', 'archdoc locate and archdoc impact, including journeys', 'Read-only MCP tools', 'Agent skill and AGENTS.md workflow', 'Explorer code panel with links'],
+      exit: 'An agent calls locate and impact first, unprompted, and names the actors and journeys its change affects.' },
+    { t: 'Diff, drift, PR loop', size: 'M–L', w: 3, ms: 'Driver seat', goal: 'Show reviewers what a change means.', unlock: 'Every PR shows its architectural impact and flags drift.',
+      items: ['Semantic diff of actors, elements, journeys', 'Analyzer plugin API; TypeScript import analyzer', 'check: undeclared dependencies, rules, broken journeys', 'GitHub Action impact comment', 'MCP check, diff, and propose', 'Explorer before/after overlay'],
+      exit: 'On ArchDoc\'s own PRs, the comment names affected journeys and flags an undeclared import added by an agent.' },
+    { t: 'Multi-repo federation', size: 'M–L', w: 3, ms: 'Enterprise', goal: 'Span teams and repos.', unlock: 'Impact and journeys reach across repos and teams.',
+      items: ['archdoc publish: versioned model bundles', 'imports, archdoc sync, archdoc.lock', 'Cross-repo reference checks and contracts', 'Landscape repo: enterprise teams, cross-team journeys, org rules', 'Cross-repo impact in PRs and MCP', 'Explorer landscape view'],
+      exit: 'In a 3-repo demo org, a contract change lists consumers and journeys in the other repos before merge.' },
+    { t: 'Data', size: 'M–L', w: 3, ms: 'What happens', goal: 'Follow the data.', unlock: 'See where data is stored, how it maps between tables, and which logic runs on it.',
+      items: ['Entities, messages, events with classification and states', 'Schema importers and drift checks', 'stores, sends, accepts on elements and contracts', 'Field mappings and lineage across databases and repos', 'Logic blocks for decisions on request data (CEL)', 'Journey data timeline and archdoc simulate', 'PII and PCI flow rules'],
+      exit: 'For "Refund a fare", a sample request shows the branch taken and the records written to each table. Sending PII to an external system is flagged.' },
+    { t: 'Bootstrap + interop', size: 'M', w: 2, goal: 'Start from existing code.', unlock: 'Point ArchDoc at an existing codebase and get a reviewable draft model.',
+      items: ['archdoc init --from-code (all facts inferred)', 'Agents draft actors, journeys, mappings as suggestions', 'More analyzers: compose, Kubernetes, OpenAPI, Python, Go', 'Import LikeC4 and Structurizr; export Mermaid', 'Review inbox for suggested facts'],
+      exit: 'A newcomer gets a reviewable draft model of a mid-sized TypeScript monorepo in minutes.' },
+    { t: 'Learning', size: 'M', w: 2, goal: 'Teach the system.', unlock: 'Newcomers learn the system the way its users experience it.',
+      items: ['Tours, including tours generated from journeys', 'Team onboarding pages: what a team owns and uses', 'Level-of-detail zoom down to files, glossary', 'Static site build for GitHub Pages', 'Optional Ask panel using your own key'],
+      exit: 'A new contributor finishes the "How ArchDoc works" tour and opens a PR without asking for orientation.' },
+    { t: 'Reach', size: 'Ongoing', w: 1.5, goal: 'Meet people where they work.', unlock: 'ArchDoc in the editor, checked against real traffic, with a community around the spec.',
+      items: ['VS Code extension', 'Journeys checked against OpenTelemetry traces', 'Optional hosted registry for bundles', 'Docs site generated from the schema', 'Spec RFC process and analyzer registry'],
+      exit: 'No single gate. Community growth is ongoing.' }
+  ];
+
+  const LANES = [
+    { name: 'Foundation', blocks: [
+      ['Monorepo + CI', 'pnpm, Node 22/24, CI=true', 0], ['v0 preserved', 'v0.2.0 tag, legacy/v0', 0],
+      ['Spec v2 + migrate', 'JSON Schema; users → actors', 1], ['Core: load + query', 'references, element and actor queries', 1] ] },
+    { name: 'Model', blocks: [
+      ['Actors', 'people, roles, teams, orgs, agents', 1], ['Elements', 'systems to components, with code paths', 1],
+      ['Journeys', 'how actors reach goals, validated', 1], ['Data layer', 'entities, storage, mappings, logic', 5], ['Tours', 'learning paths from journeys', 7] ] },
+    { name: 'Engine', blocks: [
+      ['Code map', 'files ↔ elements, locate, impact', 2], ['Diff + drift checks', 'semantic diff, rules, broken journeys', 3],
+      ['Analyzers', 'TypeScript imports first, plugin API', 3], ['Federation', 'publish, imports, archdoc.lock', 4],
+      ['Lineage + simulate', 'field lineage, logic on sample requests', 5], ['Bootstrap from code', 'draft model, all facts inferred', 6] ] },
+    { name: 'Ways in', blocks: [
+      ['CLI', 'validate, view --watch', 1], ['Explorer', 'hierarchy, actor and journey views', 1],
+      ['MCP + agent skill', 'agents check before editing', 2], ['PR impact check', 'what a change means, before merge', 3],
+      ['Landscape site', 'enterprise view across repos', 4], ['Data timeline', 'records step by step', 5],
+      ['Importers', 'LikeC4, Structurizr, Mermaid', 6], ['VS Code + traces', 'editor, OpenTelemetry checks', 8] ] }
+  ];
+
+  /* ---- track ---- */
+  const track = $('#track');
+  PHASES.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'station'; b.dataset.i = i;
+    b.setAttribute('aria-label', `Phase ${i}: ${p.t}`);
+    b.innerHTML = `<span class="dot">${i}</span><span class="nm">${esc(p.t)}</span><span class="sz">${p.size}${p.ms ? ' <span class="star">★</span>' : ''}</span>`;
+    b.addEventListener('click', () => { stop(); show(i); });
+    track.appendChild(b);
+  });
+
+  /* ---- board ---- */
+  const board = $('#board');
+  LANES.forEach(l => {
+    const lane = document.createElement('div'); lane.className = 'lane';
+    lane.innerHTML = `<span class="eyebrow">${l.name}</span><div class="blocks">${l.blocks.map(b => `<div class="blk" data-p="${b[2]}"><span class="ph">Phase ${b[2]}</span><b>${esc(b[0])}</b><span>${esc(b[1])}</span></div>`).join('')}</div>`;
+    board.appendChild(lane);
+  });
+
+  let cur = Math.min(Math.max(store.get('phase', 3), 0), PHASES.length - 1);
+  function show(i) {
+    cur = i; store.set('phase', i);
+    track.querySelectorAll('.station').forEach((s, k) => { s.classList.toggle('past', k < i); s.classList.toggle('cur', k === i); s.setAttribute('aria-current', k === i ? 'step' : 'false'); });
+    $('#fill').style.width = (i * 100 / PHASES.length) + '%';
+    board.querySelectorAll('.blk').forEach(b => {
+      const p = Number(b.dataset.p);
+      b.classList.toggle('done', p < i); b.classList.toggle('new', p === i);
+    });
+    const p = PHASES[i];
+    const landed = board.querySelectorAll('.blk.new').length;
+    $('#detail').innerHTML = `<div class="eyebrow">Phase ${i} · ${p.size}${p.ms ? ` · <span class="ms">★ ${p.ms} milestone</span>` : ''}</div>
+      <h3>${esc(p.t)}</h3>
+      <p class="unlock">${esc(p.unlock)}</p>
+      <ul>${p.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      <div class="exit"><b>Exit test</b>${esc(p.exit)}</div>
+      <p style="font-size:.82rem;color:var(--muted)">${landed} block${landed === 1 ? '' : 's'} land in this phase.</p>`;
+    $('#prev').disabled = i === 0; $('#next-btn').disabled = i === PHASES.length - 1;
+  }
+  let timer = null;
+  function stop() { if (timer) { clearInterval(timer); timer = null; $('#play').textContent = 'Play all phases'; } }
+  $('#play').addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    show(0); $('#play').textContent = 'Pause';
+    timer = setInterval(() => { if (cur >= PHASES.length - 1) { stop(); return; } show(cur + 1); }, 1700);
+  });
+  $('#prev').addEventListener('click', () => { stop(); if (cur > 0) show(cur - 1); });
+  $('#next-btn').addEventListener('click', () => { stop(); if (cur < PHASES.length - 1) show(cur + 1); });
+  show(cur);
+
+  /* ---- timeline ---- */
+  const maxW = 3;
+  $('#timeline').innerHTML = PHASES.map((p, i) => `
+    <div class="ph-row">
+      <div class="ph-rail"><span class="n">${i}</span><span class="ln"></span></div>
+      <div class="ph-body">
+        <div class="ph-top"><h3>${esc(p.t)}</h3>
+          <span class="chip">${p.size} <span class="effort ${p.size === 'Ongoing' ? 'og' : ''}" style="width:${Math.round(p.w / maxW * 64)}px"></span></span>
+          ${p.ms ? `<span class="chip next">★ ${p.ms} milestone</span>` : ''}</div>
+        <p class="ph-goal">${esc(p.goal)} ${esc(p.unlock)}</p>
+        <div class="ph-cols"><ul>${p.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul><div class="exit"><b>Exit test</b>${esc(p.exit)}</div></div>
+      </div>
+    </div>`).join('');
+
+  /* ---- decisions ---- */
+  const DECS = [
+    ['Positioning', 'Architecture control plane', 'For AI-assisted development, not a viewer or a wiki generator.'],
+    ['Model format', 'Own YAML spec v2', 'With importers for LikeC4, Structurizr, and v1.'],
+    ['Where the AI lives', 'Your agent, via MCP', 'Deterministic core with no LLM inside.'],
+    ['Future state', 'Git branches + semantic diff', 'Optional proposal notes for rationale.'],
+    ['Codebase', 'Fresh monorepo, same repo', 'Renamed to archdoc; v0 kept on legacy/v0.'],
+    ['Analysis depth', 'Declared paths + TS imports', 'More languages through a plugin API.'],
+    ['Usage modeling', 'Actors + journeys', 'Top-level actors, as v1\'s users were. Journeys validated.'],
+    ['Multi-repo', 'Federated + landscape repo', 'Namespaces, publish, archdoc.lock.'],
+    ['Data', 'Logical data layer', 'Linked to real schemas, with mappings, logic, and simulation.']
+  ];
+  $('#decs').innerHTML = DECS.map((d, i) => `<div class="dec"><span class="q">${i + 1} · ${esc(d[0])}</span><b>${esc(d[1])}</b><span>${esc(d[2])}</span></div>`).join('');
+
+  /* ---- checklist ---- */
+  const TODO = [
+    ['tag', 'v0.2.0 tag on the last v0 release', 'already exists', true],
+    ['legacy', 'Create the legacy/v0 branch from main', 'Claude, with your OK'],
+    ['rename', 'Rename the repo archdoc-ui → archdoc', 'you, in GitHub settings'],
+    ['scaffold', 'Scaffold the pnpm monorepo with Node 22/24 CI', 'Claude, on a branch + PR'],
+    ['readme', 'Rewrite the README around the mission', 'Claude, same PR'],
+    ['issues', 'Close or relabel issues #3–#6 (carry #5 and #6 forward)', 'you or Claude'],
+    ['merge', 'Review and merge the Phase 0 PR', 'you']
+  ];
+  const ticks = store.get('ticks', {});
+  const cl = $('#checklist');
+  function renderChecks() {
+    cl.innerHTML = TODO.map(([id, txt, who, fixed]) => {
+      const on = fixed || !!ticks[id];
+      return `<label class="${on ? 'is-done' : ''}" for="c-${id}"><input type="checkbox" id="c-${id}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : ''}><span>${esc(txt)}</span><span class="who">${esc(who)}</span></label>`;
+    }).join('');
+    const n = TODO.filter(t => t[3] || ticks[t[0]]).length;
+    $('#progress').innerHTML = `<b>${n} of ${TODO.length}</b> Phase 0 items done.`;
+    TODO.forEach(([id, , , fixed]) => { if (!fixed) $('#c-' + id).addEventListener('change', (e) => { ticks[id] = e.target.checked; store.set('ticks', ticks); renderChecks(); }); });
+  }
+  renderChecks();
+})();
+</script>
+</body>
+</html>

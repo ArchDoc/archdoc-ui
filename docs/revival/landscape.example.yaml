@@ -1,0 +1,237 @@
+# Illustrative only: proposed ArchDoc spec v2 federation (see 03-target-architecture.md §3.9).
+# A fictional company, Acme Rides, with four product repos and one landscape repo.
+# Each YAML document below is a different file in a different repo.
+# The payments repo also shows the data layer (§3.5): entities, storage, a mapping, and a logic block.
+# Every journey step follows a declared `uses` relationship, which `archdoc check` would enforce.
+# acme/trips and acme/support-tools aren't shown. Assume they declare trips.api, support.admin-console,
+# and the relationships the journeys rely on.
+# Team names in `owners` (payments-team, rides-team) resolve against the landscape's shared actors.
+# Locally an unresolved team is a warning; in `archdoc landscape build` it's an error.
+
+# ─────────────────────────────────────────────────────────────────────────
+# repo: acme/payments   file: .archdoc/archdoc.yaml
+# Owns the "payments" namespace. Publishes payments@5.x on each release.
+# ─────────────────────────────────────────────────────────────────────────
+archdoc: "2.0"
+namespace: payments
+name: Payments
+elements:
+  charges:
+    kind: container
+    technology: Go, gRPC
+    owners: [payments-team]
+    code: [{ path: services/charges/** }]
+    provides:
+      - { api: proto/charges.proto, accepts: RefundRequest, returns: Refund }
+      - { topic: refund.issued, carries: Refund }
+    uses:
+      ledger: { description: Records every charge and refund, sends: LedgerEntry }
+  ledger:
+    kind: datastore
+    technology: Postgres
+    owners: [payments-team]
+    stores:
+      charges:        { entity: Charge, key: id }
+      refunds:        { entity: Refund, key: id }
+      ledger_entries: { entity: LedgerEntry, key: id, retention: 7y }
+  ledger-reports:
+    kind: container
+    description: Month-end reporting UI over the ledger.
+    owners: [payments-team]
+    code: [{ path: apps/reports/** }]
+    uses:
+      ledger: Reads posted entries
+
+# ── WITH WHAT data ─────────────────────────────────────────────────────
+data:
+  RefundRequest:
+    kind: message
+    fields:
+      trip_id:      { type: uuid }
+      amount_cents: { type: int }
+      reason:       { type: enum, values: [overcharge, no_show, safety] }
+      agent_id:     { type: uuid, classification: internal }
+  Charge:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Charge }    # fields imported from the real schema
+    fields:
+      trip_id:      { type: uuid }
+      amount_cents: { type: int }
+      card_last4:   { type: string, classification: pci }
+      status:       { type: enum, values: [authorized, captured, partially_refunded, refunded] }
+    states:
+      - authorized -> captured
+      - captured -> partially_refunded | refunded
+  Refund:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Refund }
+    fields:
+      charge_id:    { type: uuid }
+      amount_cents: { type: int }
+      status:       { type: enum, values: [approved, pending_approval, escalated] }
+  LedgerEntry:
+    kind: entity
+    source: { sql: migrations/0042_ledger.sql#ledger_entries }
+    fields:
+      account:      { type: string, classification: pii }   # contains the rider id
+      amount_cents: { type: int }
+      source_ref:   { type: uuid }
+
+mappings:
+  refund-to-ledger:
+    from: { refund: Refund, trip: trips.Trip }          # named inputs used in the expressions
+    to: ledger.ledger_entries
+    code: services/charges/internal/ledger/post.go
+    fields:
+      account:      "'rider:' + trip.rider_id"
+      amount_cents: "-refund.amount_cents"
+      source_ref:   "refund.id"
+
+logic:
+  refund-approval:
+    runs-in: charges
+    input: { request: RefundRequest, trip: trips.Trip }    # trips.Trip is published by acme/trips
+    code: services/charges/internal/refunds/policy.go#Approve
+    rules:
+      - when: "request.reason == 'safety'"
+        then: escalate-to-safety
+      - when: "request.amount_cents <= trip.fare_cents / 2"
+        then: auto-approve
+      - else: needs-finance-approval
+
+rules:
+  - id: payments-boundary
+    description: Only the rides gateway and support console may call charges.
+    allow-only: { to: charges, from: [rides.api-gateway, support.admin-console] }
+  - id: pci-stays-here
+    description: Fields classified pci are only stored in this namespace.
+    data: { classification: pci, stored-in: { namespace: payments } }
+
+---
+# ─────────────────────────────────────────────────────────────────────────
+# repo: acme/rides   file: .archdoc/archdoc.yaml
+# Owns "rides". Imports the namespaces it depends on, pinned in archdoc.lock.
+# ─────────────────────────────────────────────────────────────────────────
+archdoc: "2.0"
+namespace: rides
+name: Rides
+imports:
+  trips:    { github: acme/trips,    version: ^3 }
+  payments: { github: acme/payments, version: ^5 }
+actors:
+  passenger:
+    kind: person
+    description: Books and pays for rides.
+    uses:
+      mobile-app: Requests rides, pays, rates drivers
+  driver:
+    kind: person
+    description: Accepts and completes trips.
+    uses:
+      mobile-app: Goes online, accepts trips
+elements:
+  mobile-app:
+    kind: container
+    technology: React Native
+    owners: [rides-team]
+    code: [{ path: apps/mobile/** }]
+    uses:
+      api-gateway: Calls all backend APIs
+  api-gateway:
+    kind: container
+    technology: Node.js / Fastify
+    owners: [rides-team]
+    code: [{ path: services/gateway/** }]
+    uses:
+      trips.api: Creates trips and matches drivers
+      payments.charges: { description: Pre-authorizes and captures fares, technology: gRPC }
+journeys:
+  book-a-ride:
+    actor: passenger
+    goal: Get a ride to a destination
+    importance: critical
+    steps:
+      - { from: passenger, to: mobile-app, action: Confirms pickup and destination }
+      - { from: mobile-app, to: api-gateway, action: POST /trips, code: services/gateway/src/routes/trips.ts }
+      - { from: api-gateway, to: trips.api, action: Create trip and match a driver }
+      - { from: api-gateway, to: payments.charges, action: Pre-authorize the fare }
+
+---
+# ─────────────────────────────────────────────────────────────────────────
+# repo: acme/architecture   file: .archdoc/landscape.yaml
+# The landscape: composes every namespace and adds what no single team owns.
+# `archdoc landscape build` turns this into the enterprise explorer site.
+# ─────────────────────────────────────────────────────────────────────────
+archdoc: "2.0"
+landscape: Acme Rides
+imports:
+  rides:    { github: acme/rides,         version: ^7 }
+  trips:    { github: acme/trips,         version: ^3 }
+  payments: { github: acme/payments,      version: ^5 }
+  support:  { github: acme/support-tools, version: ^2 }
+  zendesk:  { file: vendors/zendesk.yaml }            # external SaaS described as a stub
+
+domains:                                               # business capabilities for grouping
+  mobility: [rides, trips]
+  money: [payments]
+  customer-care: [support, zendesk]
+
+actors:                                                # enterprise-wide teams, usable by every repo
+  rides-team:    { kind: team, members: ["@acme/rides"] }
+  payments-team: { kind: team, members: ["@acme/payments"] }
+  support-team:
+    kind: team
+    description: Resolves rider and driver issues.
+    members: ["@acme/support"]
+    uses:
+      support.admin-console: Looks up trips and issues refunds
+      zendesk.ticketing: Works the ticket queue
+  finance-team:
+    kind: team
+    members: ["@acme/finance"]
+    uses:
+      payments.ledger-reports: Runs month-end close
+
+journeys:                                              # cross-team journeys live here
+  refund-a-fare:
+    actor: support-team
+    goal: Refund a rider who was overcharged
+    importance: high
+    steps:
+      - { from: support-team, to: zendesk.ticketing, action: Picks up the complaint }
+      - { from: support-team, to: support.admin-console, action: Finds the trip }
+      - { from: support.admin-console, to: trips.api, action: Loads trip and fare details }
+      - from: support.admin-console
+        to: payments.charges
+        action: Issues a partial refund
+        sends: payments.RefundRequest
+        decides: payments.refund-approval
+        branches:
+          auto-approve:
+            creates: payments.Refund
+            changes: { payments.Charge.status: captured -> partially_refunded }
+          needs-finance-approval:
+            creates: { payments.Refund: { status: pending_approval } }
+          escalate-to-safety:
+            creates: { payments.Refund: { status: escalated } }
+      - from: payments.charges
+        to: payments.ledger
+        action: Posts the refund entry
+        sends: payments.LedgerEntry
+        via: payments.refund-to-ledger
+        when: auto-approve
+  month-end-close:
+    actor: finance-team
+    goal: Reconcile all charges and refunds for the month
+    importance: high
+    steps:
+      - { from: finance-team, to: payments.ledger-reports, action: Runs the reconciliation report }
+      - { from: payments.ledger-reports, to: payments.ledger, action: Reads posted entries }
+
+rules:                                                 # org-wide rules apply to every namespace
+  - id: critical-journeys-reviewed
+    description: Changes that touch a critical journey need review from the journey owner's team.
+    require-review: { journeys: { importance: critical } }
+  - id: no-shared-databases
+    description: A datastore is only used by elements in its own namespace.
+    deny: { from: { namespace: "!same" }, to: { kind: datastore } }

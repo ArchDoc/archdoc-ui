@@ -1,0 +1,18 @@
+journey: review-ai-change
+actor: developer
+goal: Understand what an AI-authored PR changes in the architecture before merging
+importance: critical
+status: planned
+steps:
+  - from: coding-agent
+    to: mcp
+    action: Checks impact, then proposes model changes with the code
+  - from: github
+    to: github-action
+    action: Runs on the pull request
+  - from: github-action
+    to: core
+    action: Diffs base vs. head and checks drift, rules, and journeys
+  - from: developer
+    to: web
+    action: Opens the before/after view and accepts or rejects suggested facts

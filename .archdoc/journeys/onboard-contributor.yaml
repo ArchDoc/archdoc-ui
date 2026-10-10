@@ -1,0 +1,11 @@
+journey: onboard-contributor
+actor: new-contributor
+goal: Learn how ArchDoc fits together before a first PR
+status: planned
+steps:
+  - from: new-contributor
+    to: web
+    action: Follows the "How ArchDoc works" tour
+  - from: web
+    to: core
+    action: Loads the model and resolves code links for each step
