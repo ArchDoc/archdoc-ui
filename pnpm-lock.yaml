@@ -102,6 +102,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@archdoc/analyzers':
+        specifier: workspace:*
+        version: link:../analyzers
       '@archdoc/core':
         specifier: workspace:*
         version: link:../core
