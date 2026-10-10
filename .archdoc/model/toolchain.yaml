@@ -57,7 +57,7 @@ elements:
             code: [{ path: packages/core/src/codemap/** }]
           report:
             kind: component
-            description: Text and JSON answers shared by the CLI and MCP, so people and agents read the same words.
+            description: Text, JSON, and Mermaid answers shared by the CLI and MCP, so people and agents read the same words. Draws the PR report's diagrams of the change and its journeys.
             code: [{ path: packages/core/src/report/** }]
             uses:
               query: Formats element, actor, overview, and impact results
@@ -105,7 +105,7 @@ elements:
         uses:
           core: Commands delegate to core
           spec: Migrates v1 files and prints the JSON Schema
-          web: Serves the explorer, the raw model files, and change events for `archdoc view`
+          web: Serves the explorer, the raw model files (and with --base, the files at a ref), and change events for `archdoc view`
           mcp: Starts the MCP server for `archdoc mcp`
           analyzers:
             description: Runs analyzers for `archdoc check`
@@ -128,18 +128,21 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: Read-only MCP tools for agents (search, overview, locate, impact, element, actor, journey, validate). check, diff, and propose come next.
+        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, check, diff, validate), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
           core: Tool calls delegate to core
-          model-files:
-            description: Writes suggested changes to the model
-            status: planned
+          model-files: Writes suggested additions and proposal notes for archdoc_propose
+          analyzers:
+            description: Runs analyzers for archdoc_check
+            provenance:
+              source: suggested
+              by: agent:claude-code
 
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views and a code panel with links; diff overlay and tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)
@@ -167,7 +170,7 @@ elements:
       github-action:
         kind: container
         technology: GitHub Actions (composite), actions/github-script
-        description: Posts an architectural-impact comment on pull requests and fails on drift they introduce.
+        description: Posts an architectural-impact comment, with Mermaid diagrams of the change and its journeys, on pull requests and fails on drift they introduce.
         code: [{ path: integrations/github-action/** }]
         uses:
           cli:

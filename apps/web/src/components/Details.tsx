@@ -1,5 +1,6 @@
 import {
   describeTarget,
+  diffSummary,
   filesUnder,
   getActor,
   getElement,
@@ -11,6 +12,7 @@ import {
   type Target,
 } from "@archdoc/core/browser";
 import type { ReactNode } from "react";
+import type { Compare } from "../App.js";
 import { type CodeContext, CodeSection, StepCode } from "./code.js";
 
 export interface DetailsProps {
@@ -26,11 +28,15 @@ export interface DetailsProps {
   onFocus: (on: boolean) => void;
   onToggle: (elementId: string) => void;
   code: CodeContext;
+  compare?: Compare | undefined;
 }
 
 export function Details(props: DetailsProps) {
   const { model, selected, journey } = props;
   if (journey) return <JourneyDetails {...props} journey={journey} />;
+  if (selected?.startsWith("element:") && !model.elements.has(selected.slice(8)) && props.compare) {
+    return <RemovedDetails {...props} compare={props.compare} id={selected} />;
+  }
   if (selected?.startsWith("element:")) return <ElementDetails {...props} id={selected.slice(8)} />;
   if (selected?.startsWith("actor:")) return <ActorDetails {...props} id={selected.slice(6)} />;
   if (selected?.startsWith("external:"))
@@ -42,6 +48,15 @@ export function Details(props: DetailsProps) {
       <p className="eyebrow">Model · {model.namespace}</p>
       <h1>{model.name ?? model.namespace}</h1>
       {model.description ? <p className="lede">{model.description}</p> : null}
+      {props.compare ? (
+        <div className="changes-summary">
+          <p className="eyebrow">Changes since {props.compare.ref}</p>
+          <p>{diffSummary(props.compare.diff) || "The model didn't change."}</p>
+          {props.compare.journeys.size ? (
+            <p className="muted">Journeys affected: {[...props.compare.journeys].join(", ")}</p>
+          ) : null}
+        </div>
+      ) : null}
       <dl className="stats">
         <Stat n={o.counts.actors} label="actors" />
         <Stat n={o.counts.elements} label="elements" />
@@ -79,6 +94,7 @@ function ElementDetails(props: DetailsProps & { id: string }) {
           provenanceLabel(el.spec.provenance),
         ]}
       />
+      <ChangeNote compare={props.compare} id={el.id} />
       {el.spec.description ? <p className="lede">{el.spec.description}</p> : null}
       {el.spec.documentation ? <p>{el.spec.documentation}</p> : null}
       <Actions>
@@ -222,6 +238,41 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
           ))}
         </ol>
       </Block>
+    </div>
+  );
+}
+
+function ChangeNote({ compare, id }: { compare?: Compare | undefined; id: string }) {
+  const c = compare?.diff.elements.find((x) => x.id === id);
+  if (!c || !compare) return null;
+  const what =
+    c.kind === "added"
+      ? `Added since ${compare.ref}.`
+      : c.kind === "moved"
+        ? `Moved from ${c.from} since ${compare.ref}.`
+        : `Changed since ${compare.ref}: ${c.fields.join(", ")}.`;
+  return <p className={`change-note change-${c.kind}`}>{what}</p>;
+}
+
+function RemovedDetails(props: DetailsProps & { compare: Compare; id: string }) {
+  const el = props.compare.base.elements.get(props.id.slice(8));
+  return (
+    <div className="details">
+      <p className="eyebrow">{el?.spec.kind ?? "element"}</p>
+      <h1>{el?.spec.name ?? el?.key ?? props.id.slice(8)}</h1>
+      <p className="change-note change-removed">Removed since {props.compare.ref}.</p>
+      {el?.spec.description ? <p className="lede">{el.spec.description}</p> : null}
+      {el?.code.length ? (
+        <Block title="Code it mapped">
+          <ul className="code-list">
+            {el.code.map((c) => (
+              <li key={c.path}>
+                <code>{c.path}</code>
+              </li>
+            ))}
+          </ul>
+        </Block>
+      ) : null}
     </div>
   );
 }

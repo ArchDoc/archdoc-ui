@@ -4,7 +4,13 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { listRepoFiles, readModelSources, repoInfo } from "@archdoc/core";
+import {
+  listRepoFiles,
+  readModelSources,
+  readModelSourcesAtRef,
+  repoInfo,
+  type SourcesAtRef,
+} from "@archdoc/core";
 
 export interface ViewServerOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -17,6 +23,8 @@ export interface ViewServerOptions {
   watch?: boolean;
   /** Directory with the built explorer. Found automatically when omitted. */
   webDir?: string;
+  /** Also send the model as it was at this ref, for the explorer's before/after view. */
+  base?: string;
 }
 
 export interface ViewServer {
@@ -47,6 +55,10 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
   const watching = options.watch === true;
   const clients = new Set<ServerResponse>();
   const initial = await readModelSources(options.target, { cwd: options.cwd });
+  // The base doesn't change while the server runs, so read it once.
+  const base: SourcesAtRef | undefined = options.base
+    ? await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
+    : undefined;
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -68,6 +80,12 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
           watch: watching,
           files,
           repo: { ...repo, root: read.baseDir },
+          base: base && {
+            ref: base.ref,
+            commit: base.commit,
+            root: base.root,
+            sources: base.sources,
+          },
         });
       }
       if (url.pathname === "/api/events") {

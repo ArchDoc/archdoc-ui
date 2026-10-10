@@ -1,8 +1,12 @@
 import { isAbsolute, relative, resolve } from "node:path";
+import { checkRepository } from "@archdoc/analyzers";
 import {
+  diffModels,
   formatActor,
   formatDiagnostics,
+  formatDiff,
   formatElement,
+  formatFindings,
   formatImpact,
   formatJourney,
   formatLocate,
@@ -11,7 +15,9 @@ import {
   impact,
   type LoadedModel,
   loadModel,
+  loadModelAtRef,
   locate,
+  propose,
   resolveRef,
   search,
 } from "@archdoc/core";
@@ -33,7 +39,9 @@ Start every coding task here, before you grep or read files:
 2. Call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules.
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
-archdoc_locate tells you which element owns a file. After you change the architecture (a new component, moved code, a new dependency between components), update .archdoc/ and call archdoc_validate.`;
+archdoc_locate tells you which element owns a file.
+
+After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Use archdoc_diff to describe your model changes in the PR.`;
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 
@@ -211,6 +219,142 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
           );
         return formatJourney(m, j);
       }),
+  );
+
+  server.registerTool(
+    "archdoc_check",
+    {
+      title: "Check for drift",
+      description:
+        'Compare the model with the code and its rules: imports between elements the model doesn\'t declare, broken rules, broken journeys, stale code paths, and orphan elements. Call this after editing. Pass base (such as "main") to see what your change introduced.',
+      inputSchema: {
+        base: z.string().optional().describe("Branch or commit to compare with, such as main"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ base }) => {
+      try {
+        const { findings } = await checkRepository({ model: options.model, cwd, base });
+        const introduced = findings.filter((f) => f.introduced);
+        const next =
+          base && introduced.some((f) => f.code === "drift/undeclared-dependency")
+            ? "\n\nIf a new dependency is intended, call archdoc_propose to add it to the model as a suggestion. If not, remove the import."
+            : "";
+        return text(formatFindings(findings, "text") + next);
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_diff",
+    {
+      title: "Model changes",
+      description:
+        "What changed in the model (actors, elements, relationships, journeys, data, rules) between a ref and the working tree. Use it to describe your model changes in a PR.",
+      inputSchema: {
+        base: z.string().optional().describe("Branch or commit to compare with (default HEAD)"),
+        format: z.enum(["text", "markdown"]).optional(),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ base, format }) => {
+      try {
+        const ref = base ?? "HEAD";
+        const [before, after] = await Promise.all([
+          loadModelAtRef(options.model ?? ".", ref, { cwd }),
+          loadModel(options.model ?? ".", { cwd }),
+        ]);
+        return text(
+          formatDiff(diffModels(before, after), format ?? "text", `${ref} → working tree`),
+        );
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_propose",
+    {
+      title: "Propose model additions",
+      description:
+        "Add elements and relationships to the model as suggestions, marked provenance: suggested, for a person to accept or reject in review. Use it when your change adds a component or a dependency the model doesn't declare. It only adds: it never changes or removes what's there, never edits other repos' namespaces, and writes nothing if the result wouldn't validate. Writes a note with your rationale to .archdoc/proposals/.",
+      inputSchema: {
+        edits: z
+          .array(
+            z.discriminatedUnion("op", [
+              z.object({
+                op: z.literal("add-relationship"),
+                from: z.string().describe("Element or actor that uses the target"),
+                to: z.string().describe("Element it uses"),
+                description: z.string().describe("What the relationship is for"),
+                technology: z.string().optional(),
+              }),
+              z.object({
+                op: z.literal("add-element"),
+                id: z.string().describe("Key of the new element, such as search"),
+                parent: z
+                  .string()
+                  .optional()
+                  .describe("Element to put it inside; omit for top level"),
+                kind: z.enum([
+                  "system",
+                  "container",
+                  "component",
+                  "datastore",
+                  "queue",
+                  "external",
+                ]),
+                description: z.string(),
+                technology: z.string().optional(),
+                code: z.array(z.string()).optional().describe("Code paths (globs) for the element"),
+              }),
+            ]),
+          )
+          .min(1),
+        rationale: z.string().describe("Why the model should change; goes into the proposal note"),
+        by: z.string().optional().describe("Who proposes, such as agent:claude-code"),
+        dryRun: z.boolean().optional().describe("Check the proposal without writing anything"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ edits, rationale, by, dryRun }) => {
+      try {
+        const r = await propose({
+          model: options.model,
+          cwd,
+          edits,
+          rationale,
+          by: by ?? "agent:unknown",
+          dryRun,
+        });
+        if (!r.ok) return error(["Nothing was written.", ...r.errors].join("\n"));
+        const lines = [
+          dryRun
+            ? "Dry run: nothing was written. These edits would apply:"
+            : "Proposed, as suggestions for review:",
+          ...r.applied.map((a) => `  ${a}`),
+        ];
+        if (!dryRun) {
+          lines.push("", `Changed: ${r.changes.map((c) => c.path).join(", ")}`);
+          if (r.note) lines.push(`Note: ${r.note}`);
+          lines.push(
+            "",
+            "Mention these suggestions in your PR description; a person accepts or rejects them.",
+          );
+        }
+        return text(lines.join("\n"));
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
   );
 
   server.registerTool(

@@ -12,5 +12,8 @@ export {
   changedFiles,
   loadModelAtRef,
   mergeBase,
+  readModelSourcesAtRef,
   resolveRef as resolveGitRef,
+  type SourcesAtRef,
 } from "./load/git.js";
+export { type ProposeOptions, type ProposeResult, propose } from "./propose/write.js";

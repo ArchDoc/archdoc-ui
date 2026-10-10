@@ -12,6 +12,10 @@ export interface CardData extends Record<string, unknown> {
   suggested?: boolean;
   hiddenChildren: number;
   isGroup: boolean;
+  /** In the before/after view: how this changed. */
+  change?: "added" | "changed" | "removed" | undefined;
+  /** A collapsed box with changes inside. */
+  containsChanges?: boolean | undefined;
   emphasis: Emphasis;
   selected: boolean;
   onToggle?: (() => void) | undefined;
@@ -47,6 +51,8 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.status && data.status !== "active" ? `status-${data.status}` : "",
     data.suggested ? "is-suggested" : "",
     `emphasis-${data.emphasis}`,
+    data.change ? `change-${data.change}` : "",
+    data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
   ]
     .filter(Boolean)
@@ -63,6 +69,14 @@ export function Card({ data }: NodeProps<CardNode>) {
       <div className="card-head">
         <Icon kind={data.kind} />
         <span className="card-kind">{data.kind}</span>
+        {data.change ? (
+          <span className={`card-change change-${data.change}`}>{data.change}</span>
+        ) : null}
+        {data.containsChanges ? (
+          <span className="card-change change-changed" title="Something inside changed">
+            changes inside
+          </span>
+        ) : null}
         {data.status && data.status !== "active" ? (
           <span className="card-status">{data.status}</span>
         ) : null}

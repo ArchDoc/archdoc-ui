@@ -1,4 +1,11 @@
-import { formatDiagnostic, type Model, resolveCodeMap } from "@archdoc/core/browser";
+import {
+  diffModels,
+  formatDiagnostic,
+  type Model,
+  type ModelDiff,
+  prReport,
+  resolveCodeMap,
+} from "@archdoc/core/browser";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
@@ -27,6 +34,7 @@ export function App() {
         reloads={state.reloads}
         files={state.files}
         repo={state.repo}
+        base={state.base}
       />
     </ReactFlowProvider>
   );
@@ -38,9 +46,20 @@ interface ExplorerProps {
   reloads: number;
   files: string[];
   repo: RepoLinks;
+  base?: { ref: string; model: Model } | undefined;
 }
 
-function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
+/** What the explorer needs to show changes against a base. */
+export interface Compare {
+  ref: string;
+  base: Model;
+  diff: ModelDiff;
+  /** IDs of journeys the changes affect. */
+  journeys: Set<string>;
+}
+
+function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
+  const [compareOn, setCompareOn] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
@@ -53,6 +72,12 @@ function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
   const search = useRef<HTMLInputElement>(null);
 
   const journey = journeyId ? model.journeys.get(journeyId) : undefined;
+  const compare = useMemo<Compare | undefined>(() => {
+    if (!base || !compareOn) return undefined;
+    const diff = diffModels(base.model, model);
+    const affected = prReport({ model, changedFiles: [], diff, findings: [] }).journeys;
+    return { ref: base.ref, base: base.model, diff, journeys: new Set(affected.map((j) => j.id)) };
+  }, [base, compareOn, model]);
   const code = useMemo(
     () => ({ codemap: resolveCodeMap(model, files), repo, files: new Set(files) }),
     [model, files, repo],
@@ -165,6 +190,17 @@ function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
           <span className="model-name">{model.name ?? model.namespace}</span>
         </div>
         <div className="topbar-right">
+          {base ? (
+            <button
+              type="button"
+              className={`btn compare-toggle${compareOn ? " is-on" : ""}`}
+              aria-pressed={compareOn}
+              onClick={() => setCompareOn((on) => !on)}
+              title={`Show what changed in the model since ${base.ref}`}
+            >
+              Changes since {base.ref}
+            </button>
+          ) : null}
           {watch ? (
             <span
               className="live"
@@ -205,6 +241,7 @@ function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
         onSelect={select}
         onToggle={toggle}
         onJourney={openJourney}
+        compare={compare}
       />
 
       <main className="canvas" aria-label="Architecture diagram">
@@ -218,6 +255,7 @@ function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
           onCentered={() => setCenterOn(undefined)}
           onSelect={select}
           onToggle={toggle}
+          compare={compare}
         />
         {journey && currentStep ? (
           <section className="journey-bar" aria-label="Journey steps">
@@ -286,6 +324,7 @@ function Explorer({ model, watch, reloads, files, repo }: ExplorerProps) {
           onFocus={setFocused}
           onToggle={toggle}
           code={code}
+          compare={compare}
         />
       </aside>
     </div>

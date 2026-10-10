@@ -46,12 +46,18 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .description("Open the explorer in your browser")
     .argument("[path]", "repository, .archdoc directory, or model file", ".")
     .option("-w, --watch", "reload the explorer when model files change")
+    .option("-b, --base <ref>", "show what changed in the model since this branch or commit")
     .option("-p, --port <port>", "port to listen on (default: a free port)")
     .option("--open", "open the explorer in your default browser")
-    .action(async (path: string, opts: { watch?: boolean; port?: string; open?: boolean }) => {
-      const result = await view(path, opts, io);
-      program.exitCode = result.code;
-    });
+    .action(
+      async (
+        path: string,
+        opts: { watch?: boolean; port?: string; open?: boolean; base?: string },
+      ) => {
+        const result = await view(path, opts, io);
+        program.exitCode = result.code;
+      },
+    );
 
   program
     .command("search")
@@ -136,7 +142,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "markdown or json", "markdown")
-    .action((opts: { model?: string; base?: string; format?: string }) => run(report(opts, io)));
+    .option("--no-diagrams", "leave out the Mermaid diagrams of the change and its journeys")
+    .action((opts: { model?: string; base?: string; format?: string; diagrams?: boolean }) =>
+      run(report(opts, io)),
+    );
 
   program
     .command("diff")

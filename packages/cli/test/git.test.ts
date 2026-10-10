@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createProgram } from "../src/index.js";
+import { createProgram, startViewServer } from "../src/index.js";
 
 // A small repository with a model, real code, and history, for the commands that read git.
 let repo: string;
@@ -108,6 +108,31 @@ describe("against a git history", () => {
     expect(r.out).toContain("### Suggested facts to review (1)");
     const sha = git("rev-parse", "main").trim();
     expect((await run("report", "--base", sha)).out).toContain(`for ${sha.slice(0, 7)}...HEAD.`);
+    expect(r.out).toContain("```mermaid\nflowchart TB");
+    expect((await run("report", "--base", "main", "--no-diagrams")).out).not.toContain("mermaid");
+  });
+
+  it("view --base serves the model at the ref beside the working tree", async () => {
+    const server = await startViewServer({ target: ".", cwd: repo, webDir: repo, base: "main" });
+    try {
+      type Sources = { path: string }[];
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        sources: Sources;
+        base: { sources: Sources };
+      };
+      expect(payload.sources.map((s) => s.path)).toContain(".archdoc/more.yaml");
+      expect(payload.base).toMatchObject({
+        ref: "main",
+        commit: git("rev-parse", "main").trim(),
+        root: "main:.archdoc/archdoc.yaml",
+      });
+      expect(payload.base.sources.map((s) => s.path)).toEqual(["main:.archdoc/archdoc.yaml"]);
+    } finally {
+      await server.close();
+    }
+    await expect(
+      startViewServer({ target: ".", cwd: repo, webDir: repo, base: "nope" }),
+    ).rejects.toThrow('"nope" is not a commit');
   });
 
   it("diff a...b compares from the merge base", async () => {

@@ -25,6 +25,7 @@
     }
   },
   "dependencies": {
+    "@archdoc/analyzers": "workspace:*",
     "@archdoc/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "zod": "^4.6.5"

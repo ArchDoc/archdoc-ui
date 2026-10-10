@@ -3,6 +3,8 @@
 Shows reviewers what a pull request means for the architecture, before they merge. On every pull request, it:
 
 1. Posts one comment (and keeps it up to date) with:
+   - a diagram of the change: the elements it touches and the model changes, colored added, changed, or removed, with suggested facts dotted and unchanged neighbors in grey
+   - a sequence diagram of each of the most important affected journeys, with the steps that pass through the change highlighted
    - the elements the change touches, and their owners
    - the journeys and actors it affects, critical ones first
    - what changed in the model, and facts suggested by agents that need a person's review

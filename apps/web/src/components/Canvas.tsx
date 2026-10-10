@@ -1,4 +1,4 @@
-import type { JourneyNode, Model } from "@archdoc/core/browser";
+import type { JourneyNode, Model, ModelDiff } from "@archdoc/core/browser";
 import {
   Background,
   Controls,
@@ -9,6 +9,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { type Box, layoutGraph } from "../graph/layout.js";
 import { type CardNode, type Emphasis, nodeTypes } from "./nodes.js";
@@ -24,11 +25,17 @@ export interface CanvasProps {
   onCentered: () => void;
   onSelect: (key: string | undefined) => void;
   onToggle: (elementId: string) => void;
+  /** Show changes against a base model. */
+  compare?: { base: Model; diff: ModelDiff } | undefined;
 }
 
 export function Canvas(props: CanvasProps) {
-  const { model, view, selected, journey, step, centerOn } = props;
-  const graph = useMemo(() => buildGraph(model, view), [model, view]);
+  const { model, view, selected, journey, step, centerOn, compare } = props;
+  const overlay = useMemo<DiffGraph | undefined>(
+    () => (compare ? buildDiffGraph(model, compare.base, compare.diff, view) : undefined),
+    [model, view, compare],
+  );
+  const graph = useMemo(() => overlay?.graph ?? buildGraph(model, view), [overlay, model, view]);
   const [layout, setLayout] = useState<{ graph: Graph; boxes: Map<string, Box> }>();
   const flow = useReactFlow();
   const [hoverEdge, setHoverEdge] = useState<string>();
@@ -75,7 +82,8 @@ export function Canvas(props: CanvasProps) {
     return layout.graph.nodes.flatMap((n) => {
       const box = layout.boxes.get(n.id);
       if (!box) return [];
-      const info = describe(model, n.id);
+      const ghost = overlay?.ghosts.has(n.id) && compare;
+      const info = describe(ghost ? compare.base : model, n.id);
       const element = n.kind === "element" ? model.elements.get(n.id.slice(8)) : undefined;
       return [
         {
@@ -92,6 +100,8 @@ export function Canvas(props: CanvasProps) {
             ...info,
             hiddenChildren: n.hiddenChildren,
             isGroup: n.isGroup,
+            change: overlay?.nodes.get(n.id),
+            containsChanges: overlay?.containsChanges.has(n.id),
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
             onToggle:
@@ -100,7 +110,7 @@ export function Canvas(props: CanvasProps) {
         },
       ];
     });
-  }, [layout, model, emphasis, dimming, selected, props.onToggle]);
+  }, [layout, model, emphasis, dimming, selected, props.onToggle, overlay, compare]);
 
   const edges = useMemo<Edge[]>(() => {
     if (!layout) return [];
@@ -119,6 +129,11 @@ export function Canvas(props: CanvasProps) {
         className: [
           "rel",
           e.planned ? "is-planned" : "",
+          e.relationships.length > 0 &&
+          e.relationships.every((r) => r.provenance?.source === "suggested")
+            ? "is-suggested"
+            : "",
+          overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
           lit ? "is-lit" : "",
           dimming && !lit ? "is-dim" : "",
         ]
@@ -146,7 +161,7 @@ export function Canvas(props: CanvasProps) {
         zIndex: s.step === step ? 10 : 6,
       }));
     return [...regular, ...journeyOverlay];
-  }, [layout, journey, steps, step, selected, dimming, hoverEdge]);
+  }, [layout, journey, steps, step, selected, dimming, hoverEdge, overlay]);
 
   // Fit everything on the first layout; afterwards only move when asked to.
   useEffect(() => {

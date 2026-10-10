@@ -6,6 +6,8 @@ export interface ReportOptions {
   model?: string;
   base?: string;
   format?: string;
+  /** False leaves out the Mermaid diagrams. */
+  diagrams?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
       changedFiles: changed,
       diff: diffModels(baseModel, model),
       findings: marked,
+      diagrams: options.diagrams !== false,
       // A commit hash, as the Action passes, reads better short.
       label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });

@@ -2,7 +2,6 @@ journey: review-ai-change
 actor: developer
 goal: Understand what an AI-authored PR changes in the architecture before merging
 importance: critical
-status: planned
 steps:
   - from: coding-agent
     to: mcp
@@ -20,4 +19,4 @@ steps:
     code: packages/core/src/report/pr-report.ts
   - from: developer
     to: web
-    action: Opens the before/after view and accepts or rejects suggested facts
+    action: Opens the before/after view (archdoc view --base) and reviews the suggested facts

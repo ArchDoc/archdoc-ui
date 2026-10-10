@@ -36,6 +36,8 @@ export {
 export { type BuildOptions, buildModel, type ModelSource, normalizeCode } from "./load/build.js";
 export { type Resolution, Resolver } from "./load/resolve.js";
 export * from "./model.js";
+export { insertIntoMap } from "./propose/insert.js";
+export { type ProposalEdit, type ProposalPlan, planProposal } from "./propose/propose.js";
 export {
   type AffectedJourney,
   type Impact,
@@ -47,5 +49,12 @@ export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
 export { formatFindings, type MarkedFinding } from "./report/check-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
+export {
+  CHANGE_LEGEND,
+  type ChangeDiagramInput,
+  changeDiagram,
+  type JourneyDiagramInput,
+  journeyDiagram,
+} from "./report/mermaid.js";
 export { type PrReport, type PrReportInput, prReport, REPORT_MARKER } from "./report/pr-report.js";
 export * from "./report/report.js";

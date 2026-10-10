@@ -57,10 +57,12 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 - [x] Analyzer plugin API. First analyzers: workspace/package manifests and TS/JS imports (TypeScript's `preProcessFile` rather than dependency-cruiser, decided 2026-10-10: fewer dependencies, and other languages plug in through the API).
 - [x] `check`: undeclared dependency, rule violation, broken journey, stale mapping, orphan element. `rules.yaml`.
 - [x] `integrations/github-action`: architectural-impact PR comment (elements, owners, **affected journeys and actors**, drift), configurable warn or fail.
-- [ ] MCP write tools: `check`, `diff`, `propose` (writes `suggested` provenance and a proposal note).
-- [ ] Explorer diff mode (base vs. head overlay, suggested = dashed, affected journeys highlighted).
+- [x] MCP write tools: `check`, `diff`, `propose` (writes `suggested` provenance and a proposal note). `propose` only adds elements and relationships, decided 2026-10-10: it never changes or removes facts, never edits another repo's namespace, inserts text without reformatting the YAML, and writes nothing if the result wouldn't validate.
+- [x] Explorer diff mode (base vs. head overlay, suggested = dashed, affected journeys highlighted): `archdoc view --base <ref>` and a "Changes since" toggle. Removed elements and relationships show as ghosts.
 
 **Exit:** on this repo's own PRs, the Action posts an accurate architectural-impact comment that names the affected journeys. An agent-introduced cross-package import that the model doesn't declare is flagged.
+
+**Exit test, 2026-10-10: passed.** On PR #22 (Phase 3a), the Action posted an architectural-impact comment that named the touched elements, the affected journeys (critical first) and actors, the model changes, and the suggested facts, and it updated the comment in place on each push. On test PR #23, an undeclared `@archdoc/mcp` → `@archdoc/analyzers` import failed the check as drift the change introduced, with the file and line; the PR was closed unmerged. In Phase 3b, the same dependency went into the model the intended way: through `archdoc_propose`, as a suggestion with a proposal note.
 
 ## Phase 4: Multi-repo federation (M–L) ⭐ the "enterprise" milestone
 
