@@ -83,6 +83,9 @@ pnpm archdoc show toolchain.cli                      # details of an element, ac
 pnpm archdoc locate packages/core/src/load/fs.ts   # which element owns this file?
 pnpm archdoc impact packages/cli/src/commands      # what would changing it affect?
 pnpm archdoc map                            # how the repo's files map onto the model
+pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
+pnpm archdoc diff main                      # what changed in the model since main
+pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
 pnpm archdoc validate examples/blog.yaml    # a single-file model
 pnpm archdoc migrate examples/v1/blog.yaml  # convert a v0/v1 model to v2
 pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
@@ -93,6 +96,16 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
 `show` prints the details of any element, actor, or journey by ID. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+
+## Keep the model honest
+
+`archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it marks what your change introduced and fails only on that, so it works as a CI gate from day one.
+
+`archdoc diff` shows what changed in the model itself, by element, relationship, actor, and journey rather than by line.
+
+## Review pull requests
+
+The [GitHub Action](./integrations/github-action) comments on every pull request with its architectural impact: the elements it touches and their owners, the journeys and actors it affects (critical first), what changed in the model, facts an agent suggested that need a person's review, and drift the change introduced. It can fail the check on new drift.
 
 ## Use it with your coding agent
 
@@ -122,10 +135,12 @@ packages/
   core/   @archdoc/core   load, validate, and query models (no LLM)
   cli/    @archdoc/cli    the `archdoc` command, including the `view` server
   mcp/    @archdoc/mcp    MCP server for coding agents
+  analyzers/ @archdoc/analyzers  find the dependencies code actually has (manifests, TS/JS imports)
 apps/
   web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 integrations/
   agent-skills/           Claude Code skill, AGENTS.md snippet, MCP configs
+  github-action/          the pull request impact comment and drift gate
 examples/                 example models in v2 (v1 originals in examples/v1)
 docs/revival/             the relaunch plan: assessment, strategy, architecture, roadmap
 .archdoc/                 ArchDoc's own model

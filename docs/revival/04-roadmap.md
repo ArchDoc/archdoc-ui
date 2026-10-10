@@ -53,10 +53,10 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 
 ## Phase 3: Diff, drift, and the PR loop (M–L) ⭐ the "driver seat" milestone
 
-- [ ] `diff(modelA, modelB)` + `archdoc diff` (text, json, markdown, mermaid outputs), covering actors and journeys as well as elements.
-- [ ] Analyzer plugin API. First analyzers: workspace/package manifests and TS/JS import graph (dependency-cruiser).
-- [ ] `check`: undeclared dependency, rule violation, broken journey, stale mapping, orphan element. `rules.yaml`.
-- [ ] `integrations/github-action`: architectural-impact PR comment (elements, owners, **affected journeys and actors**, drift), configurable warn or fail.
+- [x] `diff(modelA, modelB)` + `archdoc diff` (text, json, markdown, mermaid outputs), covering actors and journeys as well as elements.
+- [x] Analyzer plugin API. First analyzers: workspace/package manifests and TS/JS imports (TypeScript's `preProcessFile` rather than dependency-cruiser, decided 2026-10-10: fewer dependencies, and other languages plug in through the API).
+- [x] `check`: undeclared dependency, rule violation, broken journey, stale mapping, orphan element. `rules.yaml`.
+- [x] `integrations/github-action`: architectural-impact PR comment (elements, owners, **affected journeys and actors**, drift), configurable warn or fail.
 - [ ] MCP write tools: `check`, `diff`, `propose` (writes `suggested` provenance and a proposal note).
 - [ ] Explorer diff mode (base vs. head overlay, suggested = dashed, affected journeys highlighted).
 
