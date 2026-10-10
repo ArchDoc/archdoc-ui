@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Relaunch plan
-    url: https://github.com/ArchDoc/archdoc-ui/tree/main/docs/revival
+    url: https://github.com/ArchDoc/archdoc/tree/main/docs/revival
     about: Read the plan and roadmap before proposing large changes.

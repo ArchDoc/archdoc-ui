@@ -32,7 +32,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Report unacceptable behavior to the project maintainers privately through a [GitHub security advisory](https://github.com/ArchDoc/archdoc-ui/security/advisories/new) or by contacting a member of the ArchDoc organization directly. All complaints will be reviewed and investigated promptly and fairly. Maintainers will respect the privacy and security of the reporter.
+Report unacceptable behavior to the project maintainers privately through a [GitHub security advisory](https://github.com/ArchDoc/archdoc/security/advisories/new) or by contacting a member of the ArchDoc organization directly. All complaints will be reviewed and investigated promptly and fairly. Maintainers will respect the privacy and security of the reporter.
 
 Maintainers follow the [Contributor Covenant enforcement guidelines](https://www.contributor-covenant.org/version/2/1/code_of_conduct/#enforcement-guidelines) when deciding on consequences: correction, warning, temporary ban, or permanent ban.
 

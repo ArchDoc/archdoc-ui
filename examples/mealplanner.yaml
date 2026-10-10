@@ -22,7 +22,7 @@ elements:
       - my
       - ui
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
     uses:
       api: Interfaces with the UI
@@ -34,7 +34,7 @@ elements:
       - my
       - other
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
   api:
     kind: container
@@ -44,7 +44,7 @@ elements:
       - my
       - api
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
     uses:
       auth-service: Generates admin JWTs
@@ -74,7 +74,7 @@ elements:
       - my
       - recipe
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
   product-service:
     kind: container
@@ -85,7 +85,7 @@ elements:
       - my
       - widget
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
   widget-service:
     kind: container
@@ -96,5 +96,5 @@ elements:
       - my
       - widget
     links:
-      - url: https://github.com/ArchDoc/archdoc-ui
+      - url: https://github.com/ArchDoc/archdoc
         title: Repository
