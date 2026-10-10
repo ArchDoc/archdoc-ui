@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,8 +37,14 @@ async function release(repo: string, tag: string) {
   git(repo, "tag", tag);
 }
 
+const webDirBefore = process.env.ARCHDOC_WEB_DIR;
+
 beforeAll(async () => {
   org = await mkdtemp(join(tmpdir(), "archdoc-landscape-"));
+  // A stand-in explorer, so the test doesn't need apps/web built.
+  await mkdir(join(org, "web"), { recursive: true });
+  await writeFile(join(org, "web/index.html"), "<!doctype html><title>explorer</title>");
+  process.env.ARCHDOC_WEB_DIR = join(org, "web");
   await cp(fileURLToPath(new URL("../../../examples/acme/", import.meta.url)), org, {
     recursive: true,
   });
@@ -55,7 +61,11 @@ beforeAll(async () => {
   await release("payments", "v5.0.1");
 }, 60_000);
 
-afterAll(() => rm(org, { recursive: true, force: true }));
+afterAll(async () => {
+  if (webDirBefore === undefined) delete process.env.ARCHDOC_WEB_DIR;
+  else process.env.ARCHDOC_WEB_DIR = webDirBefore;
+  await rm(org, { recursive: true, force: true });
+});
 
 describe("the landscape", () => {
   it("sync vendors the landscape with every repo's model", async () => {
