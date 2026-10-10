@@ -1,8 +1,18 @@
 // Everything in @archdoc/core that runs without Node: no filesystem, no network.
 // The explorer imports this entry point so it builds and queries the model
 // with the same engine as the CLI.
+
+export {
+  type CheckOptions,
+  type CheckResult,
+  check,
+  type Finding,
+  type ObservedEdge,
+  observedEdges,
+} from "./check/check.js";
 export { validateJourneys } from "./check/journeys.js";
 export { evidenceOf, type ObservedDependency } from "./check/observed.js";
+export { evaluateRules, type RuleEdge, type RuleViolation } from "./check/rules.js";
 export {
   type CodeMap,
   type CodeMatch,
@@ -35,5 +45,6 @@ export {
 } from "./query/impact.js";
 export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
+export { formatFindings, type MarkedFinding } from "./report/check-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
 export * from "./report/report.js";

@@ -37,9 +37,6 @@ elements:
           spec: Validates model files against the schema
           model-files: Reads the model
           source-tree: Lists repository files to map them to elements (git ls-files)
-          analyzers:
-            description: Collects observed architecture from source
-            status: planned
         elements:
           loader:
             kind: component
@@ -64,40 +61,64 @@ elements:
             code: [{ path: packages/core/src/report/** }]
             uses:
               query: Formats element, actor, overview, and impact results
+              checker:
+                description: Formats check findings
+                provenance: { source: suggested, by: agent:claude-code }
+              differ:
+                description: Formats model diffs as text, markdown, and mermaid
+                provenance: { source: suggested, by: agent:claude-code }
+              codemap:
+                description: Formats locate results
+                provenance: { source: suggested, by: agent:claude-code }
           checker:
             kind: component
-            description: Journey validation today. Drift detection and rule evaluation next.
+            description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans).
             code: [{ path: packages/core/src/check/** }]
+            uses:
+              codemap:
+                description: Maps observed file dependencies onto elements
+                provenance: { source: suggested, by: agent:claude-code }
+              loader:
+                description: Resolves rule selectors and journey steps
+                provenance: { source: suggested, by: agent:claude-code }
           differ:
             kind: component
-            status: planned
-            description: Semantic diff between two model revisions.
+            description: Semantic diff between two model revisions (actors, elements, relationships, journeys, data, rules).
             code: [{ path: packages/core/src/diff/** }]
 
       analyzers:
         kind: container
-        status: planned
-        technology: TypeScript, dependency-cruiser
-        description: Pluggable extractors of observed elements and dependencies.
+        technology: TypeScript (ts.preProcessFile)
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports).
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files
+          core:
+            description: Produces core's ObservedDependency records
+            provenance: { source: suggested, by: agent:claude-code }
 
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, mcp, migrate, and schema; diff and check next."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
           spec: Migrates v1 files and prints the JSON Schema
           web: Serves the explorer, the raw model files, and change events for `archdoc view`
           mcp: Starts the MCP server for `archdoc mcp`
+          analyzers:
+            description: Runs analyzers for `archdoc check`
+            provenance: { source: suggested, by: agent:claude-code }
         elements:
           commands:
             kind: component
             description: One module per command.
             code: [{ path: packages/cli/src/commands/** }]
+            uses:
+              view-server:
+                description: Starts the server for `archdoc view`
+                provenance: { source: suggested, by: agent:claude-code }
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
@@ -139,6 +160,9 @@ elements:
             code: [{ path: apps/web/src/components/**, description: Components }, apps/web/src/App.tsx]
             uses:
               graph: Renders the laid-out graph
+              model-loader:
+                description: Gets the model, files, and repository links
+                provenance: { source: suggested, by: agent:claude-code }
 
       github-action:
         kind: container

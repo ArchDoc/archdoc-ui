@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
+import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
 import { diff } from "./commands/diff.js";
 import { migrate } from "./commands/migrate.js";
@@ -106,6 +107,24 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       const { runStdio } = await import("@archdoc/mcp");
       await runStdio({ model: opts.model, cwd: io.cwd, version });
     });
+
+  program
+    .command("check")
+    .description(
+      "Compare the model with the code and its rules: undeclared dependencies, rule violations, stale paths",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option(
+      "-b, --base <ref>",
+      "mark what changed since this ref introduced, and fail only on that",
+    )
+    .option("-f, --format <format>", "text, markdown, or json", "text")
+    .option("--fail-on <severity>", "error, warning, or never", "error")
+    .option("--no-code", "check the model only, without analyzing code")
+    .action(
+      (opts: { model?: string; base?: string; format?: string; failOn?: string; code?: boolean }) =>
+        run(check(opts, io)),
+    );
 
   program
     .command("diff")
