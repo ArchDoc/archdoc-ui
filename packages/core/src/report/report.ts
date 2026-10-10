@@ -147,7 +147,8 @@ export function formatElement(model: Model, ref: string): string | undefined {
     );
   }
   if (v.usedBy.length) out.push(`Used by: ${rels(v.usedBy, "from")}`);
-  const remote = consumersElsewhere(model, new Set([e.id])).consumers;
+  const parts = [...model.elements.keys()].filter((id) => id.startsWith(`${e.id}.`));
+  const remote = consumersElsewhere(model, new Set([e.id, ...parts])).consumers;
   if (remote.length)
     out.push(`Used from other repos: ${[...new Set(remote.map((c) => c.from))].join(", ")}`);
   if (v.journeys.length) out.push(`Journeys: ${v.journeys.map((j) => j.id).join(", ")}`);
