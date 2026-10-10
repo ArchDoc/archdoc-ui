@@ -235,6 +235,24 @@ export const DataEntrySchema = z.strictObject({
 export const RuleSchema = z.looseObject({
   id: IdSchema,
   description: z.string().optional(),
+  scope: z
+    .enum(["repo", "org"])
+    .optional()
+    .describe(
+      "org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
+    ),
+});
+
+/** A business domain in a landscape: the repos and elements that belong to it. */
+export const DomainSchema = z.strictObject({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  owners: StringList.optional(),
+  namespaces: z
+    .array(NamespaceSchema)
+    .optional()
+    .describe("Repos (by namespace) that belong to this domain"),
+  elements: StringList.optional().describe("Elements that belong to it, such as payments.ledger"),
 });
 
 const importPath = z
@@ -283,6 +301,10 @@ const sections = {
   logic: z.record(IdSchema, z.looseObject({})).optional(),
   tours: z.record(IdSchema, z.looseObject({})).optional(),
   rules: z.array(RuleSchema).optional(),
+  domains: z
+    .record(IdSchema, DomainSchema)
+    .optional()
+    .describe("Business domains, for grouping a landscape by more than repo"),
 };
 
 /**
@@ -322,6 +344,7 @@ export type JourneyStepSpec = z.infer<typeof JourneyStepSchema>;
 export type JourneySpec = z.infer<typeof JourneySchema>;
 export type DataEntrySpec = z.infer<typeof DataEntrySchema>;
 export type RuleSpec = z.infer<typeof RuleSchema>;
+export type DomainSpec = z.infer<typeof DomainSchema>;
 export type ImportSpec = z.infer<typeof ImportSchema>;
 export type ProvideSpec = z.infer<typeof ProvideSchema>;
 export type ModelFile = z.infer<typeof ModelFileSchema>;

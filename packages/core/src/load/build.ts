@@ -207,6 +207,17 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
       }
       model.rules.push(rule);
     }
+
+    for (const [id, spec] of Object.entries(file.domains ?? {})) {
+      if (model.domains?.has(id)) {
+        diagnostics.push(
+          error("model/duplicate", `Domain "${id}" is defined twice.`, parsed, ["domains", id]),
+        );
+        continue;
+      }
+      model.domains ??= new Map();
+      model.domains.set(id, { id, spec, location: parsed.locate(["domains", id]) });
+    }
   }
 
   if (schemaErrors) {
@@ -277,6 +288,7 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
 
   checkDataRefs(model, resolver);
   checkLocalContracts(model);
+  checkDomains(model, resolver);
   diagnostics.push(...validateJourneys(model, resolver, journeySites));
   return model;
 
@@ -346,6 +358,31 @@ function checkDataRefs(model: Model, resolver: Resolver) {
         code: "ref/unresolved-data",
         message: `${rel.from.id} → ${rel.ref} sends "${name}", which is not defined under data.`,
         location: rel.location,
+      });
+    }
+  }
+}
+
+/** A domain's namespaces must be this model's or imported, and its elements must resolve. */
+function checkDomains(model: Model, resolver: Resolver) {
+  for (const d of model.domains?.values() ?? []) {
+    for (const ns of d.spec.namespaces ?? []) {
+      if (ns === model.namespace || model.imports[ns]) continue;
+      model.diagnostics.push({
+        severity: "warning",
+        code: "ref/unknown-domain-member",
+        message: `Domain "${d.id}" lists namespace "${ns}", which isn't imported. Add it to imports.`,
+        location: d.location,
+      });
+    }
+    for (const ref of d.spec.elements ?? []) {
+      const r = resolver.element(ref);
+      if (r.status === "resolved" || r.status === "external") continue;
+      model.diagnostics.push({
+        severity: "warning",
+        code: "ref/unknown-domain-member",
+        message: `Domain "${d.id}" lists "${ref}", which isn't an element here or in an imported namespace.`,
+        location: d.location,
       });
     }
   }

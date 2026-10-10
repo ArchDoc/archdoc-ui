@@ -175,6 +175,13 @@ export function federate(model: Model, input: FederationInput): Model {
         });
       }
       model.landscape = { ...land, members };
+      // Teams the landscape defines resolve here, so owners: [payments-team] needs no local copy.
+      for (let i = model.diagnostics.length - 1; i >= 0; i--) {
+        const d = model.diagnostics[i];
+        const owner =
+          d?.code === "ref/unresolved-owner" ? /^Owner "([^"]+)"/.exec(d.message)?.[1] : undefined;
+        if (owner && land.model.actors.has(owner)) model.diagnostics.splice(i, 1);
+      }
     }
   } else if (input.lock?.landscape) {
     diagnostics.push({

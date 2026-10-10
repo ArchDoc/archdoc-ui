@@ -94,7 +94,16 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
       files: [...new Set(e.dependencies.map((d) => d.from))],
     })),
   ];
-  const rules = evaluateRules(model, ruleEdges);
+  // Org rules from the landscape run here too, named landscape/rule.
+  const org = (model.landscape?.model.rules ?? [])
+    .filter((r) => r.scope === "org")
+    .map((r) => ({ ...r, id: `${model.landscape?.namespace}/${r.id}` }));
+  const rules = evaluateRules(
+    model,
+    ruleEdges,
+    [...model.rules, ...org],
+    new Set(org.map((r) => r.id)),
+  );
   for (const v of rules.violations) {
     const severity = v.rule.severity === "warning" ? "warning" : "error";
     const what = v.edge.source === "declared" ? "The model declares" : "The code has";
