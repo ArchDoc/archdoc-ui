@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { LOCK_FILE, type Lock, LockSchema } from "@archdoc/spec";
 import { parse } from "yaml";
 import type { FederationInput, VendoredBundle } from "./federate.js";
@@ -46,8 +46,10 @@ export async function readFederationInput(dir: string, cwd: string): Promise<Fed
 
   const bundles = new Map<string, VendoredBundle>();
   for (const [ns, entry] of Object.entries(lock.imports)) {
-    const file = join(dir, entry.bundle);
-    const body = await readFile(file, "utf8").catch(() => undefined);
+    const file = resolve(dir, entry.bundle);
+    // Bundles live under the model directory; a lockfile can't point elsewhere.
+    const inside = file.startsWith(resolve(dir) + sep);
+    const body = inside ? await readFile(file, "utf8").catch(() => undefined) : undefined;
     bundles.set(ns, {
       path: display(file),
       text: body,

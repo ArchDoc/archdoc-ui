@@ -13,6 +13,20 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
   return stdout;
 }
 
+/**
+ * Git against another repository named in a model file. Model files come from
+ * pull requests, so a URL or ref must never become a git option, and
+ * transports that run commands (ext::) stay off.
+ */
+async function remoteGit(cwd: string, args: string[], untrusted: string[]): Promise<string> {
+  for (const value of untrusted) {
+    if (value.startsWith("-") || /^ext::/i.test(value)) {
+      throw new Error(`Refusing "${value}" as a git repository or ref.`);
+    }
+  }
+  return git(cwd, "-c", "protocol.ext.allow=never", "-c", "protocol.file.allow=always", ...args);
+}
+
 /** A git URL for an import: GitHub, any git URL, or a path relative to the repository root. */
 export function gitUrl(spec: { github: string } | { git: string }, repoRoot: string): string {
   if ("github" in spec) return `https://github.com/${spec.github.replace(/\.git$/, "")}.git`;
@@ -34,7 +48,7 @@ export interface Tag {
  * publish several namespaces) payments@5.2.0 and payments-v5.2.0.
  */
 export async function listTags(url: string, namespace: string, cwd: string): Promise<Tag[]> {
-  const out = await git(cwd, "ls-remote", "--tags", url);
+  const out = await remoteGit(cwd, ["ls-remote", "--tags", url], [url]);
   const tags = new Map<string, Tag>();
   for (const line of out.split("\n")) {
     const [commit, ref] = line.split("\t");
@@ -66,7 +80,7 @@ export async function resolveVersion(
   cwd: string,
 ): Promise<{ ref: string; commit: string; version?: string | undefined }> {
   if (!semver.validRange(range)) {
-    const out = await git(cwd, "ls-remote", url, range);
+    const out = await remoteGit(cwd, ["ls-remote", url, range], [url, range]);
     const [commit] = out.split("\n")[0]?.split("\t") ?? [];
     if (!commit)
       throw new Error(`"${range}" is neither a version range nor a branch or tag in ${url}.`);
@@ -107,11 +121,13 @@ export async function readRemoteModel(
   const tmp = await mkdtemp(join(tmpdir(), "archdoc-sync-"));
   try {
     await git(tmp, "init", "-q");
-    await git(tmp, "fetch", "-q", "--depth", "1", url, ref).catch((err: Error) => {
-      throw new Error(
-        `Couldn't fetch ${ref} from ${url}: ${err.message.split("\n").find((l) => l.startsWith("fatal")) ?? err.message}`,
-      );
-    });
+    await remoteGit(tmp, ["fetch", "-q", "--depth", "1", url, ref], [url, ref]).catch(
+      (err: Error) => {
+        throw new Error(
+          `Couldn't fetch ${ref} from ${url}: ${err.message.split("\n").find((l) => l.startsWith("fatal")) ?? err.message}`,
+        );
+      },
+    );
     const commit = (await git(tmp, "rev-parse", "FETCH_HEAD")).trim();
     const at = await readModelSourcesAtRef(path, commit, { cwd: tmp });
     if (!at.sources.length) throw new Error(`No ArchDoc model at ${path} in ${url} at ${ref}.`);

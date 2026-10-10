@@ -234,3 +234,15 @@ describe("publish", () => {
     );
   });
 });
+
+describe("untrusted model files", () => {
+  it("never pass a URL or ref to git as an option", async () => {
+    await expect(listTags("--upload-pack=touch /tmp/pwned", "x", org)).rejects.toThrow(
+      'Refusing "--upload-pack=touch /tmp/pwned"',
+    );
+    await expect(
+      resolveVersion(at("payments"), "payments", "--output=/tmp/x", org),
+    ).rejects.toThrow("Refusing");
+    await expect(listTags("ext::sh -c touch% /tmp/pwned", "x", org)).rejects.toThrow("Refusing");
+  });
+});
