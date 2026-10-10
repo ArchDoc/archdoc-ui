@@ -105,7 +105,7 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 ## Review pull requests
 
-The [GitHub Action](./integrations/github-action) comments on every pull request with its architectural impact: the elements it touches and their owners, the journeys and actors it affects (critical first), what changed in the model, facts an agent suggested that need a person's review, and drift the change introduced. It can fail the check on new drift.
+The [GitHub Action](./integrations/github-action) comments on every pull request with its architectural impact. It leads with Mermaid diagrams, which GitHub renders natively: one of the change (what was added, changed, or removed, and what an agent suggested, among its unchanged neighbors) and one of each of the most important journeys it affects, with the affected steps highlighted. Below them: the elements it touches and their owners, the journeys and actors it affects (critical first), what changed in the model, facts an agent suggested that need a person's review, and drift the change introduced. It can fail the check on new drift. `archdoc report --base main` writes the same report, ready to paste into a PR description.
 
 ## Use it with your coding agent
 

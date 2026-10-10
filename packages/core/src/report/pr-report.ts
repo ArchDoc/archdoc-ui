@@ -5,6 +5,7 @@ import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
 import { formatDiff, summary } from "./diff-report.js";
+import { CHANGE_LEGEND, changeDiagram, journeyDiagram } from "./mermaid.js";
 
 /** Marks the comment so the Action can find and update it. */
 export const REPORT_MARKER = "<!-- archdoc-report -->";
@@ -18,6 +19,10 @@ export interface PrReportInput {
   findings: MarkedFinding[];
   /** Label for the comparison, such as "main...feature". */
   label?: string;
+  /** Draw Mermaid diagrams of the change and the affected journeys. Default true. */
+  diagrams?: boolean;
+  /** Most journeys to draw. Default 3. */
+  maxJourneyDiagrams?: number;
 }
 
 export interface PrReport {
@@ -137,6 +142,9 @@ export function prReport(input: PrReportInput): PrReport {
     md.push(`**Touches:** ${list.join(", ") || "the model only"}`);
     if (owners.size) md.push(`**Owners:** ${[...owners].join(", ")}`);
     md.push("");
+    const diagram =
+      input.diagrams !== false && changeDiagram({ model, diff, touched: touchedFiles });
+    if (diagram) md.push("```mermaid", diagram, "```", "", `<sub>${CHANGE_LEGEND}</sub>`, "");
     if (journeyList.length) {
       md.push(
         `### Journeys affected (${journeyList.length})`,
@@ -152,6 +160,7 @@ export function prReport(input: PrReportInput): PrReport {
         );
       }
       md.push("");
+      if (input.diagrams !== false) md.push(...journeyDiagrams(input, journeyList));
     } else {
       md.push("No journeys pass through what this change touches.", "");
     }
@@ -231,6 +240,35 @@ export function prReport(input: PrReportInput): PrReport {
     introduced: counts,
     markdown: md.join("\n"),
   };
+}
+
+/** The most important affected journeys as sequence diagrams; the first one open. */
+function journeyDiagrams(input: PrReportInput, journeys: PrReport["journeys"]): string[] {
+  const out: string[] = [];
+  for (const j of journeys.slice(0, input.maxJourneyDiagrams ?? 3)) {
+    const changes = input.diff.journeys.find((c) => c.id === j.id)?.steps;
+    const diagram = journeyDiagram({
+      model: input.model,
+      journeyId: j.id,
+      steps: j.steps,
+      changes,
+    });
+    if (!diagram) continue;
+    const where = j.steps.length
+      ? `step${j.steps.length === 1 ? "" : "s"} ${j.steps.join(", ")} go${j.steps.length === 1 ? "es" : ""} through this change`
+      : "the journey itself changed";
+    out.push(
+      `<details${out.length ? "" : " open"}><summary><b>${j.id}</b> (${j.importance}): ${where}</summary>`,
+      "",
+      "```mermaid",
+      diagram,
+      "```",
+      "",
+      "</details>",
+      "",
+    );
+  }
+  return out;
 }
 
 function ref(t: RelationshipView["from"] | RelationshipView["to"]): string {

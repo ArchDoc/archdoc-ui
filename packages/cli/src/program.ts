@@ -142,7 +142,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "markdown or json", "markdown")
-    .action((opts: { model?: string; base?: string; format?: string }) => run(report(opts, io)));
+    .option("--no-diagrams", "leave out the Mermaid diagrams of the change and its journeys")
+    .action((opts: { model?: string; base?: string; format?: string; diagrams?: boolean }) =>
+      run(report(opts, io)),
+    );
 
   program
     .command("diff")

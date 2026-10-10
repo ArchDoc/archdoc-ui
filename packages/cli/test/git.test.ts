@@ -108,6 +108,8 @@ describe("against a git history", () => {
     expect(r.out).toContain("### Suggested facts to review (1)");
     const sha = git("rev-parse", "main").trim();
     expect((await run("report", "--base", sha)).out).toContain(`for ${sha.slice(0, 7)}...HEAD.`);
+    expect(r.out).toContain("```mermaid\nflowchart TB");
+    expect((await run("report", "--base", "main", "--no-diagrams")).out).not.toContain("mermaid");
   });
 
   it("view --base serves the model at the ref beside the working tree", async () => {

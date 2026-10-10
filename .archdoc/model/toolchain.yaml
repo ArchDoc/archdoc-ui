@@ -57,7 +57,7 @@ elements:
             code: [{ path: packages/core/src/codemap/** }]
           report:
             kind: component
-            description: Text and JSON answers shared by the CLI and MCP, so people and agents read the same words.
+            description: Text, JSON, and Mermaid answers shared by the CLI and MCP, so people and agents read the same words. Draws the PR report's diagrams of the change and its journeys.
             code: [{ path: packages/core/src/report/** }]
             uses:
               query: Formats element, actor, overview, and impact results
@@ -170,7 +170,7 @@ elements:
       github-action:
         kind: container
         technology: GitHub Actions (composite), actions/github-script
-        description: Posts an architectural-impact comment on pull requests and fails on drift they introduce.
+        description: Posts an architectural-impact comment, with Mermaid diagrams of the change and its journeys, on pull requests and fails on drift they introduce.
         code: [{ path: integrations/github-action/** }]
         uses:
           cli:
