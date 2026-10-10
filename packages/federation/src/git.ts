@@ -110,6 +110,8 @@ export interface RemoteModel {
   commit: string;
   /** The repo's archdoc.lock at that ref, if it has one. */
   lock?: string | undefined;
+  /** The bundles that lock points to, by path relative to the model directory. */
+  vendored: Map<string, string>;
 }
 
 /** The model files of a repository at a ref, read without checking it out. */
@@ -137,7 +139,21 @@ export async function readRemoteModel(
       return file.startsWith(dir) ? file.slice(dir.length) : file;
     };
     const lock = await git(tmp, "show", `${commit}:${dir}archdoc.lock`).catch(() => undefined);
+    const vendored = new Map<string, string>();
+    const listing = await git(
+      tmp,
+      "ls-tree",
+      "-r",
+      "--name-only",
+      commit,
+      "--",
+      `${dir}vendor`,
+    ).catch(() => "");
+    for (const file of listing.split("\n").filter((f) => f.endsWith(".json"))) {
+      vendored.set(file.slice(dir.length), await git(tmp, "show", `${commit}:${file}`));
+    }
     return {
+      vendored,
       sources: at.sources.map((s) => ({ path: strip(s.path), text: s.text })),
       root: strip(at.root),
       commit,

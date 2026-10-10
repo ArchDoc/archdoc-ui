@@ -78,12 +78,14 @@ Decided 2026-10-10: `sync` reads other repos' models at their release tags with 
   - cross-team journeys
   - org-wide rules
   - grouping by business domain
-- [ ] Cross-repo impact:
-  - The PR comment lists consumers and journeys in other repos.
-  - The MCP `impact` tool reads the landscape from the lockfile or a cached bundle.
+- [x] Cross-repo impact (4b). A repo imports the landscape (`landscape:` in `archdoc.yaml`); `sync` reads it at its release tag together with the models it vendors, so one fetch brings every repo's model:
+  - The PR comment lists consumers and journeys in other repos, marks the consumers a change breaks (a removed element, or a removed contract they use `via`) or deprecates, and draws them in the change diagram.
+  - The MCP `impact` tool, `archdoc impact`, and `archdoc show` read the landscape from the lockfile; `show payments.charges` works in any repo that has it.
 - [ ] Explorer landscape view: group by repo, team, or domain. Journeys animate across repo boundaries.
 
 **Exit:** a demo org of at least 3 repos plus a landscape repo. A PR that changes a contract in one repo lists its consumers and affected journeys in the other repos *before* merge. After release, a consumer repo's `check` flags the reference that no longer resolves.
+
+**Exit test, 2026-10-10: passed on the demo org** ([`examples/acme`](../../examples/acme), run as real git repos by `packages/cli/test/landscape.test.ts` and `federation.test.ts`). In payments, a branch that renames the `proto/charges.proto` contract gets a report that says it breaks `rides.api-gateway`, lists `trips.trips-api` as possibly affected, and names the critical journeys `rides.request-refund` and `acme.goodwill-refund` with their actors and sequence diagrams. After payments releases it, rides runs `archdoc sync --update`, and `archdoc check --base main` fails on the reference that no longer resolves. Still to do in 4c: `archdoc landscape build` and the explorer's landscape view.
 
 ## Phase 5: Data (M–L) ⭐ the "what actually happens" milestone
 

@@ -548,6 +548,74 @@
             ],
             "description": "Another repo's model. archdoc sync pins it in archdoc.lock."
           }
+        },
+        "landscape": {
+          "description": "The landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "github": {
+                  "type": "string",
+                  "description": "owner/repo on GitHub"
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Semver range matched against the repo's tags, such as ^5"
+                },
+                "path": {
+                  "description": "Where the model lives in that repo. Defaults to .archdoc/",
+                  "type": "string"
+                }
+              },
+              "required": ["github", "version"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "git": {
+                  "type": "string",
+                  "description": "Any git URL, or a path relative to the repository root"
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Semver range matched against the repo's tags, such as ^5"
+                },
+                "path": {
+                  "description": "Where the model lives in that repo. Defaults to .archdoc/",
+                  "type": "string"
+                }
+              },
+              "required": ["git", "version"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "URL of a bundle written by archdoc publish"
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "required": ["url"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "type": "string",
+                  "description": "A model file, model directory, or bundle, relative to the repository root, such as stubs for external systems"
+                }
+              },
+              "required": ["file"],
+              "additionalProperties": false
+            }
+          ]
         }
       },
       "additionalProperties": false

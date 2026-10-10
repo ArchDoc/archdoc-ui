@@ -49,9 +49,12 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
-            description: Element, actor, and overview queries, search by words, and impact (consumers, actors, journeys, owners, rules).
+            description: Element, actor, and overview queries, search by words, and impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos).
             code: [{ path: packages/core/src/query/** }]
             uses:
+              imports:
+                description: Adds consumers and journeys in other repos to impact
+                provenance: { source: suggested, by: agent:claude-code }
               loader: Resolves references the same way the model does
               codemap: Turns a file path into its owning element
           codemap:
@@ -63,6 +66,12 @@ elements:
             description: Text, JSON, and Mermaid answers shared by the CLI and MCP, so people and agents read the same words. Draws the PR report's diagrams of the change and its journeys.
             code: [{ path: packages/core/src/report/** }]
             uses:
+              imports:
+                description: Lists consumers and journeys in other repos, and what a change breaks
+                provenance: { source: suggested, by: agent:claude-code }
+              loader:
+                description: Names contracts the same way the model checks them
+                provenance: { source: suggested, by: agent:claude-code }
               query: Formats element, actor, overview, and impact results
               checker:
                 description: Formats check findings
@@ -90,7 +99,7 @@ elements:
             code: [{ path: packages/core/src/diff/** }]
           imports:
             kind: component
-            description: Other repos' models. Packs and reads bundles, and checks the lockfile and every reference, contract, and journey step into another repo at its pinned version.
+            description: Other repos' models. Packs and reads bundles, checks the lockfile and every reference, contract, and journey step into another repo at its pinned version, and indexes who uses this repo from the others (through the landscape).
             code: [{ path: packages/core/src/federation/** }]
             provenance: { source: suggested, by: agent:claude-code }
             uses:
@@ -110,7 +119,7 @@ elements:
       federation:
         kind: container
         technology: Node.js, git, semver
-        description: Shares models across repos. `sync` reads other repos' models at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle.
+        description: Shares models across repos. `sync` reads other repos' models (and the landscape, with every model it pins) at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle.
         code: [{ path: packages/federation/** }]
         provenance: { source: suggested, by: agent:claude-code }
         uses:

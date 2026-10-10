@@ -1,4 +1,6 @@
+import type { ProvideSpec } from "@archdoc/spec";
 import type { Change, ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
+import { contractName } from "../load/build.js";
 import type { Target } from "../model.js";
 
 export type DiffFormat = "text" | "markdown" | "mermaid" | "json";
@@ -78,6 +80,7 @@ function fieldChanges(c: Change<unknown>, skip: string[] = []): string {
     .map((f) => {
       const a = before[f];
       const b = after[f];
+      if (f === "provides") return contractDelta(a, b);
       const short = (v: unknown) => (typeof v === "string" && v.length <= 24 ? v : undefined);
       return short(a ?? "active") &&
         short(b ?? "active") &&
@@ -86,6 +89,27 @@ function fieldChanges(c: Change<unknown>, skip: string[] = []): string {
         : f;
     })
     .join(", ");
+}
+
+/** "provides -proto/charges.proto +proto/charges.v2.proto", naming the contracts that changed. */
+function contractDelta(before: unknown, after: unknown): string {
+  const names = (v: unknown) =>
+    new Map(
+      (Array.isArray(v) ? (v as ProvideSpec[]) : []).map((p) => [
+        contractName(p),
+        p.status ?? "active",
+      ]),
+    );
+  const a = names(before);
+  const b = names(after);
+  const parts = [
+    ...[...a.keys()].filter((n) => !b.has(n)).map((n) => `-${n}`),
+    ...[...b.keys()].filter((n) => !a.has(n)).map((n) => `+${n}`),
+    ...[...b]
+      .filter(([n, st]) => a.has(n) && a.get(n) !== st)
+      .map(([n, st]) => `${n} ${a.get(n)} → ${st}`),
+  ];
+  return parts.length ? `provides ${parts.join(" ")}` : "provides";
 }
 
 function mermaid(diff: ModelDiff): string {

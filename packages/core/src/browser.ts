@@ -41,6 +41,13 @@ export {
   serializeBundle,
 } from "./federation/bundle.js";
 export {
+  consumersElsewhere,
+  type Elsewhere,
+  otherModels,
+  type RemoteConsumer,
+  type RemoteJourney,
+} from "./federation/consumers.js";
+export {
   type FederationInput,
   federate,
   lookupImported,
@@ -50,6 +57,7 @@ export {
   type BuildOptions,
   buildModel,
   contractName,
+  LANDSCAPE,
   type ModelSource,
   normalizeCode,
 } from "./load/build.js";

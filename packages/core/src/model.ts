@@ -110,6 +110,16 @@ export interface Model {
   importLocations?: Map<string, SourceLocation> | undefined;
   /** Other repos' models, from the vendored bundles in archdoc.lock. Empty until synced. */
   imported?: Map<string, ImportedModel> | undefined;
+  /** The `landscape:` import, as written. */
+  landscapeImport?: ImportSpec | undefined;
+  /** The landscape and the models it imports, from archdoc.lock. Undefined until synced. */
+  landscape?: Landscape | undefined;
+}
+
+/** The landscape repo's model, with every model it imports (except this one). */
+export interface Landscape extends ImportedModel {
+  /** The other repos' models, at the versions the landscape pins. */
+  members: Map<string, ImportedModel>;
 }
 
 /** Another repo's model, as pinned in archdoc.lock. */

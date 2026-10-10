@@ -1,5 +1,6 @@
 import type { RuleSpec } from "@archdoc/spec";
 import { locate } from "../codemap/codemap.js";
+import { consumersElsewhere, type Elsewhere } from "../federation/consumers.js";
 import { Resolver } from "../load/resolve.js";
 import type { ElementNode, JourneyNode, Model, Relationship, Target } from "../model.js";
 import { nodeKey } from "../model.js";
@@ -37,6 +38,8 @@ export interface Impact {
   /** Rules that mention the target or a parent. Checked from roadmap Phase 3. */
   rules: RuleSpec[];
   code: string[];
+  /** What other repos have on it: consumers and journeys, from the landscape and imports. */
+  elsewhere: Elsewhere;
 }
 
 export type ImpactResult =
@@ -171,6 +174,17 @@ export function impact(model: Model, target: string, maxDepth = 3): ImpactResult
       owners,
       rules,
       code: element?.code.map((c) => c.path) ?? [],
+      elsewhere: element
+        ? consumersElsewhere(
+            model,
+            new Set([element.id, ...descendants(model, element.id)]),
+            new Set(
+              consumers.flatMap((c) =>
+                c.relationship.from.type === "element" ? [c.relationship.from.id] : [],
+              ),
+            ),
+          )
+        : { consumers: [], journeys: [] },
     },
   };
 }

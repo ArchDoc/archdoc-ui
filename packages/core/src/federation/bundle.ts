@@ -8,6 +8,8 @@ export interface BundleMeta {
   source?: string | undefined;
   /** Versions of other namespaces the model was built against, from its archdoc.lock. */
   imports?: Record<string, string> | undefined;
+  /** Other repos' models to carry along, for a landscape. */
+  includes?: Bundle["includes"] | undefined;
 }
 
 /**
@@ -31,6 +33,7 @@ export function createBundle(
     ...(meta.imports && Object.keys(meta.imports).length ? { imports: meta.imports } : {}),
     root,
     sources: sources.map(({ path, text }) => ({ path, text })),
+    ...(meta.includes?.length ? { includes: meta.includes } : {}),
   };
   return { bundle, model };
 }
