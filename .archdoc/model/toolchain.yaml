@@ -1,0 +1,125 @@
+# What ArchDoc is made of.
+elements:
+  github:
+    kind: external
+    description: Hosts the repository, pull requests, and Actions.
+    uses:
+      github-action: Runs on every pull request
+
+  toolchain:
+    kind: system
+    description: The ArchDoc toolchain.
+    owners: [maintainers]
+    elements:
+      spec:
+        kind: container
+        technology: TypeScript, Zod, JSON Schema
+        description: Source of truth for the model format, its JSON Schema, and v1→v2 migration.
+        code: [{ path: packages/spec/** }]
+        elements:
+          schema:
+            kind: component
+            description: Zod schema for model files, and the JSON Schema generated from it.
+            code: [packages/spec/src/schema.ts, packages/spec/src/json-schema.ts]
+          migrator:
+            kind: component
+            description: Converts v1 models (users, components) to v2 (actors, elements).
+            code: [packages/spec/src/migrate.ts]
+            uses:
+              schema: Produces files that match the schema
+
+      core:
+        kind: container
+        technology: TypeScript
+        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules.
+        code: [{ path: packages/core/** }]
+        uses:
+          spec: Validates model files against the schema
+          model-files: Reads the model
+          analyzers:
+            description: Collects observed architecture from source
+            status: planned
+        elements:
+          loader:
+            kind: component
+            description: Multi-file loading, reference resolution, diagnostics with file and line.
+            code: [{ path: packages/core/src/load/** }]
+            uses:
+              checker: Validates journeys once references resolve
+          query:
+            kind: component
+            description: Element, actor, and overview queries. locate and impact come next.
+            code: [{ path: packages/core/src/query/** }]
+            uses:
+              loader: Resolves references the same way the model does
+          checker:
+            kind: component
+            description: Journey validation today. Drift detection and rule evaluation next.
+            code: [{ path: packages/core/src/check/** }]
+          differ:
+            kind: component
+            status: planned
+            description: Semantic diff between two model revisions.
+            code: [{ path: packages/core/src/diff/** }]
+
+      analyzers:
+        kind: container
+        status: planned
+        technology: TypeScript, dependency-cruiser
+        description: Pluggable extractors of observed elements and dependencies.
+        code: [{ path: packages/analyzers/** }]
+        uses:
+          source-tree: Reads manifests, imports, and infra files
+
+      cli:
+        kind: container
+        technology: Node.js, commander
+        description: "`archdoc` command: validate, migrate, and schema today; view, locate, impact, diff, check, and mcp next."
+        code: [{ path: packages/cli/** }]
+        uses:
+          core: Commands delegate to core
+          spec: Migrates v1 files and prints the JSON Schema
+          web:
+            description: Serves the explorer for `archdoc view`
+            status: planned
+
+      mcp:
+        kind: container
+        status: planned
+        technology: Node.js, @modelcontextprotocol/sdk
+        description: Exposes core queries and proposals as MCP tools and resources for agents.
+        code: [{ path: packages/mcp/** }]
+        uses:
+          core: Tool calls delegate to core
+          model-files:
+            description: Writes suggested changes to the model
+            status: planned
+
+      web:
+        kind: container
+        status: planned
+        technology: React 19, Vite, @xyflow/react, elkjs
+        description: Explorer. Hierarchical views, diff overlay, code panel, guided tours.
+        code: [{ path: apps/web/** }]
+        uses:
+          core: Loads and queries the model in the browser
+
+      github-action:
+        kind: container
+        status: planned
+        technology: GitHub Actions (Node)
+        description: Posts an architectural-impact comment on PRs and optionally fails on drift.
+        code: [{ path: integrations/github-action/** }]
+        uses:
+          core: Runs diff and check between the base and head revisions
+
+      model-files:
+        kind: datastore
+        technology: YAML in git (.archdoc/)
+        description: The human-owned architecture model, versioned with the code.
+        code: [{ path: .archdoc/** }]
+
+      source-tree:
+        kind: datastore
+        technology: Git working tree
+        description: The code the model maps to.

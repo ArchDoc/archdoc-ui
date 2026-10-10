@@ -1,0 +1,8 @@
+# Architectural guardrails. Evaluated by `archdoc check` from roadmap Phase 3.
+rules:
+  - id: core-is-pure
+    description: Only core and analyzers read the filesystem directly. Surfaces go through core.
+    allow-only: { to: source-tree, from: [analyzers] }
+  - id: surfaces-dont-talk
+    description: CLI, MCP, web, and the Action never depend on each other, except CLI serving web.
+    deny: { from: [mcp, web, github-action], to: [cli, mcp, web, github-action] }

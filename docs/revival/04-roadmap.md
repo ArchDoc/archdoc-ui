@@ -8,15 +8,16 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
 
 - [ ] Tag `v0.2.0` and create a `legacy/v0` branch. Note in the README that v0 is frozen.
 - [x] Decide on the open questions. All nine accepted on 2026-10-06 (see [README.md](./README.md#decisions)).
-- [ ] Rename the repo `archdoc-ui` → `archdoc` (optional, GitHub redirects old URLs). Rewrite the README around the new mission.
-- [ ] Scaffold the pnpm monorepo, Node 22/24 CI (lint + typecheck + test with `CI=true`), Changesets, CONTRIBUTING, CODE_OF_CONDUCT, and issue templates.
+- [ ] Rename the repo `archdoc-ui` → `archdoc` (optional, GitHub redirects old URLs).
+- [x] Rewrite the README around the new mission.
+- [x] Scaffold the pnpm monorepo, Node 22/24 CI (lint + typecheck + test with `CI=true`), Changesets, CONTRIBUTING, CODE_OF_CONDUCT, and issue templates.
 - [ ] Close or relabel issues #3–#6 (carry #5 and #6 into the new UI requirements).
 
 **Exit:** green CI on an empty monorepo, and a README that states the mission.
 
 ## Phase 1: Model core + explorer (M)
 
-- [ ] `@archdoc/spec`: Zod schema for v2 with:
+- [x] `@archdoc/spec`: Zod schema for v2 with:
   - `actors` (person, role, team, organization, agent)
   - `elements` (kinds, hierarchy, `uses`, `code`, `status`, `provenance`)
   - `journeys`
@@ -24,16 +25,18 @@ Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, 
   - a minimal `data` section (entities with fields) and `sends` on relationships. Mappings, logic, and simulation come in Phase 5, but data references are designed in now.
   - Generated JSON Schema.
   - `archdoc migrate` from v1 (`users` → `actors`, `components` → `elements`).
-- [ ] `@archdoc/core`: multi-file loader, reference resolution, diagnostics with file and line, `query.element` / `query.actor` / `usedBy` (including "which actors use me").
-- [ ] Journey validation: every step must follow a declared relationship.
-- [ ] `archdoc validate`, `archdoc view --watch` (no fixed port; live reload).
+- [x] `@archdoc/core`: multi-file loader, reference resolution, diagnostics with file and line, `query.element` / `query.actor` / `usedBy` (including "which actors use me").
+- [x] Journey validation: every step must follow a declared relationship.
+- [x] `archdoc validate`.
+- [ ] `archdoc view --watch` (no fixed port; live reload).
 - [ ] `apps/web`: Vite + React 19 + xyflow 12 + ELK. Includes:
   - compound nodes, expand/collapse
   - actor view ("what does this team use and own?")
   - journey view (step-through highlight)
   - focus mode, search, resizable details panel, center on select
-- [ ] Migrate `examples/*.yaml`. Port the v0 ranking tests as layout regression fixtures, including the orphan-node and no-deps-user cases from the assessment.
-- [ ] **Dogfood:** write `.archdoc/` for ArchDoc itself, starting from [`archdoc.v2.example.yaml`](./archdoc.v2.example.yaml).
+- [x] Migrate `examples/*.yaml` (v1 originals kept in `examples/v1/`).
+- [ ] Port the v0 ranking tests as layout regression fixtures, including the orphan-node and no-deps-user cases from the assessment.
+- [x] **Dogfood:** write `.archdoc/` for ArchDoc itself, starting from [`archdoc.v2.example.yaml`](./archdoc.v2.example.yaml).
 
 **Exit:** `npx @archdoc/cli view` renders a 3-level model of ArchDoc with its actors, and steps through at least one journey. v1 files migrate cleanly.
 

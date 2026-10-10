@@ -1,0 +1,32 @@
+# Who uses ArchDoc.
+actors:
+  developer:
+    kind: person
+    description: Engineer of any experience level exploring, reviewing, or learning a system.
+    uses:
+      web: Explores the model, reviews diffs, follows tours and journeys
+      cli: Validates, diffs, and checks the model locally
+
+  new-contributor:
+    kind: role
+    description: Someone opening their first PR to a repo they don't know yet.
+    uses:
+      web: Follows onboarding tours
+
+  maintainers:
+    kind: team
+    description: ArchDoc maintainers. Own every element and review model changes.
+    members: ["@ArchDoc/maintainers"]
+    uses:
+      github-action: Reads architectural-impact comments on PRs
+
+  coding-agent:
+    kind: agent
+    description: An AI coding agent (Claude Code, Cursor, Copilot, …) editing the codebase.
+    uses:
+      mcp:
+        description: Locates code in the architecture, checks impact, proposes model changes
+        technology: MCP (stdio)
+      cli:
+        description: Validates the model after editing it
+        technology: archdoc --json
