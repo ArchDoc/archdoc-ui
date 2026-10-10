@@ -34,7 +34,8 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
       changedFiles: changed,
       diff: diffModels(baseModel, model),
       findings: marked,
-      label: `${options.base}...HEAD`,
+      // A commit hash, as the Action passes, reads better short.
+      label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });
     io.out(format === "json" ? JSON.stringify({ ...r, markdown: undefined }, null, 2) : r.markdown);
     return 0;

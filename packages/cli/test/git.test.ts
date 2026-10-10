@@ -106,6 +106,8 @@ describe("against a git history", () => {
     expect(r.out).toContain("| checkout: Buy something | **critical** | buyer | 1, 2 |");
     expect(r.out).toContain("This change introduces 2 errors");
     expect(r.out).toContain("### Suggested facts to review (1)");
+    const sha = git("rev-parse", "main").trim();
+    expect((await run("report", "--base", sha)).out).toContain(`for ${sha.slice(0, 7)}...HEAD.`);
   });
 
   it("diff a...b compares from the merge base", async () => {
