@@ -131,7 +131,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, sync, publish, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
@@ -176,7 +176,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer. Tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)
@@ -218,6 +218,15 @@ elements:
         code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools
+
+      landscape-template:
+        kind: container
+        technology: Markdown, YAML, GitHub Actions
+        description: Starting point for a landscape repo. A model with teams, a cross-team journey, domains, and an org rule, and a workflow that takes every team's newest release weekly and publishes the site to GitHub Pages.
+        code: [{ path: integrations/landscape-template/** }]
+        provenance: { source: suggested, by: agent:claude-code }
+        uses:
+          cli: Runs archdoc sync --update and archdoc landscape build
 
       model-files:
         kind: datastore

@@ -72,12 +72,13 @@ Decided 2026-10-10: `sync` reads other repos' models at their release tags with 
 - [x] `imports:` resolution, `archdoc sync` (`--update`, `--frozen` for CI), and `archdoc.lock` with vendored bundles (pinned, offline-friendly, reproducible in CI).
 - [x] Cross-repo reference checks: dangling (with a hint), deprecated, and version-skewed references; journey steps that start in another repo are checked against its model.
 - [x] Element `provides:` (api, topic, event), and `via:` on relationships, so cross-repo relationships can target contracts. A journey step from a publisher to a subscriber follows the message.
-- [ ] Landscape repo template:
-  - `archdoc landscape build` composes all namespaces into one enterprise site
-  - enterprise actors and teams
-  - cross-team journeys
-  - org-wide rules
-  - grouping by business domain
+- [x] Landscape repo template (4c-1, [`integrations/landscape-template`](../../integrations/landscape-template)). Decided 2026-10-10: the build is a static site, domains are defined in the landscape, and the org's teams and rules flow down to every repo that imports the landscape:
+  - `archdoc landscape build` composes all namespaces into one model (each repo a system), checks it, and writes the explorer as a static site; `archdoc view --landscape` shows it live
+  - enterprise actors and teams: owners in team repos resolve against them; in the landscape build, an owner that resolves to no actor is an error
+  - cross-team journeys, checked across repos
+  - org-wide rules: `scope: org` rules run in every repo that imports the landscape, and all of the landscape's rules run across repos in the build
+  - grouping by business domain: `domains:` (namespaces and elements)
+  - a workflow that takes every team's newest release weekly (as a pull request) and publishes the site to GitHub Pages
 - [x] Cross-repo impact (4b). A repo imports the landscape (`landscape:` in `archdoc.yaml`); `sync` reads it at its release tag together with the models it vendors, so one fetch brings every repo's model:
   - The PR comment lists consumers and journeys in other repos, marks the consumers a change breaks (a removed element, or a removed contract they use `via`) or deprecates, and draws them in the change diagram.
   - The MCP `impact` tool, `archdoc impact`, and `archdoc show` read the landscape from the lockfile; `show payments.charges` works in any repo that has it.
@@ -85,7 +86,7 @@ Decided 2026-10-10: `sync` reads other repos' models at their release tags with 
 
 **Exit:** a demo org of at least 3 repos plus a landscape repo. A PR that changes a contract in one repo lists its consumers and affected journeys in the other repos *before* merge. After release, a consumer repo's `check` flags the reference that no longer resolves.
 
-**Exit test, 2026-10-10: passed on the demo org** ([`examples/acme`](../../examples/acme), run as real git repos by `packages/cli/test/landscape.test.ts` and `federation.test.ts`). In payments, a branch that renames the `proto/charges.proto` contract gets a report that says it breaks `rides.api-gateway`, lists `trips.trips-api` as possibly affected, and names the critical journeys `rides.request-refund` and `acme.goodwill-refund` with their actors and sequence diagrams. After payments releases it, rides runs `archdoc sync --update`, and `archdoc check --base main` fails on the reference that no longer resolves. Still to do in 4c: `archdoc landscape build` and the explorer's landscape view.
+**Exit test, 2026-10-10: passed on the demo org** ([`examples/acme`](../../examples/acme), run as real git repos by `packages/cli/test/landscape.test.ts` and `federation.test.ts`). In payments, a branch that renames the `proto/charges.proto` contract gets a report that says it breaks `rides.api-gateway`, lists `trips.trips-api` as possibly affected, and names the critical journeys `rides.request-refund` and `acme.goodwill-refund` with their actors and sequence diagrams. After payments releases it, rides runs `archdoc sync --update`, and `archdoc check --base main` fails on the reference that no longer resolves. Still to do in 4c-2: the explorer's landscape view.
 
 ## Phase 5: Data (M–L) ⭐ the "what actually happens" milestone
 
