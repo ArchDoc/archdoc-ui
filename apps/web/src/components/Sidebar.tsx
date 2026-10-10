@@ -64,9 +64,7 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
                 active={props.journeyId === j.id}
                 onClick={() => props.onJourney(j.id)}
                 hint={
-                  props.compare?.journeys.has(j.id)
-                    ? `affected · ${j.spec.importance ?? "normal"}`
-                    : (j.spec.importance ?? "normal")
+                  props.compare?.journeys.has(j.id) ? "affected" : (j.spec.importance ?? "normal")
                 }
                 hintClass={`importance-${j.spec.importance ?? "normal"}${props.compare?.journeys.has(j.id) ? " is-affected" : ""}`}
               >
