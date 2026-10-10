@@ -7,12 +7,33 @@ export interface ModelPayload {
   sources: ModelSource[];
   /** True when the server watches the files and sends change events. */
   watch: boolean;
+  /** Repository files, relative to the repository root, for code mapping. */
+  files?: string[];
+  repo?: RepoLinks;
+}
+
+/** Where code links point. */
+export interface RepoLinks {
+  /** Web URL of the repository, such as https://github.com/org/repo. */
+  webUrl?: string;
+  branch?: string;
+  commit?: string;
+  /** Absolute path of the repository on this machine, for editor links. */
+  root?: string;
 }
 
 export type ModelState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; model: Model; watch: boolean; loadedAt: number; reloads: number };
+  | {
+      status: "ready";
+      model: Model;
+      watch: boolean;
+      files: string[];
+      repo: RepoLinks;
+      loadedAt: number;
+      reloads: number;
+    };
 
 /**
  * Loads the model files from the CLI and builds the model in the browser with
@@ -35,6 +56,8 @@ export function useModel(): ModelState {
         status: "ready",
         model,
         watch: payload.watch,
+        files: payload.files ?? [],
+        repo: payload.repo ?? {},
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

@@ -4,7 +4,7 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readModelSources } from "@archdoc/core";
+import { listRepoFiles, readModelSources, repoInfo } from "@archdoc/core";
 
 export interface ViewServerOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -58,7 +58,17 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml.`,
           });
         }
-        return json(res, 200, { root: read.root, sources: read.sources, watch: watching });
+        const [files, repo] = await Promise.all([
+          listRepoFiles(read.baseDir),
+          repoInfo(read.baseDir),
+        ]);
+        return json(res, 200, {
+          root: read.root,
+          sources: read.sources,
+          watch: watching,
+          files,
+          repo: { ...repo, root: read.baseDir },
+        });
       }
       if (url.pathname === "/api/events") {
         if (!watching) return json(res, 404, { error: "Start with --watch for live reload." });

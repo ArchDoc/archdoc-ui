@@ -885,3 +885,79 @@ kbd {
     display: none;
   }
 }
+
+/* ---------- Code panel ---------- */
+
+.code-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.code-list li p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.path-links {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.path-links a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.path-links a:hover {
+  text-decoration: underline;
+}
+
+.chip.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: var(--warn-soft);
+}
+
+.files {
+  margin-top: 8px;
+  font-size: 0.86rem;
+}
+
+.files summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.file-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.file-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--f-mono);
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}

@@ -1,23 +1,22 @@
 {
-  "name": "@archdoc/cli",
+  "name": "@archdoc/mcp",
   "version": "0.0.0",
-  "description": "The archdoc command-line tool.",
+  "description": "MCP server for ArchDoc: lets coding agents ask where they are and what a change affects before they edit.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ArchDoc/archdoc.git",
-    "directory": "packages/cli"
+    "directory": "packages/mcp"
   },
   "engines": {
     "node": ">=22.12"
   },
   "files": [
-    "dist",
-    "web"
+    "dist"
   ],
   "bin": {
-    "archdoc": "./dist/bin.js"
+    "archdoc-mcp": "./dist/bin.js"
   },
   "exports": {
     ".": {
@@ -27,12 +26,8 @@
   },
   "dependencies": {
     "@archdoc/core": "workspace:*",
-    "@archdoc/mcp": "workspace:*",
     "@archdoc/spec": "workspace:*",
-    "commander": "^14.0.3",
-    "yaml": "^2.9.1"
-  },
-  "scripts": {
-    "prepack": "node -e \"const fs=require('node:fs');fs.rmSync('web',{recursive:true,force:true});fs.cpSync('../../apps/web/dist','web',{recursive:true})\""
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
   }
 }

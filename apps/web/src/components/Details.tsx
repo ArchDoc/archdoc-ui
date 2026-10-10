@@ -1,5 +1,6 @@
 import {
   describeTarget,
+  filesUnder,
   getActor,
   getElement,
   type JourneyNode,
@@ -10,6 +11,7 @@ import {
   type Target,
 } from "@archdoc/core/browser";
 import type { ReactNode } from "react";
+import { type CodeContext, CodeSection, StepCode } from "./code.js";
 
 export interface DetailsProps {
   model: Model;
@@ -23,6 +25,7 @@ export interface DetailsProps {
   onStep: (step: number) => void;
   onFocus: (on: boolean) => void;
   onToggle: (elementId: string) => void;
+  code: CodeContext;
 }
 
 export function Details(props: DetailsProps) {
@@ -99,16 +102,17 @@ function ElementDetails(props: DetailsProps & { id: string }) {
           />
         </Block>
       ) : null}
-      {el.code.length ? (
+      {el.code.length || el.childIds.length ? (
         <Block title="Code">
-          <ul className="code-list">
-            {el.code.map((c) => (
-              <li key={c.path}>
-                <code>{c.path}</code>
-                {c.description ? <span> · {c.description}</span> : null}
-              </li>
-            ))}
-          </ul>
+          {el.code.length === 0 ? (
+            <p className="muted">No code paths of its own. Its parts have them.</p>
+          ) : null}
+          <CodeSection
+            model={props.model}
+            elementId={el.id}
+            ctx={props.code}
+            mapped={filesUnder(props.model, props.code.codemap, el.id)}
+          />
         </Block>
       ) : null}
       <RelList title="Uses" rels={view.uses} side="to" {...props} />
@@ -212,7 +216,7 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
                   {s.to ? describeTarget(s.to) : s.spec.to}
                 </span>
                 {s.spec.action ? <span className="step-action">{s.spec.action}</span> : null}
-                {s.spec.code ? <code className="step-code">{s.spec.code}</code> : null}
+                {s.spec.code ? <StepCode step={s} ctx={props.code} /> : null}
               </button>
             </li>
           ))}
