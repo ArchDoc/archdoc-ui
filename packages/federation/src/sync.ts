@@ -5,6 +5,7 @@ import {
   createBundle,
   federationDir,
   integrityOf,
+  LANDSCAPE,
   parseBundle,
   readFederationInput,
   readModelSources,
@@ -29,7 +30,7 @@ export interface SyncOptions {
   /** Repository, .archdoc directory, or model file. Defaults to ".". */
   model?: string;
   cwd: string;
-  /** Move these namespaces (or all, with true) to the newest version their range allows. */
+  /** Move these namespaces (or all, with true) to the newest version their range allows. "landscape" names the landscape. */
   update?: boolean | string[];
   /** Write nothing, and report what doesn't match: for CI. */
   frozen?: boolean;
@@ -45,6 +46,8 @@ export interface SyncChange {
   ref?: string | undefined;
   /** For updates: the version (or commit) it had before. */
   previous?: string | undefined;
+  /** True for the landscape import. */
+  landscape?: boolean;
 }
 
 export interface SyncResult {
@@ -74,64 +77,94 @@ export async function sync(options: SyncOptions): Promise<SyncResult> {
   const problems: string[] = [];
   const next: Lock = { lockfileVersion: 1, imports: {} };
   const writes = new Map<string, string>();
+  const fetchFn = options.fetch ?? fetch;
 
-  for (const [ns, spec] of Object.entries(model.imports).sort(([a], [b]) => a.localeCompare(b))) {
-    const entry = lock?.imports[ns];
+  /** Keeps or re-resolves one import, recording the change. Returns its new lock entry. */
+  const pin = async (
+    key: string,
+    spec: ImportSpec,
+    entry: LockEntry | undefined,
+    expected: string | undefined,
+  ): Promise<{ entry: LockEntry; namespace: string } | undefined> => {
+    const label = expected ?? "the landscape";
     const source = importSource(spec);
     const requested = importRange(spec);
-    const vendored = current.bundles.get(ns);
+    const vendored = current.bundles.get(key);
     const matches = entry?.source === source && entry.requested === requested;
     const intact = matches && vendored?.integrity === entry?.integrity;
     const wantsUpdate =
-      options.update === true || (Array.isArray(options.update) && options.update.includes(ns));
+      options.update === true ||
+      (Array.isArray(options.update) && options.update.includes(expected ?? "landscape"));
+    const keptNamespace = expected ?? (entry as { namespace?: string } | undefined)?.namespace;
 
-    if (entry && intact && !wantsUpdate) {
-      next.imports[ns] = entry;
+    if (entry && intact && !wantsUpdate && keptNamespace) {
       changes.push({
-        namespace: ns,
+        namespace: keptNamespace,
         action: "kept",
         source,
         version: entry.version,
         ref: entry.ref,
+        ...(expected ? {} : { landscape: true }),
       });
-      continue;
+      return { entry, namespace: keptNamespace };
     }
     if (options.frozen) {
       problems.push(
         !entry
-          ? `${ns} isn't in archdoc.lock.`
+          ? `${label} isn't in archdoc.lock.`
           : !matches
-            ? `${ns} changed in imports since archdoc.lock was written.`
+            ? `${label} changed in ${expected ? "imports" : "archdoc.yaml"} since archdoc.lock was written.`
             : vendored?.text === undefined
-              ? `${ns}'s bundle is missing (${vendored?.path ?? entry.bundle}).`
-              : `${ns}'s bundle doesn't match its hash in archdoc.lock.`,
+              ? `${label}'s bundle is missing (${vendored?.path ?? entry.bundle}).`
+              : `${label}'s bundle doesn't match its hash in archdoc.lock.`,
       );
-      continue;
+      return undefined;
     }
 
-    const resolved = await fetchImport(ns, spec, read.baseDir, cwd, options.fetch ?? fetch);
-    const text = serializeBundle(resolved.bundle);
-    const file = `${VENDOR_DIR}/${ns}${resolved.bundle.version ? `@${resolved.bundle.version}` : ""}.json`;
+    const resolved = await fetchImport(expected, spec, read.baseDir, cwd, fetchFn, !expected);
+    const b = resolved.bundle;
+    const text = serializeBundle(b);
+    const file = `${VENDOR_DIR}/${b.namespace}${b.version ? `@${b.version}` : ""}${expected ? "" : ".landscape"}.json`;
     const pinned: LockEntry = {
       source,
       ...(requested ? { requested } : {}),
-      ...(resolved.bundle.version ? { version: resolved.bundle.version } : {}),
+      ...(b.version ? { version: b.version } : {}),
       ...(resolved.ref ? { ref: resolved.ref } : {}),
-      ...(resolved.bundle.commit ? { commit: resolved.bundle.commit } : {}),
+      ...(b.commit ? { commit: b.commit } : {}),
       bundle: file,
       integrity: integrityOf(text),
     };
-    next.imports[ns] = pinned;
     writes.set(file, text);
     const before = entry?.version ?? entry?.commit?.slice(0, 7);
     const after = pinned.version ?? pinned.commit?.slice(0, 7);
     changes.push({
-      namespace: ns,
+      namespace: b.namespace,
       action: !entry ? "added" : before !== after || !intact ? "updated" : "kept",
       source,
       version: pinned.version,
       ref: pinned.ref,
       ...(entry && before !== after ? { previous: before } : {}),
+      ...(expected ? {} : { landscape: true }),
+    });
+    return { entry: pinned, namespace: b.namespace };
+  };
+
+  for (const [ns, spec] of Object.entries(model.imports).sort(([a], [b]) => a.localeCompare(b))) {
+    const result = await pin(ns, spec, lock?.imports[ns], ns);
+    if (result) next.imports[ns] = result.entry;
+  }
+  if (model.landscapeImport) {
+    const result = await pin(LANDSCAPE, model.landscapeImport, lock?.landscape, undefined);
+    if (result) next.landscape = { ...result.entry, namespace: result.namespace };
+  } else if (lock?.landscape) {
+    if (options.frozen)
+      problems.push("archdoc.lock pins a landscape, which isn't imported anymore.");
+    changes.push({
+      namespace: lock.landscape.namespace,
+      action: "removed",
+      source: lock.landscape.source,
+      version: lock.landscape.version,
+      landscape: true,
     });
   }
 
@@ -155,12 +188,16 @@ export async function sync(options: SyncOptions): Promise<SyncResult> {
     await mkdir(dirname(join(dir, file)), { recursive: true });
     await writeFile(join(dir, file), text);
   }
-  if (Object.keys(next.imports).length === 0) {
+  if (Object.keys(next.imports).length === 0 && !next.landscape) {
     await rm(lockFile, { force: true });
   } else {
     await writeFile(lockFile, formatLock(next));
   }
-  const keep = new Set(Object.values(next.imports).map((e) => resolve(dir, e.bundle)));
+  const keep = new Set(
+    [...Object.values(next.imports), ...(next.landscape ? [next.landscape] : [])].map((e) =>
+      resolve(dir, e.bundle),
+    ),
+  );
   const vendor = join(dir, VENDOR_DIR);
   for (const name of await readdir(vendor).catch(() => [] as string[])) {
     const file = join(vendor, name);
@@ -176,16 +213,23 @@ export function formatLock(lock: Lock): string {
   return `# Written by archdoc sync. Don't edit it by hand: change imports in archdoc.yaml and run archdoc sync.\n${stringify(valid, { lineWidth: 0 })}`;
 }
 
+/**
+ * Fetches one import as a bundle. `expected` is the namespace it's imported
+ * as; the landscape has none. With `includes`, the bundle carries the models
+ * the repo vendors, as its archdoc.lock pins them.
+ */
 async function fetchImport(
-  ns: string,
+  expected: string | undefined,
   spec: ImportSpec,
   repoRoot: string,
   cwd: string,
   fetchFn: typeof fetch,
+  includes: boolean,
 ): Promise<{ bundle: Bundle; ref?: string | undefined }> {
+  const ns = expected ?? "landscape";
   const source = importSource(spec);
   const checkNamespace = (bundle: Bundle) => {
-    if (bundle.namespace !== ns) {
+    if (expected && bundle.namespace !== expected) {
       throw new Error(
         `${source} is namespace "${bundle.namespace}", not "${ns}". Import it as ${bundle.namespace}.`,
       );
@@ -202,6 +246,7 @@ async function fetchImport(
       commit: remote.commit,
       source,
       imports: lockedVersions(remote.lock),
+      includes: includes ? vendoredBundles(source, remote.lock, remote.vendored) : undefined,
     });
     if (!bundle) {
       const first = model.diagnostics.find((d) => d.severity === "error");
@@ -237,7 +282,25 @@ async function fetchImport(
     cwd: path.endsWith("yaml") || path.endsWith("yml") ? dirname(path) : path,
   });
   if (!local) throw new Error(`No ArchDoc model at ${spec.file}.`);
-  const { bundle, model } = createBundle(local.sources, local.root, { source });
+  let vendored: Bundle["includes"];
+  if (includes) {
+    const dir = await federationDir(local.source);
+    const lockText = await readFile(join(dir, LOCK_FILE), "utf8").catch(() => undefined);
+    const files = new Map<string, string>();
+    for (const name of await readdir(join(dir, VENDOR_DIR)).catch(() => [] as string[])) {
+      files.set(`${VENDOR_DIR}/${name}`, await readFile(join(dir, VENDOR_DIR, name), "utf8"));
+    }
+    vendored = vendoredBundles(source, lockText, files);
+  }
+  const { bundle, model } = createBundle(local.sources, local.root, {
+    source,
+    imports: lockedVersions(
+      await readFile(join(await federationDir(local.source), LOCK_FILE), "utf8").catch(
+        () => undefined,
+      ),
+    ),
+    includes: vendored,
+  });
   if (!bundle) {
     const first = model.diagnostics.find((d) => d.severity === "error");
     throw new Error(`${spec.file} doesn't validate${first ? `: ${first.message}` : "."}`);
@@ -254,6 +317,36 @@ function lockedVersions(text: string | undefined): Record<string, string> | unde
   for (const [ns, e] of Object.entries(result.data.imports)) {
     const v = e.version ?? e.commit;
     if (v) out[ns] = v;
+  }
+  return out;
+}
+
+/**
+ * The models a repo vendors, checked against its archdoc.lock: what a
+ * landscape import carries, so one fetch shows every repo.
+ */
+function vendoredBundles(
+  source: string,
+  lockText: string | undefined,
+  files: ReadonlyMap<string, string>,
+): NonNullable<Bundle["includes"]> {
+  if (!lockText) {
+    throw new Error(`${source} has no archdoc.lock. Run archdoc sync there and commit it.`);
+  }
+  const lock = LockSchema.safeParse(parse(lockText));
+  if (!lock.success) throw new Error(`${source} has an invalid archdoc.lock.`);
+  const out: NonNullable<Bundle["includes"]> = [];
+  for (const [ns, entry] of Object.entries(lock.data.imports)) {
+    const text = files.get(entry.bundle);
+    if (text === undefined || integrityOf(text) !== entry.integrity) {
+      throw new Error(
+        `${source}'s vendored model of ${ns} is missing or doesn't match its archdoc.lock. Run archdoc sync there and commit it.`,
+      );
+    }
+    const parsed = parseBundle(text);
+    if ("error" in parsed) throw new Error(`${source}'s vendored ${ns} is ${parsed.error}.`);
+    const { includes: _nested, ...bundle } = parsed.bundle;
+    out.push(bundle);
   }
   return out;
 }

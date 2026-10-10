@@ -30,7 +30,10 @@ export interface BuildOptions {
   root?: string;
 }
 
-const ROOT_ONLY = ["namespace", "name", "description", "imports"] as const;
+/** Key for the landscape in import locations. */
+export const LANDSCAPE = "(landscape)";
+
+const ROOT_ONLY = ["namespace", "name", "description", "imports", "landscape"] as const;
 
 /**
  * Builds a model from in-memory sources. Pure: no filesystem or network, so it
@@ -149,6 +152,10 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
       model.importLocations = new Map(
         Object.keys(model.imports).map((ns) => [ns, parsed.locate(["imports", ns])]),
       );
+      if (file.landscape) {
+        model.landscapeImport = file.landscape;
+        model.importLocations.set(LANDSCAPE, parsed.locate(["landscape"]));
+      }
     } else {
       for (const key of ROOT_ONLY) {
         if (file[key] !== undefined) {

@@ -1,6 +1,12 @@
-import { importRange, importSource, type Lock } from "@archdoc/spec";
+import {
+  type ImportSpec,
+  importRange,
+  importSource,
+  type Lock,
+  type LockEntry,
+} from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
-import { contractDiagnostic, isEventContract } from "../load/build.js";
+import { contractDiagnostic, isEventContract, LANDSCAPE } from "../load/build.js";
 import type {
   ActorNode,
   ElementNode,
@@ -56,46 +62,52 @@ export function federate(model: Model, input: FederationInput): Model {
     });
   }
 
-  for (const [ns, spec] of Object.entries(model.imports)) {
-    const entry = input.lock?.imports[ns];
+  /** Loads one locked bundle, or reports why it can't be used. */
+  const load = (
+    key: string,
+    label: string,
+    spec: ImportSpec,
+    entry: LockEntry | undefined,
+    expected: string | undefined,
+  ): ImportedModel | undefined => {
     if (!entry) {
       if (!input.lockError) {
         diagnostics.push({
           severity: "warning",
           code: "import/not-synced",
-          message: `"${ns}" is imported but not synced, so references into it aren't checked. Run archdoc sync.`,
-          location: at(ns),
+          message: `${label} is imported but not synced, so ${expected ? "references into it aren't checked" : "consumers in other repos aren't known"}. Run archdoc sync.`,
+          location: at(key),
         });
       }
-      continue;
+      return undefined;
     }
-    const pinned = `${ns}@${entry.version ?? entry.commit?.slice(0, 7) ?? entry.source}`;
+    const pinned = `${expected ?? label}@${entry.version ?? entry.commit?.slice(0, 7) ?? entry.source}`;
     if (entry.source !== importSource(spec) || entry.requested !== importRange(spec)) {
       diagnostics.push({
         severity: "warning",
         code: "import/out-of-date",
-        message: `The import of "${ns}" changed since the last sync (archdoc.lock has ${entry.source}${entry.requested ? ` ${entry.requested}` : ""}). Run archdoc sync.`,
-        location: at(ns),
+        message: `The import of ${label} changed since the last sync (archdoc.lock has ${entry.source}${entry.requested ? ` ${entry.requested}` : ""}). Run archdoc sync.`,
+        location: at(key),
       });
     }
-    const file = input.bundles.get(ns);
+    const file = input.bundles.get(key);
     if (file?.text === undefined) {
       diagnostics.push({
         severity: "error",
         code: "import/missing-bundle",
         message: `The bundle for ${pinned} is missing (${file?.path ?? entry.bundle}). Run archdoc sync.`,
-        location: at(ns),
+        location: at(key),
       });
-      continue;
+      return undefined;
     }
     if (file.integrity !== entry.integrity) {
       diagnostics.push({
         severity: "error",
         code: "import/modified-bundle",
         message: `${file.path} doesn't match the hash in archdoc.lock. Vendored bundles aren't edited by hand; run archdoc sync.`,
-        location: at(ns),
+        location: at(key),
       });
-      continue;
+      return undefined;
     }
     const parsed = parseBundle(file.text);
     if ("error" in parsed) {
@@ -103,18 +115,18 @@ export function federate(model: Model, input: FederationInput): Model {
         severity: "error",
         code: "import/invalid-bundle",
         message: `${file.path} is ${parsed.error}. Run archdoc sync.`,
-        location: at(ns),
+        location: at(key),
       });
-      continue;
+      return undefined;
     }
-    if (parsed.bundle.namespace !== ns) {
+    if (expected && parsed.bundle.namespace !== expected) {
       diagnostics.push({
         severity: "error",
         code: "import/namespace-mismatch",
-        message: `"${ns}" points to a model with namespace "${parsed.bundle.namespace}". Import it under that name.`,
-        location: at(ns),
+        message: `"${expected}" points to a model with namespace "${parsed.bundle.namespace}". Import it under that name.`,
+        location: at(key),
       });
-      continue;
+      return undefined;
     }
     const m = modelFromBundle(parsed.bundle);
     const errors = m.diagnostics.filter((d) => d.severity === "error").length;
@@ -123,16 +135,53 @@ export function federate(model: Model, input: FederationInput): Model {
         severity: "warning",
         code: "import/invalid-bundle",
         message: `${pinned} has ${errors} error${errors === 1 ? "" : "s"} of its own, so checks against it may be wrong.`,
-        location: at(ns),
+        location: at(key),
       });
     }
-    imported.set(ns, {
-      namespace: ns,
+    return {
+      namespace: parsed.bundle.namespace,
       version: entry.version,
       commit: entry.commit,
       source: entry.source,
       bundle: parsed.bundle,
       model: m,
+    };
+  };
+
+  for (const [ns, spec] of Object.entries(model.imports)) {
+    const dep = load(ns, `"${ns}"`, spec, input.lock?.imports[ns], ns);
+    if (dep) imported.set(ns, dep);
+  }
+
+  if (model.landscapeImport) {
+    const land = load(
+      LANDSCAPE,
+      "The landscape",
+      model.landscapeImport,
+      input.lock?.landscape,
+      undefined,
+    );
+    if (land) {
+      const members = new Map<string, ImportedModel>();
+      for (const b of land.bundle.includes ?? []) {
+        if (b.namespace === model.namespace) continue;
+        members.set(b.namespace, {
+          namespace: b.namespace,
+          version: b.version,
+          commit: b.commit,
+          source: b.source,
+          bundle: b,
+          model: modelFromBundle(b),
+        });
+      }
+      model.landscape = { ...land, members };
+    }
+  } else if (input.lock?.landscape) {
+    diagnostics.push({
+      severity: "warning",
+      code: "import/unused-lock-entry",
+      message: `archdoc.lock pins the landscape ${input.lock.landscape.namespace}, which isn't imported anymore. Run archdoc sync.`,
+      location: lockLocation,
     });
   }
 

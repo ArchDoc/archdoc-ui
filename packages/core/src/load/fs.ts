@@ -72,7 +72,11 @@ export async function loadModel(target = ".", options: LoadOptions = {}): Promis
   }
   const model = buildModel(read.sources, { root: read.root });
   // Other repos' models, pinned in archdoc.lock. Repos without imports skip this.
-  if (Object.keys(model.imports).length > 0 || (await hasLock(read.source))) {
+  if (
+    Object.keys(model.imports).length > 0 ||
+    model.landscapeImport ||
+    (await hasLock(read.source))
+  ) {
     federate(model, await readFederationInput(await federationDir(read.source), cwd));
   }
   return { ...model, source: read.source, baseDir: read.baseDir };

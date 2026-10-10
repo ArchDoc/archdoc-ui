@@ -137,7 +137,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     {
       title: "Impact of a change",
       description:
-        "The blast radius of changing an element, actor, or file: what uses it (directly and indirectly), which actors and journeys are affected (most important first), what it depends on, owners, and rules that mention it. Call it while planning, before you edit.",
+        "The blast radius of changing an element, actor, or file: what uses it (directly and indirectly), which actors and journeys are affected (most important first), what it depends on, owners, and rules that mention it. With a landscape or imports synced, also who uses it from other repos and which of their journeys pass through it. Call it while planning, before you edit.",
       inputSchema: {
         target: z.string().describe("Element ID (e.g. core.loader), actor ID, or file path"),
       },
@@ -162,7 +162,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     {
       title: "Element details",
       description:
-        "Everything about one element: description, technology, parents and children, owners, code paths, what it uses, what uses it (including actors), and journeys through it.",
+        "Everything about one element: description, technology, parents and children, owners, code paths, contracts it provides, what it uses, what uses it (including actors and other repos), and journeys through it. Works for elements in other repos too, such as payments.charges, once they're synced.",
       inputSchema: { id: z.string().describe("Element ID, e.g. toolchain.core or just core") },
       annotations: READ_ONLY,
     },

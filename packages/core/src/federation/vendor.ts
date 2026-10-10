@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { LOCK_FILE, type Lock, LockSchema } from "@archdoc/spec";
 import { parse } from "yaml";
+import { LANDSCAPE } from "../load/build.js";
 import type { FederationInput, VendoredBundle } from "./federate.js";
 
 /** sha256 of a file's text, as written in archdoc.lock. */
@@ -45,7 +46,9 @@ export async function readFederationInput(dir: string, cwd: string): Promise<Fed
   }
 
   const bundles = new Map<string, VendoredBundle>();
-  for (const [ns, entry] of Object.entries(lock.imports)) {
+  const entries = Object.entries(lock.imports) as [string, { bundle: string }][];
+  if (lock.landscape) entries.push([LANDSCAPE, lock.landscape]);
+  for (const [ns, entry] of entries) {
     const file = resolve(dir, entry.bundle);
     // Bundles live under the model directory; a lockfile can't point elsewhere.
     const inside = file.startsWith(resolve(dir) + sep);

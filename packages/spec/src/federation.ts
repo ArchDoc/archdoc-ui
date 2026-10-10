@@ -7,7 +7,7 @@ import { type ImportSpec, NamespaceSchema } from "./schema.js";
  * repo that imports the namespace. JSON, so tools that don't use ArchDoc can
  * read it too.
  */
-export const BundleSchema = z.strictObject({
+const bundleShape = {
   archdocBundle: z.literal(1).describe("Bundle format version"),
   namespace: NamespaceSchema,
   name: z.string().optional(),
@@ -23,6 +23,19 @@ export const BundleSchema = z.strictObject({
     .array(z.strictObject({ path: z.string(), text: z.string() }))
     .min(1)
     .describe("The model files, as written"),
+};
+
+/** A bundle without the models it includes. */
+export const IncludedBundleSchema = z.strictObject(bundleShape);
+
+export const BundleSchema = z.strictObject({
+  ...bundleShape,
+  includes: z
+    .array(IncludedBundleSchema)
+    .optional()
+    .describe(
+      "The models a landscape imports, at the versions it pins, so one fetch shows every repo",
+    ),
 });
 
 export const LockEntrySchema = z.strictObject({
@@ -41,9 +54,13 @@ export const LockEntrySchema = z.strictObject({
 export const LockSchema = z.strictObject({
   lockfileVersion: z.literal(1),
   imports: z.record(NamespaceSchema, LockEntrySchema),
+  landscape: LockEntrySchema.extend({ namespace: NamespaceSchema })
+    .optional()
+    .describe("The landscape, vendored with the models it imports"),
 });
 
 export type Bundle = z.infer<typeof BundleSchema>;
+export type IncludedBundle = z.infer<typeof IncludedBundleSchema>;
 export type LockEntry = z.infer<typeof LockEntrySchema>;
 export type Lock = z.infer<typeof LockSchema>;
 

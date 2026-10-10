@@ -295,6 +295,9 @@ export const ModelFileSchema = z.strictObject({
   name: z.string().optional(),
   description: z.string().optional(),
   imports: z.record(NamespaceSchema, ImportSchema).optional(),
+  landscape: ImportSchema.optional().describe(
+    "The landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
+  ),
 });
 
 /** A file that holds exactly one journey, such as `journeys/book-a-ride.yaml`. */

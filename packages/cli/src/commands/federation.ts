@@ -36,11 +36,12 @@ export async function sync(options: SyncCommandOptions, io: Io): Promise<number>
     }
     for (const c of result.changes) {
       const at = c.version ? `@${c.version}` : c.ref ? ` at ${c.ref}` : "";
+      const what = c.landscape ? "landscape " : "";
       const line = {
-        kept: `  ${c.namespace}${at}`,
-        added: `+ ${c.namespace}${at} (${c.source})`,
-        updated: `↑ ${c.namespace}${c.previous && c.version ? ` ${c.previous} → ${c.version}` : at}`,
-        removed: `- ${c.namespace}${at}`,
+        kept: `  ${what}${c.namespace}${at}`,
+        added: `+ ${what}${c.namespace}${at} (${c.source})`,
+        updated: `↑ ${what}${c.namespace}${c.previous && c.version ? ` ${c.previous} → ${c.version}` : at}`,
+        removed: `- ${what}${c.namespace}${at}`,
       }[c.action];
       io.out(line);
     }

@@ -1,5 +1,7 @@
 import type { Located } from "../codemap/codemap.js";
 import { formatDiagnostic } from "../diagnostics.js";
+import { consumersElsewhere, otherModels } from "../federation/consumers.js";
+import { contractName } from "../load/build.js";
 import type { ElementNode, JourneyNode, Model, Relationship, Target } from "../model.js";
 import type { Impact } from "../query/impact.js";
 import { getActor, getElement, overview } from "../query/index.js";
@@ -75,6 +77,31 @@ export function formatImpact(model: Model, i: Impact): string {
     );
   }
 
+  const { consumers: remote, journeys: remoteJourneys } = i.elsewhere;
+  if (remote.length || remoteJourneys.length) {
+    out.push("", `Used from other repos (${new Set(remote.map((c) => c.from)).size})`);
+    if (remote.length === 0) out.push("  no relationships");
+    const reach = {
+      direct: "",
+      parent: " (through a parent; may be affected)",
+      indirect: " (through something here that uses it)",
+    };
+    for (const c of remote) {
+      const r = c.relationship;
+      out.push(
+        `  ${c.from} (${c.namespace}${c.version ? `@${c.version}` : ""}) uses ${model.namespace}.${c.target}${r.via ? ` via ${r.via}` : ""}${r.description ? `: ${r.description}` : ""}${reach[c.reach]}`,
+      );
+    }
+    out.push("", `Journeys in other repos (${remoteJourneys.length})`);
+    if (remoteJourneys.length === 0) out.push("  none");
+    for (const j of remoteJourneys) {
+      out.push(
+        `  ${j.namespace}.${j.journey.id} (${j.journey.spec.importance ?? "normal"}) · actor ${j.journey.spec.actor} · steps ${j.steps.join(", ")}`,
+        `    ${j.journey.spec.goal}`,
+      );
+    }
+  }
+
   if (i.dependencies.length) out.push("", `Depends on: ${rels(i.dependencies, "to")}`);
   if (i.rules.length) {
     out.push("", "Rules that mention it");
@@ -85,7 +112,18 @@ export function formatImpact(model: Model, i: Impact): string {
 
 export function formatElement(model: Model, ref: string): string | undefined {
   const v = getElement(model, ref);
-  if (!v) return undefined;
+  if (!v) {
+    // An element in another repo, from the landscape or an import.
+    const dot = ref.indexOf(".");
+    const dep = dot > 0 ? otherModels(model).get(ref.slice(0, dot)) : undefined;
+    const there = dep && formatElement(dep.model, ref.slice(dot + 1));
+    if (!dep || !there) return undefined;
+    const [first, ...rest] = there.split("\n");
+    return [
+      `${dep.namespace}.${first} · in ${dep.namespace}@${dep.version ?? dep.commit?.slice(0, 7) ?? "?"}, another repo`,
+      ...rest,
+    ].join("\n");
+  }
   const e = v.element;
   const out = [label(e)];
   if (e.spec.status && e.spec.status !== "active") out.push(`Status: ${e.spec.status}`);
@@ -98,7 +136,20 @@ export function formatElement(model: Model, ref: string): string | undefined {
   if (v.owners.length) out.push(`Owners: ${v.owners.join(", ")}`);
   if (e.code.length) out.push(`Code: ${e.code.map((c) => c.path).join(", ")}`);
   if (v.uses.length) out.push(`Uses: ${rels(v.uses, "to")}`);
+  if (e.spec.provides?.length) {
+    out.push(
+      `Provides: ${e.spec.provides
+        .map(
+          (p) =>
+            `${contractName(p)} (${"api" in p ? "api" : "topic" in p ? "topic" : "event"}${p.status === "deprecated" ? ", deprecated" : ""})`,
+        )
+        .join(", ")}`,
+    );
+  }
   if (v.usedBy.length) out.push(`Used by: ${rels(v.usedBy, "from")}`);
+  const remote = consumersElsewhere(model, new Set([e.id])).consumers;
+  if (remote.length)
+    out.push(`Used from other repos: ${[...new Set(remote.map((c) => c.from))].join(", ")}`);
   if (v.journeys.length) out.push(`Journeys: ${v.journeys.map((j) => j.id).join(", ")}`);
   return out.join("\n");
 }

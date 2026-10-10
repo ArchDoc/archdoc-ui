@@ -3,6 +3,9 @@ namespace: payments
 name: Payments
 description: Charges riders' cards, issues refunds, and keeps the ledger.
 
+# Who uses payments in other repos: the landscape imports every team's model.
+landscape: { git: ../landscape, version: ^1 }
+
 actors:
   payments-team: { kind: team }
   finance:
