@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
-import { impact, locate, map, search } from "./commands/code.js";
+import { impact, locate, map, search, show } from "./commands/code.js";
 import { migrate } from "./commands/migrate.js";
 import { schema } from "./commands/schema.js";
 import { validate } from "./commands/validate.js";
@@ -79,6 +79,13 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action((target: string, opts: { model?: string; json?: boolean }) =>
       run(impact(target, opts, io)),
     );
+
+  program
+    .command("show")
+    .description("Print the details of an element, actor, or journey")
+    .argument("<id>", "element, actor, or journey ID")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .action((id: string, opts: { model?: string }) => run(show(id, opts, io)));
 
   program
     .command("map")

@@ -86,7 +86,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, locate, impact, map, mcp, migrate, and schema; diff and check next."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, mcp, migrate, and schema; diff and check next."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
