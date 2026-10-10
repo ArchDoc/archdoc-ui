@@ -47,4 +47,5 @@ export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
 export { formatFindings, type MarkedFinding } from "./report/check-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
+export { type PrReport, type PrReportInput, prReport, REPORT_MARKER } from "./report/pr-report.js";
 export * from "./report/report.js";

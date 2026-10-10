@@ -5,6 +5,7 @@ import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
 import { diff } from "./commands/diff.js";
 import { migrate } from "./commands/migrate.js";
+import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
 import { validate } from "./commands/validate.js";
 import { view } from "./commands/view.js";
@@ -125,6 +126,17 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       (opts: { model?: string; base?: string; format?: string; failOn?: string; code?: boolean }) =>
         run(check(opts, io)),
     );
+
+  program
+    .command("report")
+    .description("The architectural impact of a change, as markdown for a pull request comment")
+    .requiredOption(
+      "-b, --base <ref>",
+      "the branch or commit the change is compared with, such as main",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-f, --format <format>", "markdown or json", "markdown")
+    .action((opts: { model?: string; base?: string; format?: string }) => run(report(opts, io)));
 
   program
     .command("diff")
