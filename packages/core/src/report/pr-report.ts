@@ -160,7 +160,6 @@ export function prReport(input: PrReportInput): PrReport {
         );
       }
       md.push("");
-      if (input.diagrams !== false) md.push(...journeyDiagrams(input, journeyList));
     } else {
       md.push("No journeys pass through what this change touches.", "");
     }
@@ -169,6 +168,7 @@ export function prReport(input: PrReportInput): PrReport {
         `**Actors affected:** ${[...actors.values()].map((a) => `${a.id} (${a.kind})`).join(", ")}`,
         "",
       );
+    if (input.diagrams !== false) md.push(...journeyDiagrams(input, journeyList));
   }
 
   md.push("### Drift and rules", "");

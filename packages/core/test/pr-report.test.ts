@@ -103,6 +103,10 @@ describe("prReport", () => {
       "<details open><summary><b>book</b> (critical): steps 1, 2 go through this change</summary>\n\n```mermaid\nsequenceDiagram",
     );
     expect(r.markdown).toContain("<details><summary><b>browse</b> (normal): step 1 goes through");
+    // Actors stay with the journey table, above the journey diagrams.
+    expect(r.markdown.indexOf("**Actors affected:**")).toBeLessThan(
+      r.markdown.indexOf("sequenceDiagram"),
+    );
     const plain = prReport({
       model: after,
       changedFiles: ["apps/mobile/x.ts"],
