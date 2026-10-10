@@ -1,2 +1,3 @@
-/** The ArchDoc spec version this package implements. */
-export const SPEC_VERSION = "2.0";
+export * from "./json-schema.js";
+export * from "./migrate.js";
+export * from "./schema.js";

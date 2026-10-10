@@ -44,22 +44,22 @@ importers:
       '@archdoc/spec':
         specifier: workspace:*
         version: link:../spec
-      picomatch:
-        specifier: ^4.0.7
-        version: 4.0.7
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
-    devDependencies:
-      '@types/picomatch':
-        specifier: ^4.0.3
-        version: 4.0.3
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
 
   packages/spec:
     dependencies:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
 
 packages:
 
@@ -318,9 +318,6 @@ packages:
 
   '@types/node@22.20.5':
     resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
-
-  '@types/picomatch@4.0.3':
-    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   '@vitest/mocker@5.0.3':
     resolution: {integrity: sha512-T8sWAIbkSyAjkwTcaEc3Iu0o9A27X1/kdXrizhZkGuSKScRQtRzclfAMpOTcGdXCsqxeWlpGy3XjqaW8CpLORg==}
@@ -882,8 +879,6 @@ snapshots:
   '@types/node@22.20.5':
     dependencies:
       undici-types: 6.21.0
-
-  '@types/picomatch@4.0.3': {}
 
   '@vitest/mocker@5.0.3(vite@8.3.4(@types/node@22.20.5)(yaml@2.9.1))':
     dependencies:
