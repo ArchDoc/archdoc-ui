@@ -10,6 +10,8 @@ export interface ModelPayload {
   /** Repository files, relative to the repository root, for code mapping. */
   files?: string[];
   repo?: RepoLinks;
+  /** With `archdoc view --base <ref>`: the model's files at that ref. */
+  base?: { ref: string; commit: string; root: string; sources: ModelSource[] };
 }
 
 /** Where code links point. */
@@ -31,6 +33,8 @@ export type ModelState =
       watch: boolean;
       files: string[];
       repo: RepoLinks;
+      /** The model at the base ref, for the before/after view. */
+      base?: { ref: string; model: Model } | undefined;
       loadedAt: number;
       reloads: number;
     };
@@ -58,6 +62,12 @@ export function useModel(): ModelState {
         watch: payload.watch,
         files: payload.files ?? [],
         repo: payload.repo ?? {},
+        base: payload.base && {
+          ref: payload.base.ref,
+          model: payload.base.sources.length
+            ? buildModel(payload.base.sources, { root: payload.base.root })
+            : buildModel([]),
+        },
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

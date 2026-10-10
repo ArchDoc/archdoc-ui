@@ -1,5 +1,6 @@
 import type { Model } from "@archdoc/core/browser";
 import { forwardRef, type ReactNode, useMemo } from "react";
+import type { Compare } from "../App.js";
 
 export interface SidebarProps {
   model: Model;
@@ -11,6 +12,7 @@ export interface SidebarProps {
   onSelect: (key: string) => void;
   onToggle: (elementId: string) => void;
   onJourney: (id: string) => void;
+  compare?: Compare | undefined;
 }
 
 interface Hit {
@@ -54,14 +56,19 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
         </Section>
       ) : (
         <>
+          {props.compare ? <Changes {...props} compare={props.compare} /> : null}
           <Section title="Journeys">
             {[...model.journeys.values()].map((j) => (
               <Item
                 key={j.id}
                 active={props.journeyId === j.id}
                 onClick={() => props.onJourney(j.id)}
-                hint={j.spec.importance ?? "normal"}
-                hintClass={`importance-${j.spec.importance ?? "normal"}`}
+                hint={
+                  props.compare?.journeys.has(j.id)
+                    ? `affected · ${j.spec.importance ?? "normal"}`
+                    : (j.spec.importance ?? "normal")
+                }
+                hintClass={`importance-${j.spec.importance ?? "normal"}${props.compare?.journeys.has(j.id) ? " is-affected" : ""}`}
               >
                 {j.spec.name ?? j.id}
               </Item>
@@ -97,6 +104,54 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
     else props.onSelect(key);
   }
 });
+
+const MARK = { added: "+", removed: "−", changed: "~", moved: "→" } as const;
+
+/** What changed since the base, as a clickable list. */
+function Changes(props: SidebarProps & { compare: Compare }) {
+  const { diff, ref } = props.compare;
+  const items = [
+    ...diff.elements.map((c) => ({
+      key: `element:${c.id}`,
+      kind: c.kind,
+      label: c.id,
+      hint: "element",
+    })),
+    ...diff.actors.map((c) => ({ key: `actor:${c.id}`, kind: c.kind, label: c.id, hint: "actor" })),
+    ...diff.journeys.map((c) => ({
+      key: `journey:${c.id}`,
+      kind: c.kind,
+      label: c.id,
+      hint: "journey",
+    })),
+  ];
+  const rels = diff.relationships.length;
+  return (
+    <Section title={`Changes since ${ref}`}>
+      {items.length === 0 && rels === 0 ? <p className="empty">The model didn't change.</p> : null}
+      {items.map((i) => (
+        <Item
+          key={i.key}
+          active={props.selected === i.key || props.journeyId === i.key.slice(8)}
+          onClick={() =>
+            i.key.startsWith("journey:")
+              ? i.kind !== "removed" && props.onJourney(i.key.slice(8))
+              : props.onSelect(i.key)
+          }
+          hint={i.hint}
+          hintClass={`change-${i.kind}`}
+        >
+          <span className={`change-mark change-${i.kind}`}>{MARK[i.kind]}</span> {i.label}
+        </Item>
+      ))}
+      {rels ? (
+        <p className="empty">
+          {rels} relationship change{rels === 1 ? "" : "s"}, shown on the canvas
+        </p>
+      ) : null}
+    </Section>
+  );
+}
 
 function Tree(props: SidebarProps & { parentId: string | undefined }) {
   const { model, parentId } = props;

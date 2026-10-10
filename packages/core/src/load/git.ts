@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type { Model } from "../model.js";
-import { buildModel } from "./build.js";
+import { buildModel, type ModelSource } from "./build.js";
 import { type LoadOptions, readModelSources } from "./fs.js";
 
 const run = promisify(execFile);
@@ -37,11 +37,24 @@ export async function mergeBase(cwd: string, a: string, b: string): Promise<stri
  * didn't exist yet at the ref comes back empty, so a diff shows everything as
  * added.
  */
-export async function loadModelAtRef(
+export interface SourcesAtRef {
+  ref: string;
+  commit: string;
+  /** Display path of the root file, such as main:.archdoc/archdoc.yaml. Empty when there was no model. */
+  root: string;
+  sources: ModelSource[];
+}
+
+/**
+ * The model's files as they were at a git ref. The model is found in the
+ * working tree first (to learn where it lives), then read from the ref. A
+ * model that didn't exist yet at the ref comes back with no sources.
+ */
+export async function readModelSourcesAtRef(
   target: string,
   ref: string,
   options: LoadOptions = {},
-): Promise<Model & { ref: string; commit: string }> {
+): Promise<SourcesAtRef> {
   const cwd = options.cwd ?? process.cwd();
   const commit = await resolveRef(cwd, ref);
   if (!commit) throw new Error(`"${ref}" is not a commit, branch, or tag in this repository.`);
@@ -79,10 +92,18 @@ export async function loadModelAtRef(
       text: await git(top, "show", `${commit}:${f}`),
     })),
   );
-  const model = sources.length
-    ? buildModel(sources, { root: `${ref}:${rootFile}` })
-    : buildModel([]);
-  return Object.assign(model, { ref, commit });
+  return { ref, commit, root: rootFile ? `${ref}:${rootFile}` : "", sources };
+}
+
+/** Builds the model as it was at a git ref. See {@link readModelSourcesAtRef}. */
+export async function loadModelAtRef(
+  target: string,
+  ref: string,
+  options: LoadOptions = {},
+): Promise<Model & { ref: string; commit: string }> {
+  const at = await readModelSourcesAtRef(target, ref, options);
+  const model = at.sources.length ? buildModel(at.sources, { root: at.root }) : buildModel([]);
+  return Object.assign(model, { ref, commit: at.commit });
 }
 
 /** Files changed between a commit and the working tree (or another commit), relative to the repo root. */

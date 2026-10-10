@@ -5,6 +5,8 @@ import { startViewServer, type ViewServer } from "../server.js";
 
 export interface ViewOptions {
   watch?: boolean;
+  /** Show changes since this ref. */
+  base?: string;
   port?: string;
   open?: boolean;
 }
@@ -22,7 +24,13 @@ export async function view(
   }
   let server: ViewServer;
   try {
-    server = await startViewServer({ target, cwd: io.cwd, port, watch: options.watch });
+    server = await startViewServer({
+      target,
+      cwd: io.cwd,
+      port,
+      watch: options.watch,
+      base: options.base,
+    });
   } catch (err) {
     io.err(`Couldn't start the explorer: ${err instanceof Error ? err.message : String(err)}`);
     return { code: 1 };
@@ -34,7 +42,9 @@ export async function view(
   }
 
   const what = relative(io.cwd, server.source) || ".";
-  io.out(`ArchDoc explorer: ${server.url}`);
+  io.out(
+    `ArchDoc explorer: ${server.url}${options.base ? ` (showing changes since ${options.base})` : ""}`,
+  );
   io.out(
     options.watch
       ? `Watching ${what} for changes. Press Ctrl+C to stop.`

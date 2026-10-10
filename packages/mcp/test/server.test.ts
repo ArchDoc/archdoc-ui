@@ -45,7 +45,9 @@ describe("archdoc MCP server", () => {
     ]);
     const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);
     expect(writers).toEqual(["archdoc_propose"]);
-    expect(tools.find((t) => t.name === "archdoc_propose")?.annotations?.destructiveHint).toBe(false);
+    expect(tools.find((t) => t.name === "archdoc_propose")?.annotations?.destructiveHint).toBe(
+      false,
+    );
   });
 
   it("finds where an area lives", async () => {
