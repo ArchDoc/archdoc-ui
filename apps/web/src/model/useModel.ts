@@ -1,4 +1,10 @@
-import { buildModel, type Model, type ModelSource } from "@archdoc/core/browser";
+import {
+  buildModel,
+  type LandscapeDomain,
+  type LandscapeRepo,
+  type Model,
+  type ModelSource,
+} from "@archdoc/core/browser";
 import { useCallback, useEffect, useState } from "react";
 
 /** What `archdoc view` serves at /api/model. */
@@ -12,6 +18,15 @@ export interface ModelPayload {
   repo?: RepoLinks;
   /** With `archdoc view --base <ref>`: the model's files at that ref. */
   base?: { ref: string; commit: string; root: string; sources: ModelSource[] };
+  /** A composed landscape (`archdoc view --landscape`, `archdoc landscape build`): its repos and domains. */
+  landscape?: LandscapeInfo;
+}
+
+export interface LandscapeInfo {
+  namespace: string;
+  name?: string | undefined;
+  repos: LandscapeRepo[];
+  domains: LandscapeDomain[];
 }
 
 /** Where code links point. */
@@ -49,7 +64,8 @@ export function useModel(): ModelState {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/model", { cache: "no-store" });
+      // Relative, so the same build works under archdoc view and on a static host at any path.
+      const res = await fetch("api/model", { cache: "no-store" });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `The server answered ${res.status}.`);
@@ -86,7 +102,7 @@ export function useModel(): ModelState {
     let cancelled = false;
     void load().then((watch) => {
       if (!watch || cancelled) return;
-      events = new EventSource("/api/events");
+      events = new EventSource("api/events");
       events.addEventListener("change", () => void load());
     });
     return () => {

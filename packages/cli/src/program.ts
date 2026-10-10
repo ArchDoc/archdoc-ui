@@ -5,6 +5,7 @@ import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
 import { diff } from "./commands/diff.js";
 import { publish, sync } from "./commands/federation.js";
+import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
@@ -48,12 +49,22 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("[path]", "repository, .archdoc directory, or model file", ".")
     .option("-w, --watch", "reload the explorer when model files change")
     .option("-b, --base <ref>", "show what changed in the model since this branch or commit")
+    .option(
+      "-l, --landscape",
+      "show the landscape: this model composed with every model it imports",
+    )
     .option("-p, --port <port>", "port to listen on (default: a free port)")
     .option("--open", "open the explorer in your default browser")
     .action(
       async (
         path: string,
-        opts: { watch?: boolean; port?: string; open?: boolean; base?: string },
+        opts: {
+          watch?: boolean;
+          port?: string;
+          open?: boolean;
+          base?: string;
+          landscape?: boolean;
+        },
       ) => {
         const result = await view(path, opts, io);
         program.exitCode = result.code;
@@ -185,6 +196,19 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .option("-o, --out <dir>", "directory to write the bundle to, or - for stdout", "dist")
     .action((version: string | undefined, opts: { model?: string; out?: string }) =>
       run(publish({ ...opts, version }, io)),
+    );
+
+  const landscape = program
+    .command("landscape")
+    .description("Compose every repo's model into one landscape (run in the landscape repo)");
+  landscape
+    .command("build")
+    .description("Check the composed landscape and write a static explorer site for GitHub Pages")
+    .argument("[path]", "the landscape repo, .archdoc directory, or model file", ".")
+    .option("-o, --out <dir>", "directory to write the site to", "site")
+    .option("--force", "write the site even when the landscape has errors")
+    .action((path: string, opts: { out?: string; force?: boolean }) =>
+      run(landscapeBuild(path, opts, io)),
     );
 
   program

@@ -2,6 +2,7 @@ import type {
   ActorSpec,
   Bundle,
   DataEntrySpec,
+  DomainSpec,
   ElementSpec,
   ImportSpec,
   JourneySpec,
@@ -86,6 +87,12 @@ export interface JourneyNode {
   location?: SourceLocation | undefined;
 }
 
+export interface DomainNode {
+  id: string;
+  spec: DomainSpec;
+  location?: SourceLocation | undefined;
+}
+
 export interface DataNode {
   id: string;
   spec: DataEntrySpec;
@@ -110,6 +117,8 @@ export interface Model {
   importLocations?: Map<string, SourceLocation> | undefined;
   /** Other repos' models, from the vendored bundles in archdoc.lock. Empty until synced. */
   imported?: Map<string, ImportedModel> | undefined;
+  /** Business domains, mostly defined in a landscape. */
+  domains?: Map<string, DomainNode> | undefined;
   /** The `landscape:` import, as written. */
   landscapeImport?: ImportSpec | undefined;
   /** The landscape and the models it imports, from archdoc.lock. Undefined until synced. */

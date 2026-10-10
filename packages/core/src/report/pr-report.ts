@@ -189,6 +189,13 @@ export function prReport(input: PrReportInput): PrReport {
           (c.after as { provenance?: { source?: string } })?.provenance?.source === "suggested",
       )
       .map((c) => `element \`${c.id}\``),
+    ...diff.actors
+      .filter(
+        (c) =>
+          c.kind !== "removed" &&
+          (c.after as { provenance?: { source?: string } })?.provenance?.source === "suggested",
+      )
+      .map((c) => `actor \`${c.id}\``),
     ...diff.relationships
       .filter(
         (c) =>

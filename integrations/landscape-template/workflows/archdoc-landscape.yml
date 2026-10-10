@@ -1,0 +1,61 @@
+# Copy to .github/workflows/archdoc-landscape.yml in the landscape repo.
+#
+# - Weekly (or on demand): take every team's newest release (archdoc sync --update)
+#   and open a pull request, so model changes from other repos get reviewed.
+# - On every push to main: check the composed landscape and publish the
+#   explorer to GitHub Pages (Settings → Pages → Source: GitHub Actions).
+name: ArchDoc landscape
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Private repos: a token that can read every team's repo.
+      - name: Let git read the other repos
+        env:
+          TOKEN: ${{ secrets.ARCHDOC_READ_TOKEN }}
+        if: env.TOKEN != ''
+        run: git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+      - run: npx -y @archdoc/cli sync --update
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: archdoc/sync
+          title: "chore: take the newest releases of every team's model"
+          commit-message: "chore: archdoc sync --update"
+          body: Runs `archdoc sync --update`. Review the model changes, then merge to republish the landscape.
+
+  site:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y @archdoc/cli sync --frozen
+      - run: npx -y @archdoc/cli landscape build --out site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

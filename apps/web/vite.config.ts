@@ -5,6 +5,8 @@ import { defineConfig } from "vite";
 // proxies the model API to it. Set ARCHDOC_API to use another address.
 export default defineConfig({
   plugins: [react()],
+  // Relative asset paths, so the explorer works from a static host at any path (archdoc landscape build).
+  base: "./",
   server: {
     proxy: { "/api": process.env.ARCHDOC_API ?? "http://127.0.0.1:4321" },
   },

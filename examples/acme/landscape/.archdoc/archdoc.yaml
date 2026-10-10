@@ -8,7 +8,12 @@ imports:
   trips: { git: ../trips, version: ^3 }
   rides: { git: ../rides, version: ^1 }
 
+# Enterprise teams. Repos that import this landscape resolve owners against them,
+# so payments doesn't define payments-team itself.
 actors:
+  payments-team: { kind: team, members: ["@acme/payments"] }
+  rides-team: { kind: team, members: ["@acme/rides"] }
+  trips-team: { kind: team, members: ["@acme/trips"] }
   support-agent:
     kind: role
     description: Handles rider complaints.
@@ -20,7 +25,27 @@ journeys:
     actor: support-agent
     goal: Make a rider whole after a bad trip
     importance: critical
+    owners: [payments-team]
     steps:
       - { from: support-agent, to: rides.api-gateway, action: Issues a goodwill refund }
       - { from: rides.api-gateway, to: payments.charges, action: Refunds the charge }
       - { from: payments.charges, to: payments.ledger, action: Records the refund }
+
+domains:
+  rider-experience:
+    name: Rider experience
+    description: What riders touch, from booking to refunds.
+    owners: [rides-team]
+    namespaces: [rides, trips]
+  money:
+    name: Money
+    description: Charging, refunding, and the books.
+    owners: [payments-team]
+    namespaces: [payments]
+
+rules:
+  # scope: org runs in every repo that imports this landscape, as well as here.
+  - id: apps-never-touch-datastores
+    scope: org
+    description: Apps go through a service, never straight to a datastore.
+    deny: { from: { tag: app }, to: { kind: datastore } }

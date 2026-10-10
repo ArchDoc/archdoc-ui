@@ -30,6 +30,9 @@ export interface RuleViolation {
 export function evaluateRules(
   model: Model,
   edges: RuleEdge[],
+  rules: readonly RuleSpec[] = model.rules,
+  /** Rules whose selectors may name things outside this model, such as org rules: unknown ones are skipped quietly. */
+  quiet: ReadonlySet<string> = new Set(),
 ): {
   violations: RuleViolation[];
   unknownSelectors: { rule: string; selector: string }[];
@@ -60,7 +63,7 @@ export function evaluateRules(
     if (typeof sel === "string") {
       const r = resolver.endpoint(sel);
       if (r.status !== "resolved") {
-        unknownSelectors.push({ rule: rule.id, selector: sel });
+        if (!quiet.has(rule.id)) unknownSelectors.push({ rule: rule.id, selector: sel });
         return () => undefined;
       }
       const key = `${r.target.type}:${r.target.id}`;
@@ -84,7 +87,7 @@ export function evaluateRules(
     return () => undefined;
   };
 
-  for (const rule of model.rules) {
+  for (const rule of rules) {
     const deny = rule.deny as { from?: Selector; to?: Selector } | undefined;
     const allowOnly = rule["allow-only"] as { from?: Selector; to?: Selector } | undefined;
     if (!deny && !allowOnly) {

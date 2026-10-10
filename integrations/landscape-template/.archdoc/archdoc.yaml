@@ -1,0 +1,42 @@
+# The landscape: every team's model, plus what no single team owns.
+# Copy this folder into a new repository (for example your-org/architecture).
+archdoc: "2.0"
+namespace: your-org
+name: Your Org
+description: Every team's architecture in one place.
+
+# Each team's repo, pinned to its releases. archdoc sync vendors their models.
+imports:
+  payments: { github: your-org/payments, version: ^1 }
+  web: { github: your-org/web, version: ^1 }
+
+# Enterprise teams and roles. Repos that import this landscape resolve
+# owners: [payments-team] against them.
+actors:
+  payments-team: { kind: team, members: ["@your-org/payments"] }
+  web-team: { kind: team, members: ["@your-org/web"] }
+  customer: { kind: person, uses: { web.app: Shops } }
+
+# Journeys that cross teams. Each step must follow a relationship one of the
+# repos declares; archdoc landscape build checks them all.
+journeys:
+  checkout:
+    actor: customer
+    goal: Buy something
+    importance: critical
+    steps:
+      - { from: customer, to: web.app, action: Checks out }
+      - { from: web.app, to: payments.charges, action: Pays }
+
+# Business domains, for grouping the landscape by more than repo.
+domains:
+  commerce:
+    name: Commerce
+    namespaces: [web, payments]
+
+# Org-wide rules. scope: org runs them in every repo that imports this landscape.
+rules:
+  - id: apps-never-touch-datastores
+    scope: org
+    description: Apps go through a service, never straight to a datastore.
+    deny: { from: { tag: app }, to: { kind: datastore } }
