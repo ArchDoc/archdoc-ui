@@ -1,4 +1,4 @@
-import type { JourneyNode, Model, ModelDiff } from "@archdoc/core/browser";
+import type { JourneyNode, Model, ModelDiff, Simulation } from "@archdoc/core/browser";
 import {
   Background,
   Controls,
@@ -9,6 +9,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { dataFocus } from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
@@ -20,6 +21,8 @@ export interface CanvasProps {
   view: ViewState;
   /** For a landscape: how repos, teams, or domains are boxed. */
   grouping?: Grouping | undefined;
+  /** A simulation of the open journey: steps it skipped are drawn faint. */
+  simulation?: Simulation | undefined;
   selected?: string | undefined;
   journey?: JourneyNode | undefined;
   step: number;
@@ -73,8 +76,19 @@ export function Canvas(props: CanvasProps) {
     return out;
   }, [model, journey, grouping]);
 
+  // A selected data entry: where it's stored, and where it travels.
+  const focus = useMemo(
+    () => (selected?.startsWith("data:") ? dataFocus(model, view, selected.slice(5)) : undefined),
+    [model, view, selected],
+  );
+
   const emphasis = useMemo(() => {
     const map = new Map<string, Emphasis>();
+    if (focus) {
+      for (const k of focus.nodes) map.set(k, "highlight");
+      for (const k of focus.stores) map.set(k, "current");
+      return map;
+    }
     if (journey) {
       for (const s of steps) {
         const current = s.step === step;
@@ -100,7 +114,7 @@ export function Canvas(props: CanvasProps) {
       }
     }
     return map;
-  }, [journey, steps, step, selected, graph]);
+  }, [journey, steps, step, selected, graph, focus]);
   const dimming = journey !== undefined || selected !== undefined;
 
   const nodes = useMemo<CardNode[]>(() => {
@@ -131,6 +145,7 @@ export function Canvas(props: CanvasProps) {
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
             entered: crossings.get(step) === n.id,
+            stores: focus?.stores.has(n.id),
             onToggle:
               element && element.childIds.length > 0 ? () => props.onToggle(element.id) : undefined,
           },
@@ -149,13 +164,15 @@ export function Canvas(props: CanvasProps) {
     grouping,
     crossings,
     step,
+    focus,
   ]);
 
   const edges = useMemo<Edge[]>(() => {
     if (!layout) return [];
     const regular: Edge[] = layout.graph.edges.map((e) => {
-      const lit =
-        !journey && selected !== undefined && (e.source === selected || e.target === selected);
+      const lit = focus
+        ? focus.edges.has(e.id)
+        : !journey && selected !== undefined && (e.source === selected || e.target === selected);
       const label = e.relationships
         .map((r) => r.description)
         .filter(Boolean)
@@ -196,6 +213,7 @@ export function Canvas(props: CanvasProps) {
           "journey",
           s.step === step ? "is-current" : "",
           crossings.has(s.step) ? "is-crossing" : "",
+          props.simulation && props.simulation.steps[s.step]?.ran === false ? "is-skipped" : "",
         ]
           .filter(Boolean)
           .join(" "),
@@ -206,7 +224,19 @@ export function Canvas(props: CanvasProps) {
         zIndex: s.step === step ? 10 : 6,
       }));
     return [...regular, ...journeyOverlay];
-  }, [layout, journey, steps, step, selected, dimming, hoverEdge, overlay, crossings]);
+  }, [
+    layout,
+    journey,
+    steps,
+    step,
+    selected,
+    dimming,
+    hoverEdge,
+    overlay,
+    crossings,
+    focus,
+    props.simulation,
+  ]);
 
   // Fit everything on the first layout; afterwards only move when asked to.
   useEffect(() => {

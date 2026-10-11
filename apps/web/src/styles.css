@@ -1214,3 +1214,205 @@ kbd {
 .cross-mark {
   color: var(--brand);
 }
+
+/* ---------- Data ---------- */
+
+:root {
+  --k-data: #0f7b8a;
+  --sensitive: #b4235a;
+  --sensitive-soft: #fbe4ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --k-data: #3cc4d4;
+    --sensitive: #ff7aa8;
+    --sensitive-soft: #3a1426;
+  }
+}
+
+.card.family-data {
+  --accent: var(--k-data);
+}
+
+.card.family-field {
+  --accent: var(--k-data);
+  border-left-width: 3px;
+}
+
+.card.family-field.is-classified {
+  --accent: var(--sensitive);
+}
+
+.card.family-field.is-classified .card-kind {
+  color: var(--sensitive);
+}
+
+/* A box that stores the selected data entry. */
+.card.is-store {
+  border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 25%, transparent);
+}
+
+.chip.classification {
+  color: var(--sensitive);
+  background: var(--sensitive-soft);
+  border-color: color-mix(in srgb, var(--sensitive) 40%, transparent);
+}
+
+.side-item-hint.is-sensitive {
+  color: var(--sensitive);
+}
+
+table.fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+table.fields td {
+  padding: 4px 6px 4px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+table.fields td:first-child {
+  font-family: var(--f-mono);
+}
+
+ul.plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.86rem;
+}
+
+.react-flow__edge.lineage path {
+  stroke: var(--k-data);
+  stroke-width: 1.8;
+}
+
+.react-flow__edge.lineage.is-derived path {
+  stroke-dasharray: 6 3;
+}
+
+.react-flow__edge.lineage .react-flow__edge-text {
+  font-family: var(--f-mono);
+  font-size: 10px;
+}
+
+.canvas-empty {
+  padding: 24px;
+  color: var(--muted);
+}
+
+/* ---------- Simulation ---------- */
+
+textarea.sample {
+  width: 100%;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.sample-pick {
+  width: 100%;
+  margin-bottom: 6px;
+  font: inherit;
+}
+
+.sample-actions {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+ol.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+ol.timeline > li {
+  border-left: 3px solid var(--k-data);
+  padding: 2px 0 2px 10px;
+}
+
+ol.timeline > li.is-skipped {
+  border-left-color: var(--line);
+  opacity: 0.6;
+}
+
+.timeline-step {
+  all: unset;
+  cursor: pointer;
+  display: block;
+}
+
+.sim-decision {
+  margin: 4px 0;
+  font-size: 0.86rem;
+}
+
+.sim-record {
+  margin: 4px 0;
+  font-size: 0.84rem;
+}
+
+.sim-record p {
+  margin: 0;
+}
+
+.sim-record ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-family: var(--f-mono);
+  font-size: 0.76rem;
+}
+
+.sim-mark {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  color: var(--k-data);
+}
+
+.sim-record.kind-changed .sim-mark {
+  color: var(--warn);
+}
+
+.sim-problem {
+  margin: 4px 0;
+  color: var(--err);
+  font-size: 0.82rem;
+}
+
+.journey-bar-data {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  color: var(--k-data);
+}
+
+.journey-bar-data.is-skipped {
+  color: var(--muted);
+}
+
+.react-flow__edge.journey.is-skipped path {
+  opacity: 0.25;
+}
+
+.card-head .card-version {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

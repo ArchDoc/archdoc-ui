@@ -309,4 +309,22 @@ describe("the landscape", () => {
       "  - rule 2: when request.amount_cents <= charge.amount_cents / 2 then auto-approve → when request.amount_cents <= charge.amount_cents * 3 / 4 then auto-approve",
     );
   });
+  it("view sends samples and other repos' models, so the explorer simulates across repos", async () => {
+    const server = await startViewServer({
+      target: ".",
+      cwd: join(org, "rides"),
+      webDir: join(org, "web"),
+    });
+    try {
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        samples: { path: string }[];
+        federation: { bundles: { key: string; text?: string }[] };
+      };
+      expect(payload.samples.map((s) => s.path)).toEqual(["samples/refund-overcharge.json"]);
+      expect(payload.federation.bundles.map((b) => b.key).sort()).toEqual(["payments", "trips"]);
+      expect(payload.federation.bundles.every((b) => b.text?.startsWith("{"))).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
 });

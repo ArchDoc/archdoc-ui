@@ -5,7 +5,9 @@ import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  federationDir,
   listRepoFiles,
+  readFederationInput,
   readModelSources,
   readModelSourcesAtRef,
   repoInfo,
@@ -77,15 +79,24 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml.`,
           });
         }
-        const [files, repo] = await Promise.all([
+        const [files, repo, federation] = await Promise.all([
           listRepoFiles(read.baseDir),
           repoInfo(read.baseDir),
+          readFederationInput(await federationDir(read.source), options.cwd),
         ]);
         return json(res, 200, {
           root: read.root,
           sources: read.sources,
           watch: watching,
           files,
+          // Other repos' models, so the explorer checks and simulates across repos like the CLI.
+          federation: {
+            lockPath: federation.lockPath,
+            lock: federation.lock,
+            lockError: federation.lockError,
+            bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
+          },
+          samples: await readSamples(read.baseDir, files),
           repo: { ...repo, root: read.baseDir },
           base: base && {
             ref: base.ref,
@@ -198,4 +209,18 @@ export function findWebDir(): string | undefined {
     fileURLToPath(new URL("../web/", import.meta.url)),
   ];
   return candidates.find((d): d is string => !!d && existsSync(join(d, "index.html")));
+}
+
+/** Sample records for simulating journeys: JSON files in any samples/ directory. */
+async function readSamples(
+  baseDir: string,
+  files: readonly string[],
+): Promise<{ path: string; text: string }[]> {
+  const paths = files.filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f)).slice(0, 50);
+  const out: { path: string; text: string }[] = [];
+  for (const path of paths) {
+    const text = await readFile(join(baseDir, path), "utf8").catch(() => undefined);
+    if (text !== undefined && text.length <= 256 * 1024) out.push({ path, text });
+  }
+  return out;
 }

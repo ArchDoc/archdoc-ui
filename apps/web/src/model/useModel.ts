@@ -1,5 +1,6 @@
 import {
   buildModel,
+  federate,
   type LandscapeDomain,
   type LandscapeRepo,
   type Model,
@@ -20,6 +21,20 @@ export interface ModelPayload {
   base?: { ref: string; commit: string; root: string; sources: ModelSource[] };
   /** A composed landscape (`archdoc view --landscape`, `archdoc landscape build`): its repos and domains. */
   landscape?: LandscapeInfo;
+  /** Other repos' models, as archdoc.lock pins them. */
+  federation?: {
+    lockPath: string;
+    lock?: unknown;
+    lockError?: string | undefined;
+    bundles: {
+      key: string;
+      path: string;
+      text?: string | undefined;
+      integrity?: string | undefined;
+    }[];
+  };
+  /** Sample records for simulating journeys. */
+  samples?: { path: string; text: string }[];
 }
 
 export interface LandscapeInfo {
@@ -52,6 +67,7 @@ export type ModelState =
       base?: { ref: string; model: Model } | undefined;
       /** Set when the model is a composed landscape. */
       landscape?: LandscapeInfo | undefined;
+      samples: { path: string; text: string }[];
       loadedAt: number;
       reloads: number;
     };
@@ -74,6 +90,18 @@ export function useModel(): ModelState {
       }
       const payload = (await res.json()) as ModelPayload;
       const model = buildModel(payload.sources, { root: payload.root });
+      const fed = payload.federation;
+      if (
+        fed &&
+        (fed.lock || fed.lockError || Object.keys(model.imports).length || model.landscapeImport)
+      ) {
+        federate(model, {
+          lockPath: fed.lockPath,
+          lock: fed.lock as Parameters<typeof federate>[1]["lock"],
+          lockError: fed.lockError,
+          bundles: new Map(fed.bundles.map(({ key, ...b }) => [key, b])),
+        });
+      }
       setState((prev) => ({
         status: "ready",
         model,
@@ -87,6 +115,7 @@ export function useModel(): ModelState {
             : buildModel([]),
         },
         landscape: payload.landscape,
+        samples: payload.samples ?? [],
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

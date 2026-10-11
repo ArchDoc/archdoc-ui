@@ -9,12 +9,15 @@ import {
   nodeKey,
   overview,
   type Relationship,
+  type Simulation,
   type Target,
 } from "@archdoc/core/browser";
 import type { ReactNode } from "react";
 import type { Compare } from "../App.js";
+import { hasData } from "../graph/data.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 import { type CodeContext, CodeSection, StepCode } from "./code.js";
+import { DataDetails, FieldDetails, SimulatePanel } from "./DataPanels.js";
 
 export interface DetailsProps {
   model: Model;
@@ -31,6 +34,9 @@ export interface DetailsProps {
   code: CodeContext;
   compare?: Compare | undefined;
   landscape?: LandscapeInfo | undefined;
+  samples?: { path: string; text: string }[];
+  simulation?: Simulation | undefined;
+  onSimulate?: (sample: Record<string, unknown> | undefined) => void;
 }
 
 export function Details(props: DetailsProps) {
@@ -44,6 +50,10 @@ export function Details(props: DetailsProps) {
   if (selected?.startsWith("external:"))
     return <ExternalDetails {...props} ref_={selected.slice(9)} />;
   if (selected?.startsWith("domain:")) return <DomainDetails {...props} id={selected.slice(7)} />;
+  if (selected?.startsWith("data:"))
+    return <DataDetails model={model} entry={selected.slice(5)} onSelect={props.onSelect} />;
+  if (selected?.startsWith("field:"))
+    return <FieldDetails model={model} field={selected.slice(6)} onSelect={props.onSelect} />;
 
   const o = overview(model);
   return (
@@ -288,6 +298,16 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
           ))}
         </ol>
       </Block>
+      {hasData(journey) && props.onSimulate ? (
+        <SimulatePanel
+          model={props.model}
+          journey={journey}
+          samples={props.samples ?? []}
+          simulation={props.simulation}
+          onSimulate={props.onSimulate}
+          onStep={props.onStep}
+        />
+      ) : null}
     </div>
   );
 }
