@@ -1,6 +1,8 @@
 import type { Located } from "../codemap/codemap.js";
 import { dataFlows, dataStores } from "../data/flows.js";
+import type { FieldId, Lineage } from "../data/lineage.js";
 import { parseStates, qualifyData, resolveData } from "../data/resolve.js";
+import type { Simulation } from "../data/simulate.js";
 import { formatDiagnostic } from "../diagnostics.js";
 import { consumersElsewhere, otherModels } from "../federation/consumers.js";
 import { contractName } from "../load/build.js";
@@ -375,4 +377,84 @@ function ancestry(model: Model, e: ElementNode): ElementNode[] {
 
 function ownersOf(model: Model, e: ElementNode): string[] {
   return [...new Set(ancestry(model, e).flatMap((x) => x.spec.owners ?? []))];
+}
+
+/** Field lineage as text: where a value comes from and where it goes, with the tables it lands in. */
+export function formatLineage(l: Lineage): string {
+  const key = (f: FieldId) => `${f.entry}.${f.field}`;
+  const label = (f: FieldId) => {
+    const c = l.classifications.get(key(f));
+    return `${key(f)}${c ? ` (${c})` : ""}`;
+  };
+  const tables = (entry: string) => {
+    const t = l.stored.get(entry) ?? [];
+    return t.length
+      ? ` · stored in ${t.map((s) => `${s.namespace}.${s.element} (${s.table})`).join(", ")}`
+      : "";
+  };
+  const out = [label(l.field) + tables(l.field.entry)];
+  out.push("", "Comes from:");
+  if (!l.upstream.length) out.push("  nothing a mapping declares");
+  for (const e of l.upstream) {
+    out.push(
+      `  ${label(e.to)} = ${e.expression}  (${e.mapping}${e.copy ? ", copied" : ""})`,
+      `    reads ${e.from.map(label).join(", ") || "no input fields"}`,
+    );
+  }
+  out.push("", "Goes to:");
+  if (!l.downstream.length) out.push("  nothing a mapping declares");
+  for (const e of l.downstream) {
+    const table = e.table
+      ? ` · written to ${e.table.namespace}.${e.table.element} (${e.table.table})`
+      : tables(e.to.entry);
+    out.push(
+      `  ${label(e.to)} = ${e.expression}  (${e.mapping}${e.copy ? ", copied" : ""})${table}`,
+    );
+  }
+  return out.join("\n");
+}
+
+/** A simulation as text: the path, each decision and why, and the records at each step. */
+export function formatSimulation(s: Simulation): string {
+  const value = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+  const out = [
+    `Journey ${s.journey}${s.outcomes.length ? ` · decided: ${s.outcomes.join(", ")}` : ""}`,
+  ];
+  for (const step of s.steps) {
+    out.push(`  ${step.step}. ${step.from} → ${step.to}${step.action ? `: ${step.action}` : ""}`);
+    if (!step.ran) {
+      out.push(`     skipped: ${step.skipped}`);
+      continue;
+    }
+    const d = step.decision;
+    if (d) {
+      out.push(
+        d.outcome
+          ? `     decides ${d.logic} → ${d.outcome} (${d.rule === "else" ? "else" : `rule ${d.rule}: ${d.when}`})`
+          : `     decides ${d.logic} → no outcome`,
+      );
+    }
+    for (const e of step.events) {
+      const where = e.tables.length
+        ? ` → ${e.tables.map((t) => `${t.namespace}.${t.element} (${t.table})`).join(", ")}`
+        : "";
+      if (e.kind === "sent") {
+        out.push(`     sends ${e.entry}`);
+      } else if (e.kind === "created") {
+        const fields = Object.entries(e.record)
+          .map(([k, v]) => `${k}: ${value(v)}`)
+          .join(", ");
+        out.push(`     + creates ${e.entry} { ${fields} }${e.via ? ` via ${e.via}` : ""}${where}`);
+      } else {
+        for (const f of e.fields) {
+          out.push(
+            `     ~ changes ${e.entry}.${f.field}: ${value(f.from)} → ${value(f.to)}${where}`,
+          );
+        }
+      }
+    }
+    if (step.next) out.push(`     continues as journey ${step.next}`);
+    for (const p of step.problems) out.push(`     ! ${p}`);
+  }
+  return out.join("\n");
 }

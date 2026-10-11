@@ -106,10 +106,10 @@ describe("data entries", () => {
       },
     ]);
     expect(messages(m, "ref/unresolved-data")).toEqual([
-      'Journey "refund", step 1 sends "RefundRequset", which is not defined under data.',
+      'Journey "refund", step 1 sends "RefundRequset", which is not defined under data. Did you mean RefundRequest?',
     ]);
     expect(messages(bad, "ref/unresolved-data")).toEqual([
-      'ledger stores ledger_entries as "LedgerEntri", which is not defined under data.',
+      'ledger stores ledger_entries as "LedgerEntri", which is not defined under data. Did you mean LedgerEntry?',
     ]);
   });
 
@@ -314,7 +314,7 @@ describe("data in other repos", () => {
     `);
     expect(before).not.toContain("data/not-accepted");
     expect(messages(m, "ref/unknown-in-import")).toEqual([
-      'Journey "refund", step 1 sends payments.RefundReqest, which payments@5.0.0 doesn\'t have.',
+      'Journey "refund", step 1 sends payments.RefundReqest, which payments@5.0.0 doesn\'t have. Did you mean payments.RefundRequest?',
     ]);
     expect(messages(m, "data/not-accepted")).toEqual([
       "gateway → payments.charges sends payments.Charge, which payments.charges doesn't accept through proto/charges.proto. It accepts: payments.RefundRequest.",

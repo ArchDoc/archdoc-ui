@@ -7,6 +7,8 @@ import type {
   ImportSpec,
   JourneySpec,
   JourneyStepSpec,
+  LogicSpec,
+  MappingSpec,
   Provenance,
   RuleSpec,
   Status,
@@ -99,6 +101,18 @@ export interface DataNode {
   location?: SourceLocation | undefined;
 }
 
+export interface MappingNode {
+  id: string;
+  spec: MappingSpec;
+  location?: SourceLocation | undefined;
+}
+
+export interface LogicNode {
+  id: string;
+  spec: LogicSpec;
+  location?: SourceLocation | undefined;
+}
+
 export interface Model {
   namespace: string;
   name?: string | undefined;
@@ -108,6 +122,8 @@ export interface Model {
   elements: Map<string, ElementNode>;
   journeys: Map<string, JourneyNode>;
   data: Map<string, DataNode>;
+  mappings: Map<string, MappingNode>;
+  logic: Map<string, LogicNode>;
   rules: RuleSpec[];
   relationships: Relationship[];
   /** Model files that were read, in load order. */

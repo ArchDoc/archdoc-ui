@@ -5,5 +5,6 @@ CREATE TABLE trips (
   rider_id    uuid NOT NULL,
   rider_email text NOT NULL,
   fare_cents  integer NOT NULL,
+  refunded_cents integer NOT NULL DEFAULT 0,
   status      trip_status NOT NULL DEFAULT 'requested'
 );

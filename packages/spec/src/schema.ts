@@ -189,6 +189,71 @@ export const ChangesSchema = z
   .record(z.string(), z.string().regex(/->/, 'Write a change as "before -> after"'))
   .describe("Fields this step changes, such as Charge.status: captured -> refunded");
 
+/** One outcome of a decision: what it creates and changes, and where the journey goes next. */
+export const BranchSchema = z.strictObject({
+  description: z.string().optional(),
+  creates: CreatesSchema.optional(),
+  changes: ChangesSchema.optional(),
+  next: z.string().optional().describe("Another journey this outcome continues as"),
+});
+
+/** A name for an input in CEL expressions, such as refund or trip. */
+const AliasSchema = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Input names are letters, digits, and _ (CEL identifiers)");
+
+const InputsSchema = z
+  .record(AliasSchema, z.string())
+  .describe(
+    "Named inputs: a name for each data entry, such as { refund: Refund, trip: trips.Trip }",
+  );
+
+/** How one record becomes another: target fields as CEL expressions over named inputs. */
+export const MappingSchema = z.strictObject({
+  description: z.string().optional(),
+  from: InputsSchema,
+  to: z
+    .string()
+    .describe(
+      "The entry it produces, or a datastore table, such as LedgerEntry or payments.ledger.ledger_entries",
+    ),
+  fields: z
+    .record(z.string(), z.string())
+    .describe(
+      "Each target field as a CEL expression over the inputs, such as -refund.amount_cents",
+    ),
+  code: CodeSchema.optional().describe("The code that does it"),
+  status: StatusSchema.optional(),
+  tags: StringList.optional(),
+  provenance: ProvenanceSchema.optional(),
+});
+
+/** A decision an element makes on the data it receives. First match wins. */
+export const LogicRuleSchema = z.union([
+  z.strictObject({
+    when: z.string().describe("A CEL condition over the inputs"),
+    // biome-ignore lint/suspicious/noThenProperty: `then` is the model's word for a rule's outcome, never awaited.
+    then: z.string().describe("The outcome"),
+    description: z.string().optional(),
+  }),
+  z.strictObject({
+    else: z.string().describe("The outcome when no rule above matches"),
+    description: z.string().optional(),
+  }),
+]);
+
+export const LogicSchema = z.strictObject({
+  description: z.string().optional(),
+  "runs-in": RefSchema.optional().describe("The element that makes the decision"),
+  input: InputsSchema,
+  rules: z.array(LogicRuleSchema).min(1).describe("Checked in order; the first that matches wins"),
+  code: CodeSchema.optional().describe("The code that implements it"),
+  owners: StringList.optional(),
+  status: StatusSchema.optional(),
+  tags: StringList.optional(),
+  provenance: ProvenanceSchema.optional(),
+});
+
 export const JourneyStepSchema = z.strictObject({
   from: RefSchema,
   to: RefSchema,
@@ -199,11 +264,22 @@ export const JourneyStepSchema = z.strictObject({
   creates: CreatesSchema.optional(),
   changes: ChangesSchema.optional(),
   provenance: ProvenanceSchema.optional(),
-  // Logic and mappings on a step. Their semantics arrive with logic and mappings (roadmap Phase 5c).
-  decides: z.string().optional(),
-  via: z.string().optional(),
-  when: z.string().optional(),
-  branches: z.record(z.string(), z.unknown()).optional(),
+  decides: z
+    .string()
+    .optional()
+    .describe("A logic block that decides where this step goes, such as payments.refund-approval"),
+  branches: z
+    .record(z.string(), BranchSchema)
+    .optional()
+    .describe("What happens for each outcome of `decides`"),
+  when: z
+    .string()
+    .optional()
+    .describe("Run this step only when an earlier decision had this outcome"),
+  via: z
+    .string()
+    .optional()
+    .describe("A mapping that produces the record this step writes, such as refund-to-ledger"),
 });
 
 const journeyShape = {
@@ -348,9 +424,15 @@ const sections = {
   elements: z.record(IdSchema, ElementSchema).optional(),
   journeys: z.record(IdSchema, JourneySchema).optional(),
   data: z.record(IdSchema, DataEntrySchema).optional(),
-  // Reserved for the data layer and learning phases. Accepted now, validated later.
-  mappings: z.record(IdSchema, z.looseObject({})).optional(),
-  logic: z.record(IdSchema, z.looseObject({})).optional(),
+  mappings: z
+    .record(IdSchema, MappingSchema)
+    .optional()
+    .describe("How records become other records, field by field, for lineage and simulation"),
+  logic: z
+    .record(IdSchema, LogicSchema)
+    .optional()
+    .describe("Decisions elements make on the data they receive"),
+  // Reserved for the learning phase. Accepted now, validated later.
   tours: z.record(IdSchema, z.looseObject({})).optional(),
   rules: z.array(RuleSchema).optional(),
   domains: z
@@ -397,6 +479,10 @@ export type JourneySpec = z.infer<typeof JourneySchema>;
 export type DataEntrySpec = z.infer<typeof DataEntrySchema>;
 export type DataFieldSpec = z.infer<typeof DataFieldSchema>;
 export type DataRuleSpec = z.infer<typeof DataRuleSchema>;
+export type MappingSpec = z.infer<typeof MappingSchema>;
+export type LogicSpec = z.infer<typeof LogicSchema>;
+export type LogicRuleSpec = z.infer<typeof LogicRuleSchema>;
+export type BranchSpec = z.infer<typeof BranchSchema>;
 export type RuleSpec = z.infer<typeof RuleSchema>;
 export type DomainSpec = z.infer<typeof DomainSchema>;
 export type ImportSpec = z.infer<typeof ImportSchema>;

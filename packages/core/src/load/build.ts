@@ -49,6 +49,8 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
     elements: new Map(),
     journeys: new Map(),
     data: new Map(),
+    mappings: new Map(),
+    logic: new Map(),
     rules: [],
     relationships: [],
     files: sources.map((s) => s.path),
@@ -197,6 +199,27 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
       }
       model.data.set(id, { id, spec, location: parsed.locate(path) });
       if (spec.owners) ownerSites.push({ owners: spec.owners, file: parsed, path });
+    }
+
+    for (const [section, label, map] of [
+      ["mappings", "mapping", model.mappings],
+      ["logic", "logic block", model.logic],
+    ] as const) {
+      for (const [id, spec] of Object.entries(file[section] ?? {})) {
+        const path = [section, id];
+        if (map.has(id)) {
+          diagnostics.push(duplicate(label, id, parsed, path, map.get(id)?.location));
+          continue;
+        }
+        (map as Map<string, { id: string; spec: unknown; location?: SourceLocation }>).set(id, {
+          id,
+          spec,
+          location: parsed.locate(path),
+        });
+      }
+    }
+    for (const [id, l] of Object.entries(file.logic ?? {})) {
+      if (l.owners) ownerSites.push({ owners: l.owners, file: parsed, path: ["logic", id] });
     }
 
     for (const [i, rule] of (file.rules ?? []).entries()) {

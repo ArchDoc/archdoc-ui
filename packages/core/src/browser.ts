@@ -28,12 +28,27 @@ export {
 } from "./codemap/codemap.js";
 export { compileGlob, literalPrefix, normalizePath } from "./codemap/glob.js";
 export {
+  compile as compileCel,
+  evaluate as evaluateCel,
+  type FieldRef,
+  SIMULATED_NOW,
+} from "./data/cel.js";
+export {
   type NewSensitiveFlow,
   type NewSensitiveStore,
   sensitiveDataChanges,
 } from "./data/changes.js";
 export { checkData } from "./data/check.js";
 export { type DataFlow, type DataStore, dataFlows, dataStores } from "./data/flows.js";
+export {
+  type FieldId,
+  type Lineage,
+  type LineageEdge,
+  lineage,
+  lineageEdges,
+} from "./data/lineage.js";
+export { checkLogic, outcomesOf } from "./data/logic.js";
+export { DataRegistry, type Owned, type StoredIn } from "./data/registry.js";
 export {
   classifiedFields,
   type DataResolution,
@@ -53,6 +68,14 @@ export {
   parseSourceRef,
   schemaDrift,
 } from "./data/schemas.js";
+export {
+  type DataRecord,
+  type RecordEvent,
+  type SimulatedDecision,
+  type SimulatedStep,
+  type Simulation,
+  simulate,
+} from "./data/simulate.js";
 export * from "./diagnostics.js";
 export {
   type Change,

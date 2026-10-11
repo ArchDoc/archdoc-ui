@@ -139,10 +139,30 @@ export function providesOf(model: Model, t: Target | undefined): ProvideSpec[] |
 
 function near(model: Model, id: string, ns?: string): string | undefined {
   const lower = id.toLowerCase();
-  const hits = [...model.data.keys()].filter((k) => k.toLowerCase() === lower);
+  const hits = [...model.data.keys()].filter((k) => {
+    const other = k.toLowerCase();
+    return other === lower || (lower.length > 3 && distance(other, lower) <= 2);
+  });
   return hits.length
     ? `Did you mean ${hits.map((h) => (ns ? `${ns}.${h}` : h)).join(" or ")}?`
     : undefined;
+}
+
+/** Edit distance, for "did you mean" hints. */
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(
+        (prev[j] ?? 0) + 1,
+        (cur[j - 1] ?? 0) + 1,
+        (prev[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = cur;
+  }
+  return prev[b.length] ?? 0;
 }
 
 /** The contract a relationship or step goes through, by its name. */

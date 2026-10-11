@@ -37,6 +37,8 @@ export interface ModelDiff {
   relationships: Change<RelationshipView>[];
   journeys: (Change<unknown> & { steps?: StepChange[] })[];
   data: Change<unknown>[];
+  mappings: Change<unknown>[];
+  logic: Change<unknown>[];
   rules: Change<unknown>[];
 }
 
@@ -58,6 +60,14 @@ export function diffModels(base: Model, head: Model): ModelDiff {
     data: diffMaps(
       mapValues(base.data, (d) => d.spec),
       mapValues(head.data, (d) => d.spec),
+    ),
+    mappings: diffMaps(
+      mapValues(base.mappings, (m) => m.spec),
+      mapValues(head.mappings, (m) => m.spec),
+    ),
+    logic: diffMaps(
+      mapValues(base.logic, (l) => l.spec),
+      mapValues(head.logic, (l) => l.spec),
     ),
     rules: diffMaps(
       new Map(base.rules.map((r) => [r.id, r])),

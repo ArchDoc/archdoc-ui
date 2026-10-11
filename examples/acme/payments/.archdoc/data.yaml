@@ -64,3 +64,48 @@ data:
       charge_id: { type: uuid }
       amount_cents: { type: int }
       card_country: { type: string }
+
+# How a refund request is decided, and what it writes.
+logic:
+  refund-approval:
+    description: Small refunds go through on their own; large ones need finance, and safety reports go to the safety team.
+    runs-in: charges.refunds
+    input: { request: RefundRequest, charge: Charge }
+    code: services/charges/internal/refunds/policy.go
+    owners: [payments-team]
+    rules:
+      - when: "request.reason == 'safety'"
+        then: escalate-to-safety
+      - when: "request.amount_cents <= charge.amount_cents / 2"
+        then: auto-approve
+      - else: needs-finance-approval
+
+mappings:
+  request-to-refund:
+    description: A refund for part (or all) of a charge.
+    from: { request: RefundRequest, charge: Charge }
+    to: ledger.refunds
+    code: services/charges/internal/refunds/create.go
+    fields:
+      id: "'refund-' + charge.id"
+      charge_id: charge.id
+      amount_cents: request.amount_cents
+  refund-to-ledger:
+    description: Every approved refund is a negative ledger entry.
+    from: { refund: Refund }
+    to: ledger.ledger_entries
+    code: services/charges/internal/ledger/post.go
+    fields:
+      id: "'entry-' + refund.id"
+      account: "'charge:' + refund.charge_id"
+      amount_cents: -refund.amount_cents
+      source_ref: refund.id
+      posted_at: now()
+  refund-issued:
+    description: The event trips listens to.
+    from: { refund: Refund, request: RefundRequest }
+    to: RefundIssued
+    fields:
+      refund_id: refund.id
+      trip_id: request.trip_id
+      amount_cents: refund.amount_cents

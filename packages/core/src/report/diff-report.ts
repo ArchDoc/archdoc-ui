@@ -5,7 +5,16 @@ import type { Target } from "../model.js";
 
 export type DiffFormat = "text" | "markdown" | "mermaid" | "json";
 
-const SECTIONS = ["elements", "relationships", "actors", "journeys", "data", "rules"] as const;
+const SECTIONS = [
+  "elements",
+  "relationships",
+  "actors",
+  "journeys",
+  "data",
+  "mappings",
+  "logic",
+  "rules",
+] as const;
 const SYMBOL = { added: "+", removed: "-", changed: "~", moved: "→" } as const;
 
 /** Renders a model diff. `label` names the two sides, such as "main → working tree". */
@@ -56,6 +65,15 @@ export function describeChange(section: (typeof SECTIONS)[number], c: Change<unk
     const r = (c.after ?? c.before) as RelationshipView;
     const text = `${ref(r.from)} → ${ref(r.to)}${r.description ? `: ${r.description}` : ""}`;
     return c.kind === "changed" ? `${text} (${fieldChanges(c)})` : text;
+  }
+  if (section === "mappings" || section === "logic") {
+    const spec = (c.after ?? c.before ?? {}) as { to?: string; "runs-in"?: string };
+    const what =
+      section === "mappings"
+        ? `mapping to ${spec.to}`
+        : `logic${spec["runs-in"] ? ` in ${spec["runs-in"]}` : ""}`;
+    if (c.kind === "changed") return `${c.id} (${what}): ${blockChanges(section, c)}`;
+    return `${c.id} (${what})`;
   }
   const spec = (c.after ?? c.before ?? {}) as Record<string, unknown>;
   const kind =
@@ -114,6 +132,50 @@ function contractDelta(before: unknown, after: unknown): string {
       .map(([n, st]) => `${n} ${a.get(n)} → ${st}`),
   ];
   return parts.length ? `provides ${parts.join(" ")}` : "provides";
+}
+
+/**
+ * What changed in a mapping or logic block, with the expressions themselves:
+ * "amount_cents: -refund.amount_cents → refund.amount_cents" or
+ * "rule 2: when a <= b / 2 → when a <= b * 3 / 4".
+ */
+export function blockChanges(section: "mappings" | "logic", c: Change<unknown>): string {
+  const before = (c.before ?? {}) as Record<string, unknown>;
+  const after = (c.after ?? {}) as Record<string, unknown>;
+  return c.fields
+    .map((f) => {
+      if (section === "mappings" && f === "fields") {
+        const a = (before.fields ?? {}) as Record<string, string>;
+        const b = (after.fields ?? {}) as Record<string, string>;
+        return [
+          ...Object.keys(b)
+            .filter((k) => !(k in a))
+            .map((k) => `+${k} = ${b[k]}`),
+          ...Object.keys(a)
+            .filter((k) => !(k in b))
+            .map((k) => `-${k}`),
+          ...Object.keys(b)
+            .filter((k) => k in a && a[k] !== b[k])
+            .map((k) => `${k}: ${a[k]} → ${b[k]}`),
+        ].join("; ");
+      }
+      if (section === "logic" && f === "rules") {
+        type Rule = { when?: string; then?: string; else?: string };
+        const a = (before.rules ?? []) as Rule[];
+        const b = (after.rules ?? []) as Rule[];
+        const show = (r: Rule | undefined) =>
+          !r ? "none" : r.else !== undefined ? `else ${r.else}` : `when ${r.when} then ${r.then}`;
+        const parts: string[] = [];
+        for (let i = 0; i < Math.max(a.length, b.length); i++) {
+          if (JSON.stringify(a[i]) === JSON.stringify(b[i])) continue;
+          parts.push(`rule ${i + 1}: ${show(a[i])} → ${show(b[i])}`);
+        }
+        return parts.join("; ");
+      }
+      if (f === "to" || f === "runs-in") return `${f} ${before[f]} → ${after[f]}`;
+      return f;
+    })
+    .join("; ");
 }
 
 /** "fields +card_last4 (pci) -legacy_id ~email (classification internal → pii)" */
