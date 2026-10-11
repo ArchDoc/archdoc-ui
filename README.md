@@ -98,13 +98,50 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
-`show` prints the details of any element, actor, or journey by ID. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+`show` prints the details of any element, actor, journey, or data entry by ID. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
 
 ## Keep the model honest
 
 `archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it marks what your change introduced and fails only on that, so it works as a CI gate from day one.
 
 `archdoc diff` shows what changed in the model itself, by element, relationship, actor, and journey rather than by line.
+
+## Data: what's sent and stored
+
+Boxes and arrows say *that* two things talk. Data says *what* they exchange and *where* it lands. Data entries are records (`entity`), requests and responses (`message`), and `event`s, with fields, a `classification` on sensitive ones, and an optional lifecycle:
+
+```yaml
+data:
+  Charge:
+    kind: entity
+    fields:
+      card_last4: { type: string, classification: pci }
+      status: { type: enum, values: [authorized, captured, refunded] }
+    states:
+      - authorized -> captured -> refunded
+elements:
+  ledger:
+    kind: datastore
+    stores: { charges: { entity: Charge } }
+  charges:
+    kind: container
+    provides:
+      - { api: proto/charges.proto, accepts: RefundRequest, returns: Refund }
+    uses:
+      ledger: { description: Records charges, sends: Charge }
+```
+
+Relationships `send` data, contracts `accept`, `return`, or `carry` it, datastores `store` it, and journey steps say what they `send`, `create`, and `change` (`Charge.status: captured -> refunded`). Data in another repo is referenced by namespace, like elements (`payments.Charge`). `validate` reports data that isn't defined, fields that don't exist, values outside an enum, state changes the lifecycle doesn't allow, and data sent to an element that doesn't accept it. Rules can say where classified data may be stored and where it may never go:
+
+```yaml
+rules:
+  - id: pci-stays-in-payments
+    data: { classification: pci, stored-in: { namespace: payments } }
+  - id: no-pii-to-external
+    data: { classification: pii, not-sent-to: { kind: external } }
+```
+
+The pull request report lists the data entries a change touches, and calls out sensitive data that goes somewhere new, external services first.
 
 ## Share models across repos
 
