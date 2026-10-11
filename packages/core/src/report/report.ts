@@ -1,4 +1,6 @@
 import type { Located } from "../codemap/codemap.js";
+import { dataFlows, dataStores } from "../data/flows.js";
+import { parseStates, qualifyData, resolveData } from "../data/resolve.js";
 import { formatDiagnostic } from "../diagnostics.js";
 import { consumersElsewhere, otherModels } from "../federation/consumers.js";
 import { contractName } from "../load/build.js";
@@ -152,6 +154,66 @@ export function formatElement(model: Model, ref: string): string | undefined {
   if (remote.length)
     out.push(`Used from other repos: ${[...new Set(remote.map((c) => c.from))].join(", ")}`);
   if (v.journeys.length) out.push(`Journeys: ${v.journeys.map((j) => j.id).join(", ")}`);
+  return out.join("\n");
+}
+
+/**
+ * A data entry: its fields and classifications, its lifecycle, where it's
+ * stored, and where this model sends it. Entries in synced imports show too.
+ */
+export function formatData(model: Model, ref: string): string | undefined {
+  const r = resolveData(model, ref);
+  if (r.status !== "found") return undefined;
+  const d = r.node;
+  const where = r.local
+    ? ""
+    : ` · in ${r.namespace}@${model.imported?.get(r.namespace)?.version ?? "?"}, another repo`;
+  const out = [`${r.local ? d.id : r.ref} (${d.spec.kind})${where}`];
+  if (d.spec.status && d.spec.status !== "active") out.push(`Status: ${d.spec.status}`);
+  if (d.spec.description) out.push(d.spec.description);
+  if (d.spec.owners?.length) out.push(`Owners: ${d.spec.owners.join(", ")}`);
+  if (d.spec.source) {
+    out.push(
+      `Source: ${Object.entries(d.spec.source)
+        .map(([k, v]) => `${k} ${v}`)
+        .join(", ")}`,
+    );
+  }
+  const fields = Object.entries(d.spec.fields ?? {});
+  if (fields.length) {
+    out.push("Fields:");
+    for (const [name, f] of fields) {
+      const values = f.values ? ` (${f.values.join(", ")})` : "";
+      const extra = [f.classification, f.required ? "required" : undefined, f.status]
+        .filter((x) => x && x !== "active")
+        .join(", ");
+      out.push(`  ${name}: ${f.type}${values}${extra ? ` · ${extra}` : ""}`);
+    }
+  }
+  const life = parseStates(d.spec.states ?? []);
+  if (life.states.size) {
+    out.push(
+      `States: ${[...life.next].map(([a, b]) => `${a} → ${[...b].join(" | ")}`).join("; ")}`,
+    );
+  }
+  const same = (data: string) => qualifyData(data, model.namespace) === r.ref;
+  const stored = dataStores(model).filter((s) => same(s.data));
+  if (stored.length)
+    out.push(`Stored in: ${stored.map((s) => `${s.element} (${s.table})`).join(", ")}`);
+  const flows = dataFlows(model).filter((f) => same(f.data));
+  if (flows.length) {
+    out.push("Sent:");
+    const name = (t: Target) => (t.type === "external" ? t.ref : t.id);
+    for (const f of flows) {
+      const how =
+        f.how === "step"
+          ? `journey ${f.journey}, step ${f.step}`
+          : f.how === "sends"
+            ? "sends"
+            : `${f.how} through ${f.via}`;
+      out.push(`  ${name(f.from)} → ${name(f.to)} (${how})`);
+    }
+  }
   return out.join("\n");
 }
 

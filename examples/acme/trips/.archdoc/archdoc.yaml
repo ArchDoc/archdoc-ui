@@ -16,9 +16,9 @@ elements:
     owners: [trips-team]
     code: services/trips/**
     provides:
-      - { api: openapi/trips.yaml, description: Look up trips and their fares }
+      - { api: openapi/trips.yaml, description: Look up trips and their fares, returns: Trip }
     uses:
-      trips-db: Reads and writes trips
+      trips-db: { description: Reads and writes trips, sends: Trip }
       payments.charges:
         description: Marks the trip refunded when a refund is issued
         via: refund.issued
@@ -26,3 +26,18 @@ elements:
     kind: datastore
     technology: Postgres
     owners: [trips-team]
+    stores:
+      trips: { entity: Trip, key: id }
+
+data:
+  Trip:
+    kind: entity
+    owners: [trips-team]
+    fields:
+      id: { type: uuid }
+      rider_id: { type: uuid }
+      rider_email: { type: string, classification: pii }
+      fare_cents: { type: int }
+      status: { type: enum, values: [requested, completed, refunded] }
+    states:
+      - requested -> completed -> refunded

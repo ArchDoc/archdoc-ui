@@ -1,0 +1,60 @@
+# What payments sends and stores. Classifications follow a field everywhere it goes.
+data:
+  RefundRequest:
+    kind: message
+    description: A rider's request for money back.
+    fields:
+      trip_id: { type: uuid, required: true }
+      amount_cents: { type: int, required: true }
+      reason: { type: enum, values: [overcharge, no_show, safety] }
+      rider_email: { type: string, classification: pii }
+
+  Refund:
+    kind: entity
+    owners: [payments-team]
+    fields:
+      id: { type: uuid }
+      charge_id: { type: uuid }
+      amount_cents: { type: int }
+      status: { type: enum, values: [pending_approval, approved, sent] }
+    states:
+      - pending_approval -> approved -> sent
+
+  RefundIssued:
+    kind: event
+    description: A refund was approved and sent to the card network.
+    fields:
+      refund_id: { type: uuid }
+      trip_id: { type: uuid }
+      amount_cents: { type: int }
+
+  Charge:
+    kind: entity
+    owners: [payments-team]
+    fields:
+      id: { type: uuid }
+      trip_id: { type: uuid }
+      amount_cents: { type: int }
+      card_last4: { type: string, classification: pci }
+      status: { type: enum, values: [authorized, captured, partially_refunded, refunded] }
+    states:
+      - authorized -> captured
+      - captured -> partially_refunded | refunded
+      - partially_refunded -> refunded
+
+  LedgerEntry:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      account: { type: string }
+      amount_cents: { type: int }
+      source_ref: { type: uuid }
+      posted_at: { type: timestamp }
+
+  FraudCheck:
+    kind: message
+    description: What the fraud scorer sees. No card or rider details.
+    fields:
+      charge_id: { type: uuid }
+      amount_cents: { type: int }
+      card_country: { type: string }

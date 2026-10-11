@@ -1,9 +1,9 @@
 import type { Model } from "../model.js";
 
 export interface SearchHit {
-  type: "element" | "actor" | "journey";
+  type: "element" | "actor" | "journey" | "data";
   id: string;
-  /** Element kind, actor kind, or journey importance. */
+  /** Element kind, actor kind, journey importance, or data kind. */
   kind: string;
   description?: string | undefined;
   /** Code paths (elements) or step code entry points (journeys). */
@@ -18,7 +18,7 @@ const STOP = new Set(
 );
 
 /**
- * Finds elements, actors, and journeys by words, so an agent can ask "where do
+ * Finds elements, actors, journeys, and data entries by words, so an agent can ask "where do
  * CLI commands live?" before it knows any file paths. Plain phrasing works:
  * filler words are ignored, results that match more of the words rank first,
  * and at least half of the words must match. Matches in IDs, names, and code
@@ -104,6 +104,25 @@ export function search(model: Model, query: string, limit = 10): SearchHit[] {
         kind: j.spec.importance ?? "normal",
         description: j.spec.goal,
         code: j.spec.steps.flatMap((st) => (st.code ? [st.code] : [])),
+        score: s,
+      });
+    }
+  }
+  for (const d of model.data.values()) {
+    const s = score([
+      { text: d.id, weight: 5 },
+      { text: d.spec.name, weight: 5 },
+      { text: d.spec.kind, weight: 2 },
+      { text: Object.keys(d.spec.fields ?? {}).join(" "), weight: 2 },
+      { text: d.spec.description, weight: 1 },
+    ]);
+    if (s > 0) {
+      hits.push({
+        type: "data",
+        id: d.id,
+        kind: d.spec.kind,
+        description: d.spec.description,
+        code: Object.values(d.spec.source ?? {}),
         score: s,
       });
     }

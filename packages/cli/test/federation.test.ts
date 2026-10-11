@@ -89,7 +89,7 @@ describe("archdoc sync and publish", () => {
 
   it("publish writes a bundle, or prints it with --out -", async () => {
     const r = await run("payments", "publish");
-    expect(r.out).toContain("✓ Wrote dist/payments@5.1.0.json (payments@5.1.0, 1 file).");
+    expect(r.out).toContain("✓ Wrote dist/payments@5.1.0.json (payments@5.1.0, 2 files).");
     const printed = await run("payments", "publish", "5.1.1", "--out", "-");
     expect(JSON.parse(printed.out)).toMatchObject({ namespace: "payments", version: "5.1.1" });
     const broken = await run("rides", "publish", "1.1.0");

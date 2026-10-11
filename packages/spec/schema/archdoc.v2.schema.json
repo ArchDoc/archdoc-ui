@@ -260,6 +260,7 @@
                       "type": "string"
                     },
                     "sends": {
+                      "description": "Data entries this step sends, such as RefundRequest",
                       "anyOf": [
                         {
                           "type": "string"
@@ -271,6 +272,50 @@
                           }
                         }
                       ]
+                    },
+                    "creates": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": ["string", "number", "boolean", "null"]
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+                    },
+                    "changes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "pattern": "->"
+                      },
+                      "description": "Fields this step changes, such as Charge.status: captured -> refunded"
                     },
                     "provenance": {
                       "type": "object",
@@ -317,9 +362,7 @@
                         "type": "string"
                       },
                       "additionalProperties": {}
-                    },
-                    "creates": {},
-                    "changes": {}
+                    }
                   },
                   "required": ["from", "to"],
                   "additionalProperties": false
@@ -341,7 +384,11 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": ["entity", "message", "event"]
+                "enum": ["entity", "message", "event"],
+                "description": "entity: a stored record; message: a request or response; event: something that happened"
+              },
+              "name": {
+                "type": "string"
               },
               "description": {
                 "type": "string"
@@ -353,7 +400,7 @@
                 }
               },
               "source": {
-                "description": "The real schema this is imported from",
+                "description": "The real schema this is imported from, such as { prisma: prisma/schema.prisma#Charge }",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
@@ -371,7 +418,8 @@
                   "type": "object",
                   "properties": {
                     "type": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "int, string, uuid, enum, timestamp, or another entry's name"
                     },
                     "description": {
                       "type": "string"
@@ -381,6 +429,7 @@
                       "type": "string"
                     },
                     "values": {
+                      "description": "Allowed values, for an enum",
                       "type": "array",
                       "items": {
                         "type": ["string", "number"]
@@ -388,6 +437,11 @@
                     },
                     "required": {
                       "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["active", "planned", "deprecated"],
+                      "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
                     }
                   },
                   "required": ["type"],
@@ -395,6 +449,7 @@
                 }
               },
               "states": {
+                "description": "Lifecycle transitions, such as authorized -> captured or captured -> partially_refunded | refunded",
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -405,6 +460,41 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "planned", "deprecated"],
+                "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": ["declared", "inferred", "suggested"],
+                    "description": "declared: written by a person (the default). inferred: produced by an analyzer. suggested: proposed by an AI agent and not yet accepted."
+                  },
+                  "by": {
+                    "description": "Who produced it: analyzer:ts-imports, agent:claude-code, human:@handle",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["source"],
+                "additionalProperties": false,
+                "description": "Where a fact came from. Absent means declared by a person."
               }
             },
             "required": ["kind"],
@@ -458,6 +548,33 @@
               },
               "description": {
                 "type": "string"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "classification": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ],
+                    "description": "The classifications it applies to, such as pci"
+                  },
+                  "stored-in": {
+                    "description": "Where it may be stored: an element, a list, { namespace: payments }, or { kind, tag }"
+                  },
+                  "not-sent-to": {
+                    "description": "Where it may never be sent, such as { kind: external }"
+                  }
+                },
+                "required": ["classification"],
+                "additionalProperties": false
               },
               "scope": {
                 "description": "org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
@@ -741,6 +858,7 @@
                 "type": "string"
               },
               "sends": {
+                "description": "Data entries this step sends, such as RefundRequest",
                 "anyOf": [
                   {
                     "type": "string"
@@ -752,6 +870,50 @@
                     }
                   }
                 ]
+              },
+              "creates": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": ["string", "number", "boolean", "null"]
+                      }
+                    }
+                  }
+                ],
+                "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+              },
+              "changes": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "->"
+                },
+                "description": "Fields this step changes, such as Charge.status: captured -> refunded"
               },
               "provenance": {
                 "type": "object",
@@ -798,9 +960,7 @@
                   "type": "string"
                 },
                 "additionalProperties": {}
-              },
-              "creates": {},
-              "changes": {}
+              }
             },
             "required": ["from", "to"],
             "additionalProperties": false

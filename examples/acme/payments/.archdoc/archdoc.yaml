@@ -22,10 +22,16 @@ elements:
     owners: [payments-team]
     code: services/charges/**
     provides:
-      - { api: proto/charges.proto, description: "Charge a card, and refund a charge" }
-      - { topic: refund.issued, description: A refund was approved and sent to the card network }
+      - api: proto/charges.proto
+        description: Charge a card, and refund a charge
+        accepts: RefundRequest
+        returns: Refund
+      - topic: refund.issued
+        description: A refund was approved and sent to the card network
+        carries: RefundIssued
     uses:
-      ledger: Records every charge and refund
+      ledger: { description: Records every charge and refund, sends: [Charge, Refund, LedgerEntry] }
+      fraud-scoring: { description: Scores risky charges, sends: FraudCheck }
     elements:
       refunds:
         kind: component
@@ -35,6 +41,13 @@ elements:
     kind: datastore
     technology: Postgres
     owners: [payments-team]
+    stores:
+      charges: { entity: Charge, key: id }
+      refunds: { entity: Refund, key: id }
+      ledger_entries: { entity: LedgerEntry, key: id, retention: 7y }
+  fraud-scoring:
+    kind: external
+    description: A third-party service that scores charges for fraud.
   ledger-reports:
     kind: container
     description: Month-end reporting over the ledger.

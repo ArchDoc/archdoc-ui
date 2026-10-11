@@ -5,6 +5,7 @@ import {
   type Lock,
   type LockEntry,
 } from "@archdoc/spec";
+import { checkData } from "../data/check.js";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
 import { contractDiagnostic, isEventContract, LANDSCAPE } from "../load/build.js";
 import type {
@@ -218,6 +219,7 @@ export function federate(model: Model, input: FederationInput): Model {
 
   model.imported = imported;
   checkReferences(model, imported, diagnostics);
+  diagnostics.push(...checkData(model, "imported"));
   // Domain members in other repos, now that their models are here.
   for (const d of model.domains?.values() ?? []) {
     for (const ref of d.spec.elements ?? []) {

@@ -22,7 +22,7 @@ elements:
     owners: [rides-team]
     code: apps/rider/**
     uses:
-      api-gateway: Calls
+      api-gateway: { description: Calls, sends: payments.RefundRequest }
   api-gateway:
     kind: container
     technology: Node.js
@@ -43,8 +43,13 @@ journeys:
     importance: critical
     steps:
       - { from: rider, to: app, action: Taps "Report a problem" on the trip }
-      - { from: app, to: api-gateway, action: Sends the refund request }
+      - { from: app, to: api-gateway, action: Sends the refund request, sends: payments.RefundRequest }
       - { from: api-gateway, to: trips.trips-api, action: Checks the trip and its fare }
-      - { from: api-gateway, to: payments.charges, action: Asks for a refund }
-      - { from: payments.charges, to: payments.ledger, action: Records the refund }
-      - { from: payments.charges, to: trips.trips-api, action: Publishes refund.issued; the trip is marked refunded }
+      - from: api-gateway
+        to: payments.charges
+        action: Asks for a refund
+        sends: payments.RefundRequest
+        creates: { payments.Refund: { status: approved } }
+        changes: { payments.Charge.status: captured -> partially_refunded }
+      - { from: payments.charges, to: payments.ledger, action: Records the refund, sends: payments.LedgerEntry }
+      - { from: payments.charges, to: trips.trips-api, action: Publishes refund.issued; the trip is marked refunded, sends: payments.RefundIssued, changes: { trips.Trip.status: completed -> refunded } }

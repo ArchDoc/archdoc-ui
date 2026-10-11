@@ -1,4 +1,5 @@
 import { type CodeMap, locate, resolveCodeMap } from "../codemap/codemap.js";
+import { evaluateDataRules } from "../data/rules.js";
 import type { Severity, SourceLocation } from "../diagnostics.js";
 import type { ElementNode, Model } from "../model.js";
 import { nodeKey } from "../model.js";
@@ -115,6 +116,22 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
       rule: v.rule.id,
       evidence: v.edge.evidence,
       files: v.edge.files,
+    });
+  }
+  const quiet = new Set(org.map((r) => r.id));
+  const dataViolations = evaluateDataRules(model, [...model.rules, ...org], (rule, selector) => {
+    if (!quiet.has(rule)) rules.unknownSelectors.push({ rule, selector });
+  });
+  for (const v of dataViolations) {
+    findings.push({
+      severity: v.rule.severity === "warning" ? "warning" : "error",
+      code: "rule/violation",
+      message: `The model says ${v.message}`,
+      element: v.element,
+      rule: v.rule.id,
+      evidence: v.location ? [`${v.location.file}:${v.location.line}`] : [],
+      files: v.location ? [v.location.file] : [],
+      location: v.location,
     });
   }
   for (const u of rules.unknownSelectors) {

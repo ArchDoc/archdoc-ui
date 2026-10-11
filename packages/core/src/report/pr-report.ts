@@ -1,5 +1,10 @@
 import type { ProvideSpec } from "@archdoc/spec";
 import { locate } from "../codemap/codemap.js";
+import {
+  type NewSensitiveFlow,
+  type NewSensitiveStore,
+  sensitiveDataChanges,
+} from "../data/changes.js";
 import { countChanges, type ModelDiff, type RelationshipView } from "../diff/diff.js";
 import { consumersElsewhere, otherModels } from "../federation/consumers.js";
 import { contractName } from "../load/build.js";
@@ -7,7 +12,7 @@ import type { Model } from "../model.js";
 import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
-import { formatDiff, summary } from "./diff-report.js";
+import { describeChange, formatDiff, summary } from "./diff-report.js";
 import { CHANGE_LEGEND, changeDiagram, journeyDiagram, type RemoteUse } from "./mermaid.js";
 
 /** Marks the comment so the Action can find and update it. */
@@ -16,6 +21,8 @@ export const REPORT_MARKER = "<!-- archdoc-report -->";
 export interface PrReportInput {
   /** The model after the change. */
   model: Model;
+  /** The model before it, to find sensitive data that goes somewhere new. */
+  base?: Model | undefined;
   /** Repository files the change touched, relative to the root. */
   changedFiles: string[];
   diff: ModelDiff;
@@ -49,6 +56,8 @@ export interface PrReport {
     description?: string | undefined;
     reach: "direct" | "parent" | "indirect";
   })[];
+  /** Sensitive data the change starts sending or storing somewhere new (needs the base model). */
+  data: { flows: NewSensitiveFlow[]; stores: NewSensitiveStore[] };
   suggested: string[];
   introduced: { errors: number; warnings: number };
   markdown: string;
@@ -300,6 +309,9 @@ export function prReport(input: PrReportInput): PrReport {
     if (input.diagrams !== false) md.push(...journeyDiagrams(input, journeyList));
   }
 
+  const data = input.base ? sensitiveDataChanges(input.base, model) : { flows: [], stores: [] };
+  md.push(...dataSection(diff, data));
+
   md.push("### Drift and rules", "");
   if (counts.errors || counts.warnings) {
     md.push(
@@ -366,10 +378,72 @@ export function prReport(input: PrReportInput): PrReport {
     actors: [...actors.values()],
     owners: [...owners],
     elsewhere,
+    data,
     suggested,
     introduced: counts,
     markdown: md.join("\n"),
   };
+}
+
+/** Sensitive data going somewhere new, and data entries that changed. */
+function dataSection(
+  diff: ModelDiff,
+  data: { flows: NewSensitiveFlow[]; stores: NewSensitiveStore[] },
+): string[] {
+  if (!diff.data.length && !data.flows.length && !data.stores.length) return [];
+  const md = ["### Data", ""];
+  const name = (t: NewSensitiveFlow["flow"]["from"]) => (t.type === "external" ? t.ref : t.id);
+  const fields = (list: { field: string; classification: string }[]) =>
+    list.map((f) => `${f.field} (${f.classification})`).join(", ");
+  const external = data.flows.filter((f) => f.external);
+  if (external.length) {
+    md.push(
+      `> [!CAUTION]\n> This change sends sensitive data to ${new Set(external.map((f) => name(f.flow.to))).size === 1 ? "an external element" : "external elements"}: ${external
+        .map((f) => `\`${f.flow.data}\` (${fields(f.fields)}) to \`${name(f.flow.to)}\``)
+        .join("; ")}.`,
+      "",
+    );
+  }
+  if (data.flows.length) {
+    md.push(
+      "**Sensitive data that goes somewhere new**",
+      "",
+      "| Data | Sensitive fields | From → to | How |",
+      "|---|---|---|---|",
+    );
+    const how = (f: NewSensitiveFlow["flow"]) =>
+      f.how === "step"
+        ? `journey \`${f.journey}\`, step ${f.step}`
+        : f.how === "sends"
+          ? "sends"
+          : `${f.how} through \`${f.via}\``;
+    for (const f of data.flows.slice(0, 20)) {
+      md.push(
+        `| \`${f.flow.data}\` | ${fields(f.fields)} | \`${name(f.flow.from)}\` → \`${name(f.flow.to)}\`${f.external ? " (external)" : ""} | ${how(f.flow)} |`,
+      );
+    }
+    if (data.flows.length > 20) md.push("", `…and ${data.flows.length - 20} more.`);
+    md.push("");
+  }
+  if (data.stores.length) {
+    md.push(
+      `**Sensitive data stored somewhere new:** ${data.stores
+        .map((s) => `\`${s.data}\` (${fields(s.fields)}) in \`${s.element}\` (${s.table})`)
+        .join("; ")}`,
+      "",
+    );
+  }
+  if (diff.data.length) {
+    md.push(
+      `**Data entries changed (${diff.data.length})**`,
+      "",
+      ...diff.data.map(
+        (c) => `- ${c.kind === "changed" ? "" : `**${c.kind}** `}${describeChange("data", c)}`,
+      ),
+      "",
+    );
+  }
+  return md;
 }
 
 /** The most important affected journeys as sequence diagrams; the first one open. */

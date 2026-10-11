@@ -2,6 +2,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import {
   filesUnder,
   formatActor,
+  formatData,
   formatElement,
   formatImpact,
   formatJourney,
@@ -156,6 +157,7 @@ export async function show(id: string, options: ModelOptions, io: Io): Promise<n
     formatElement(model, id),
     formatActor(model, id),
     journey ? formatJourney(model, journey) : undefined,
+    formatData(model, id),
   ].filter((s): s is string => s !== undefined);
 
   if (sections.length === 0) {
@@ -163,7 +165,7 @@ export async function show(id: string, options: ModelOptions, io: Io): Promise<n
     if (r.status === "ambiguous") {
       io.err(`"${id}" is ambiguous: ${r.candidates.join(", ")}.`);
     } else {
-      io.err(`No element, actor, or journey "${id}".`);
+      io.err(`No element, actor, journey, or data entry "${id}".`);
       if (r.status === "unresolved" && r.hint) io.err(r.hint);
       const near = searchModel(model, id.replace(/[._-]+/g, " "), 5);
       if (near.length) io.err(`Did you mean: ${near.map((h) => h.id).join(", ")}?`);

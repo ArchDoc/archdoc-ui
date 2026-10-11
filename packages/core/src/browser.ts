@@ -12,7 +12,12 @@ export {
 } from "./check/check.js";
 export { validateJourneys } from "./check/journeys.js";
 export { evidenceOf, type ObservedDependency } from "./check/observed.js";
-export { evaluateRules, type RuleEdge, type RuleViolation } from "./check/rules.js";
+export {
+  evaluateRules,
+  type RuleEdge,
+  type RuleViolation,
+  selectorMatcher,
+} from "./check/rules.js";
 export {
   type CodeMap,
   type CodeMatch,
@@ -22,6 +27,24 @@ export {
   resolveCodeMap,
 } from "./codemap/codemap.js";
 export { compileGlob, literalPrefix, normalizePath } from "./codemap/glob.js";
+export {
+  type NewSensitiveFlow,
+  type NewSensitiveStore,
+  sensitiveDataChanges,
+} from "./data/changes.js";
+export { checkData } from "./data/check.js";
+export { type DataFlow, type DataStore, dataFlows, dataStores } from "./data/flows.js";
+export {
+  classifiedFields,
+  type DataResolution,
+  type Lifecycle,
+  parseChange,
+  parseStates,
+  qualifyData,
+  resolveData,
+  splitField,
+} from "./data/resolve.js";
+export { type DataRuleViolation, evaluateDataRules } from "./data/rules.js";
 export * from "./diagnostics.js";
 export {
   type Change,
