@@ -24,7 +24,7 @@ export function formatDiff(diff: ModelDiff, format: DiffFormat, label = ""): str
     if (list.length === 0) continue;
     out.push("", md ? `**${title(section)}**` : title(section));
     for (const c of list) {
-      const line = describe(section, c);
+      const line = describeChange(section, c);
       out.push(md ? `- ${markdownSymbol(c.kind)} ${line}` : `  ${SYMBOL[c.kind]} ${line}`);
       const steps = (c as { steps?: StepChange[] }).steps;
       for (const s of steps ?? []) {
@@ -50,7 +50,8 @@ export function summary(diff: ModelDiff): string {
   return parts.join("; ");
 }
 
-function describe(section: (typeof SECTIONS)[number], c: Change<unknown>): string {
+/** One change as a line, such as "Charge (entity): fields +card_last4 (pci)". */
+export function describeChange(section: (typeof SECTIONS)[number], c: Change<unknown>): string {
   if (section === "relationships") {
     const r = (c.after ?? c.before) as RelationshipView;
     const text = `${ref(r.from)} → ${ref(r.to)}${r.description ? `: ${r.description}` : ""}`;
@@ -81,6 +82,9 @@ function fieldChanges(c: Change<unknown>, skip: string[] = []): string {
       const a = before[f];
       const b = after[f];
       if (f === "provides") return contractDelta(a, b);
+      if (f === "fields") return fieldDelta(a, b);
+      if (f === "sends") return listDelta("sends", a, b);
+      if (f === "stores") return storeDelta(a, b);
       const short = (v: unknown) => (typeof v === "string" && v.length <= 24 ? v : undefined);
       return short(a ?? "active") &&
         short(b ?? "active") &&
@@ -110,6 +114,62 @@ function contractDelta(before: unknown, after: unknown): string {
       .map(([n, st]) => `${n} ${a.get(n)} → ${st}`),
   ];
   return parts.length ? `provides ${parts.join(" ")}` : "provides";
+}
+
+/** "fields +card_last4 (pci) -legacy_id ~email (classification internal → pii)" */
+function fieldDelta(before: unknown, after: unknown): string {
+  type Field = { type?: string; classification?: string };
+  const a = (before ?? {}) as Record<string, Field>;
+  const b = (after ?? {}) as Record<string, Field>;
+  const parts = [
+    ...Object.keys(b)
+      .filter((k) => !(k in a))
+      .map((k) => `+${k}${b[k]?.classification ? ` (${b[k]?.classification})` : ""}`),
+    ...Object.keys(a)
+      .filter((k) => !(k in b))
+      .map((k) => `-${k}`),
+    ...Object.keys(b)
+      .filter((k) => k in a && JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+      .map((k) => {
+        const x = a[k] ?? {};
+        const y = b[k] ?? {};
+        const what = [
+          x.classification !== y.classification
+            ? `classification ${x.classification ?? "none"} → ${y.classification ?? "none"}`
+            : "",
+          x.type !== y.type ? `type ${x.type} → ${y.type}` : "",
+        ].filter(Boolean);
+        return `~${k}${what.length ? ` (${what.join(", ")})` : ""}`;
+      }),
+  ];
+  return parts.length ? `fields ${parts.join(" ")}` : "fields";
+}
+
+/** "sends +RideRequest -Ping" */
+function listDelta(name: string, before: unknown, after: unknown): string {
+  const list = (v: unknown) => (Array.isArray(v) ? v : v === undefined ? [] : [v]).map(String);
+  const a = list(before);
+  const b = list(after);
+  const parts = [
+    ...b.filter((x) => !a.includes(x)).map((x) => `+${x}`),
+    ...a.filter((x) => !b.includes(x)).map((x) => `-${x}`),
+  ];
+  return parts.length ? `${name} ${parts.join(" ")}` : name;
+}
+
+/** "stores +ledger_entries (LedgerEntry) -old_table" */
+function storeDelta(before: unknown, after: unknown): string {
+  const a = (before ?? {}) as Record<string, { entity?: string }>;
+  const b = (after ?? {}) as Record<string, { entity?: string }>;
+  const parts = [
+    ...Object.keys(b)
+      .filter((k) => !(k in a) || a[k]?.entity !== b[k]?.entity)
+      .map((k) => `+${k} (${b[k]?.entity})`),
+    ...Object.keys(a)
+      .filter((k) => !(k in b))
+      .map((k) => `-${k}`),
+  ];
+  return parts.length ? `stores ${parts.join(" ")}` : "stores";
 }
 
 function mermaid(diff: ModelDiff): string {

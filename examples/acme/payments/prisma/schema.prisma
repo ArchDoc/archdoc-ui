@@ -1,0 +1,49 @@
+// The payments database.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Charge {
+  id           String       @id @default(uuid()) @db.Uuid
+  trip_id      String       @db.Uuid
+  amount_cents Int
+  card_last4   String
+  status       ChargeStatus
+  refunds      Refund[]
+
+  @@map("charges")
+}
+
+model Refund {
+  id           String       @id @default(uuid()) @db.Uuid
+  charge_id    String       @db.Uuid
+  amount_cents Int
+  status       RefundStatus
+  charge       Charge       @relation(fields: [charge_id], references: [id])
+
+  @@map("refunds")
+}
+
+model LedgerEntry {
+  id           String   @id @default(uuid()) @db.Uuid
+  account      String
+  amount_cents Int
+  source_ref   String   @db.Uuid
+  posted_at    DateTime @default(now())
+
+  @@map("ledger_entries")
+}
+
+enum ChargeStatus {
+  authorized
+  captured
+  partially_refunded
+  refunded
+}
+
+enum RefundStatus {
+  pending_approval
+  approved
+  sent
+}

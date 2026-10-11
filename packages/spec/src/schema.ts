@@ -177,21 +177,33 @@ export const ElementSchema: z.ZodType<ElementSpec> = z.strictObject({
 
 export const ImportanceSchema = z.enum(["critical", "high", "normal"]);
 
+const FieldValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+/** Records a step creates: entries by name, or entries with some field values. */
+export const CreatesSchema = z
+  .union([OneOrMany, z.record(z.string(), z.record(z.string(), FieldValue))])
+  .describe("Records this step creates, such as Refund or { Refund: { status: pending } }");
+
+/** Field transitions, keyed by entry and field. */
+export const ChangesSchema = z
+  .record(z.string(), z.string().regex(/->/, 'Write a change as "before -> after"'))
+  .describe("Fields this step changes, such as Charge.status: captured -> refunded");
+
 export const JourneyStepSchema = z.strictObject({
   from: RefSchema,
   to: RefSchema,
   action: z.string().optional(),
   description: z.string().optional(),
   code: z.string().optional().describe("Code entry point for this step"),
-  sends: OneOrMany.optional(),
+  sends: OneOrMany.optional().describe("Data entries this step sends, such as RefundRequest"),
+  creates: CreatesSchema.optional(),
+  changes: ChangesSchema.optional(),
   provenance: ProvenanceSchema.optional(),
-  // Data annotations. Their semantics arrive with the data layer (roadmap Phase 5).
+  // Logic and mappings on a step. Their semantics arrive with logic and mappings (roadmap Phase 5c).
   decides: z.string().optional(),
   via: z.string().optional(),
   when: z.string().optional(),
   branches: z.record(z.string(), z.unknown()).optional(),
-  creates: z.unknown().optional(),
-  changes: z.unknown().optional(),
 });
 
 const journeyShape = {
@@ -209,32 +221,72 @@ const journeyShape = {
 export const JourneySchema = z.strictObject(journeyShape);
 
 export const DataFieldSchema = z.strictObject({
-  type: z.string(),
+  type: z
+    .string()
+    .optional()
+    .describe(
+      "int, number, string, bool, uuid, timestamp, date, json, bytes, enum, or another entry's name. Can be left out when the entry has a source.",
+    ),
   description: z.string().optional(),
   classification: z
     .string()
     .optional()
     .describe("pii, pci, phi, internal, public, or a custom label"),
-  values: z.array(z.union([z.string(), z.number()])).optional(),
+  values: z
+    .array(z.union([z.string(), z.number()]))
+    .optional()
+    .describe("Allowed values, for an enum"),
   required: z.boolean().optional(),
+  status: StatusSchema.optional(),
 });
 
 export const DataEntrySchema = z.strictObject({
-  kind: z.enum(["entity", "message", "event"]),
+  kind: z
+    .enum(["entity", "message", "event"])
+    .describe(
+      "entity: a stored record; message: a request or response; event: something that happened",
+    ),
+  name: z.string().optional(),
   description: z.string().optional(),
   owners: StringList.optional(),
   source: z
     .record(z.string(), z.string())
     .optional()
-    .describe("The real schema this is imported from"),
+    .describe(
+      "The real schema it comes from, checked for drift: { prisma: prisma/schema.prisma#Charge }, { sql: migrations#charges }, { openapi: openapi/trips.yaml#Trip }, { jsonschema: schemas/trip.json }, or { proto: proto/charges.proto#RefundRequest }",
+    ),
   fields: z.record(z.string(), DataFieldSchema).optional(),
-  states: StringList.optional(),
+  states: StringList.optional().describe(
+    "Lifecycle transitions, such as authorized -> captured or captured -> partially_refunded | refunded",
+  ),
   tags: StringList.optional(),
+  status: StatusSchema.optional(),
+  provenance: ProvenanceSchema.optional(),
 });
+
+/** A data rule: where data with a classification may be stored, and where it may not go. */
+export const DataRuleSchema = z
+  .strictObject({
+    classification: OneOrMany.describe("The classifications it applies to, such as pci"),
+    "stored-in": z
+      .unknown()
+      .optional()
+      .describe(
+        "Where it may be stored: an element, a list, { namespace: payments }, or { kind, tag }",
+      ),
+    "not-sent-to": z
+      .unknown()
+      .optional()
+      .describe("Where it may never be sent, such as { kind: external }"),
+  })
+  .refine((d) => d["stored-in"] !== undefined || d["not-sent-to"] !== undefined, {
+    message: 'A data rule needs "stored-in" or "not-sent-to".',
+  });
 
 export const RuleSchema = z.looseObject({
   id: IdSchema,
   description: z.string().optional(),
+  data: DataRuleSchema.optional(),
   scope: z
     .enum(["repo", "org"])
     .optional()
@@ -343,6 +395,8 @@ export type Importance = z.infer<typeof ImportanceSchema>;
 export type JourneyStepSpec = z.infer<typeof JourneyStepSchema>;
 export type JourneySpec = z.infer<typeof JourneySchema>;
 export type DataEntrySpec = z.infer<typeof DataEntrySchema>;
+export type DataFieldSpec = z.infer<typeof DataFieldSchema>;
+export type DataRuleSpec = z.infer<typeof DataRuleSchema>;
 export type RuleSpec = z.infer<typeof RuleSchema>;
 export type DomainSpec = z.infer<typeof DomainSchema>;
 export type ImportSpec = z.infer<typeof ImportSchema>;

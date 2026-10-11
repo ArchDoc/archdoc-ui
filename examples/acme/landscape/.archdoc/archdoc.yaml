@@ -49,3 +49,11 @@ rules:
     scope: org
     description: Apps go through a service, never straight to a datastore.
     deny: { from: { tag: app }, to: { kind: datastore } }
+  - id: no-pii-to-external
+    scope: org
+    description: Personal data never leaves for a third party.
+    data: { classification: pii, not-sent-to: { kind: external } }
+  - id: pci-stays-in-payments
+    scope: org
+    description: Card data is only stored in payments.
+    data: { classification: pci, stored-in: { namespace: payments } }

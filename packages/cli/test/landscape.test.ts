@@ -88,7 +88,7 @@ describe("the landscape", () => {
     const r = await run("landscape", "landscape", "build", "--out", "site");
     expect(r.err).toBe("");
     expect(r.out).toContain(
-      "✓ Wrote site/: Acme Rides, 3 repos (payments@5.0.0, rides@1.0.0, trips@3.0.0), 11 elements, 6 actors, 3 journeys, 2 domains.",
+      "✓ Wrote site/: Acme Rides, 3 repos (payments@5.0.0, rides@1.0.0, trips@3.0.0), 12 elements, 6 actors, 3 journeys, 2 domains.",
     );
     expect((await stat(join(org, "landscape/site/index.html"))).isFile()).toBe(true);
     const payload = JSON.parse(await readFile(join(org, "landscape/site/api/model"), "utf8"));
@@ -174,6 +174,60 @@ describe("the landscape", () => {
     );
     expect(r.out).toContain(
       "changed charges (container): provides -proto/charges.proto +proto/charges.v2.proto",
+    );
+  });
+  it("data in other repos resolves and is checked: fields, states, and what a step sends", async () => {
+    expect((await run("rides", "validate", "--strict")).code).toBe(0);
+    const show = await run("rides", "show", "payments.RefundRequest");
+    expect(show.out).toContain(
+      "payments.RefundRequest (message) · in payments@5.0.0, another repo",
+    );
+    expect(show.out).toContain("  rider_email · pii");
+    expect(show.out).toContain("  app → api-gateway (sends)");
+    expect(show.out).toContain("  api-gateway → payments.charges (journey request-refund, step 4)");
+  });
+
+  it("a PR that starts sending personal data to a third party is flagged", async () => {
+    git("payments", "checkout", "-q", "--", ".");
+    git("payments", "checkout", "-q", "main");
+    git("payments", "checkout", "-q", "-b", "fraud-pii");
+    const file = join(org, "payments/.archdoc/archdoc.yaml");
+    await writeFile(
+      file,
+      (await readFile(file, "utf8")).replace(
+        "sends: FraudCheck",
+        "sends: [FraudCheck, RefundRequest]",
+      ),
+    );
+    const check = await run("payments", "check", "--base", "main", "--no-code");
+    expect(check.code).toBe(1);
+    expect(check.out).toContain(
+      'The model says charges sends RefundRequest (rider_email (pii)) to fraud-scoring, which breaks rule "acme/no-pii-to-external": Personal data never leaves for a third party.',
+    );
+    const report = await run("payments", "report", "--base", "main");
+    expect(report.out).toContain(
+      "> [!CAUTION]\n> This change sends sensitive data to an external element: `RefundRequest` (rider_email (pii)) to `fraud-scoring`.",
+    );
+    expect(report.out).toContain(
+      "| `RefundRequest` | rider_email (pii) | `charges` → `fraud-scoring` (external) | sends |",
+    );
+  });
+  it("a migration that renames a classified column fails check, and the new column needs classifying", async () => {
+    expect((await run("trips", "check")).out).not.toContain("drift/schema");
+    git("trips", "checkout", "-q", "-b", "rename-email");
+    await writeFile(
+      join(org, "trips/migrations/002_rename_email.sql"),
+      "ALTER TABLE trips RENAME COLUMN rider_email TO email;\n",
+    );
+    git("trips", "add", "-A");
+    git("trips", "commit", "-q", "-m", "rename email");
+    const r = await run("trips", "check", "--base", "main");
+    expect(r.code).toBe(1);
+    expect(r.out).toContain(
+      "✗ error drift/schema-field-missing: The model has Trip.rider_email (pii), but migrations#trips doesn't. If it was renamed, move its classification to the new name.",
+    );
+    expect(r.out).toContain(
+      "! warning drift/schema-field-unmodeled: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
     );
   });
 });

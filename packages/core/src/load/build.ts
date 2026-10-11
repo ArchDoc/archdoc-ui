@@ -11,6 +11,7 @@ import {
 } from "@archdoc/spec";
 import type { z } from "zod";
 import { validateJourneys } from "../check/journeys.js";
+import { checkData } from "../data/check.js";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
 import type { ActorNode, CodeRef, ElementNode, Model, NodeRef, Relationship } from "../model.js";
 import { type Resolution, Resolver } from "./resolve.js";
@@ -286,10 +287,11 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
     }
   }
 
-  checkDataRefs(model, resolver);
   checkLocalContracts(model);
   checkDomains(model, resolver);
   diagnostics.push(...validateJourneys(model, resolver, journeySites));
+  // After journeys, whose steps resolve their ends.
+  diagnostics.push(...checkData(model, "local"));
   return model;
 
   function addElements(
@@ -344,22 +346,6 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
     });
     journeySites.set(id, { file, path });
     if (spec.owners) ownerSites.push({ owners: spec.owners, file, path });
-  }
-}
-
-function checkDataRefs(model: Model, resolver: Resolver) {
-  const known = (name: string) =>
-    model.data.has(name) || resolver.isImported(name) || name.startsWith(`${model.namespace}.`);
-  for (const rel of model.relationships) {
-    for (const name of rel.sends) {
-      if (known(name)) continue;
-      model.diagnostics.push({
-        severity: "warning",
-        code: "ref/unresolved-data",
-        message: `${rel.from.id} → ${rel.ref} sends "${name}", which is not defined under data.`,
-        location: rel.location,
-      });
-    }
   }
 }
 

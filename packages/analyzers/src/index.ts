@@ -6,5 +6,16 @@ export {
 } from "./check.js";
 export { manifests } from "./manifests.js";
 export { analyze, builtinAnalyzers } from "./run.js";
+export {
+  builtinImporters,
+  type ImportedType,
+  importSchemas,
+  jsonschema,
+  openapi,
+  prisma,
+  proto,
+  type SchemaImporter,
+  sql,
+} from "./schemas/index.js";
 export { tsImports } from "./ts-imports.js";
 export { packageNameOf, type WorkspacePackage, workspacePackages } from "./workspace.js";

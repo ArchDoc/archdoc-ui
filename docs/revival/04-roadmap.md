@@ -90,18 +90,21 @@ Decided 2026-10-10: `sync` reads other repos' models at their release tags with 
 
 ## Phase 5: Data (M–L) ⭐ the "what actually happens" milestone
 
-- [ ] Spec: `data` entities, messages, and events with fields, `classification`, and lifecycle `states`. `stores:` maps tables and collections to entities. `sends` / `accepts` / `returns` / `carries` attach data to relationships and contracts.
-- [ ] Schema importers (as analyzers): SQL migrations, Prisma, TypeORM, OpenAPI/JSON Schema components, Protobuf, Avro. Schema-drift findings in `check`.
+Decided 2026-10-11: CEL expressions are evaluated with [`@marcbachmann/cel-js`](https://www.npmjs.com/package/@marcbachmann/cel-js) (zero dependencies, runs in Node and the browser). The schema importers are SQL migrations, Prisma, OpenAPI/JSON Schema, and Protobuf; TypeORM and Avro follow on the same analyzer API. The demo org in [`examples/acme`](../../examples/acme) carries the data. Phase 5 ships as four PRs: 5a (data spec, checks, PR comment), 5b (schema importers and drift), 5c (mappings, lineage, logic, journey data, simulate), 5d (MCP and the explorer).
+
+- [x] Spec: `data` entities, messages, and events with fields, `classification`, and lifecycle `states`. `stores:` maps tables and collections to entities. `sends` / `accepts` / `returns` / `carries` attach data to relationships and contracts. Journey steps say what they `send`, `create`, and `change` (5a). Data in other repos is referenced by namespace and checked once synced; the landscape composes every repo's data.
+- [x] Schema importers (as analyzers): SQL migrations, Prisma, OpenAPI/JSON Schema components, and Protobuf, named in a data entry's `source:`. Fields left untyped in the model are filled from the source. Schema-drift findings in `check`: classified fields the schema lost (an error), unmodeled fields, and type or enum mismatches (5b).
+- [ ] Schema importers for TypeORM and Avro, on the same `SchemaImporter` API.
 - [ ] `mappings:` with CEL field expressions, which give field-level lineage across tables, datastores, and repos. `archdoc lineage <entity.field>`.
 - [ ] `logic:` blocks: decisions on request data written as CEL rules, linked to the implementing code.
 - [ ] Journey data annotations (`sends`, `decides`, `branches`, `creates`, `changes`) and `archdoc simulate <journey> --sample <file>`.
 - [ ] Checks:
-  - classification rules (for example, PCI only stored in `payments`, PII not sent to external elements)
-  - invalid state transitions
-  - steps that send data the target doesn't accept
-  - broken mappings
+  - [x] classification rules: `data: { classification, stored-in }` and `data: { classification, not-sent-to }`, as repo or org rules (5a)
+  - [x] invalid state transitions, unknown fields, and values outside an enum (5a)
+  - [x] steps and relationships that send data the target doesn't accept (5a)
+  - [ ] broken mappings
 - [ ] MCP: `archdoc_data`, `archdoc_lineage`, `archdoc_simulate`.
-- [ ] PR comment: changed fields, mappings, logic thresholds, and classification flows.
+- [ ] PR comment: changed fields and sensitive data that goes somewhere new, external elements first (5a); mappings and logic thresholds (5c).
 - [ ] Explorer:
   - data view (entities and where they're stored)
   - field lineage graph

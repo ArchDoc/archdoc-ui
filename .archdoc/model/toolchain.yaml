@@ -31,7 +31,7 @@ elements:
       core:
         kind: container
         technology: TypeScript
-        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules, and checks references into other repos.
+        description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules and data, and checks references into other repos.
         code: [{ path: packages/core/** }]
         uses:
           spec: Validates model files against the schema
@@ -44,6 +44,9 @@ elements:
             code: [{ path: packages/core/src/load/** }]
             uses:
               checker: Validates journeys once references resolve
+              data:
+                description: Checks data references, fields, and lifecycles
+                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Loads archdoc.lock and the vendored models of other repos
                 provenance: { source: suggested, by: agent:claude-code }
@@ -79,6 +82,9 @@ elements:
               differ:
                 description: Formats model diffs as text, markdown, and mermaid
                 provenance: { source: suggested, by: agent:claude-code }
+              data:
+                description: Shows data entries, and the sensitive data a change sends or stores somewhere new
+                provenance: { source: suggested, by: agent:claude-code }
               codemap:
                 description: Formats locate results
                 provenance: { source: suggested, by: agent:claude-code }
@@ -87,6 +93,9 @@ elements:
             description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans).
             code: [{ path: packages/core/src/check/** }]
             uses:
+              data:
+                description: Runs data rules with the other rules
+                provenance: { source: suggested, by: agent:claude-code }
               codemap:
                 description: Maps observed file dependencies onto elements
                 provenance: { source: suggested, by: agent:claude-code }
@@ -104,11 +113,23 @@ elements:
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               loader: Builds the models inside bundles, and checks contracts the same way
+              data:
+                description: Checks data in other repos once they're synced
+                provenance: { source: suggested, by: agent:claude-code }
+          data:
+            kind: component
+            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new.
+            code: [{ path: packages/core/src/data/** }]
+            provenance: { source: suggested, by: agent:claude-code }
+            uses:
+              checker:
+                description: Matches rule selectors the same way relationship rules do
+                provenance: { source: suggested, by: agent:claude-code }
 
       analyzers:
         kind: container
-        technology: TypeScript (ts.preProcessFile)
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports).
+        technology: TypeScript (ts.preProcessFile), yaml
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files

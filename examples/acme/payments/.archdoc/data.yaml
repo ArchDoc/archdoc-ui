@@ -1,0 +1,66 @@
+# What payments sends and stores. Fields come from the real schemas (source:);
+# the model adds what they can't say: classifications and lifecycles.
+data:
+  RefundRequest:
+    kind: message
+    description: A rider's request for money back.
+    source: { proto: proto/charges.proto#RefundRequest }
+    fields:
+      trip_id: {}
+      amount_cents: {}
+      reason: {}
+      rider_email: { classification: pii }
+
+  Refund:
+    kind: entity
+    owners: [payments-team]
+    source: { prisma: prisma/schema.prisma#Refund }
+    fields:
+      id: {}
+      charge_id: {}
+      amount_cents: {}
+      status: {}
+    states:
+      - pending_approval -> approved -> sent
+
+  RefundIssued:
+    kind: event
+    description: A refund was approved and sent to the card network.
+    source: { proto: proto/charges.proto#RefundIssued }
+    fields:
+      refund_id: {}
+      trip_id: {}
+      amount_cents: {}
+
+  Charge:
+    kind: entity
+    owners: [payments-team]
+    source: { prisma: prisma/schema.prisma#Charge }
+    fields:
+      id: {}
+      trip_id: {}
+      amount_cents: {}
+      card_last4: { classification: pci }
+      status: {}
+    states:
+      - authorized -> captured
+      - captured -> partially_refunded | refunded
+      - partially_refunded -> refunded
+
+  LedgerEntry:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#LedgerEntry }
+    fields:
+      id: {}
+      account: {}
+      amount_cents: {}
+      source_ref: {}
+      posted_at: {}
+
+  FraudCheck:
+    kind: message
+    description: What the fraud scorer sees. No card or rider details.
+    fields:
+      charge_id: { type: uuid }
+      amount_cents: { type: int }
+      card_country: { type: string }

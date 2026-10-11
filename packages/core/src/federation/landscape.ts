@@ -1,8 +1,11 @@
 import type {
   ActorSpec,
+  DataEntrySpec,
   ElementSpec,
   JourneySpec,
+  JourneyStepSpec,
   ModelFile,
+  ProvideSpec,
   RelationshipSpec,
   UsesSpec,
 } from "@archdoc/spec";
@@ -47,8 +50,8 @@ export interface ComposedLandscape {
  * inside (payments.charges keeps its ID). The landscape's own actors,
  * elements, journeys, rules, and domains stay at the top, and its actors
  * (enterprise teams and roles) stand in for repo actors with the same ID.
- * Repo actors and journeys keep their IDs unless two repos use the same
- * one; then they're prefixed with the namespace. Owners that resolve to no
+ * Repo actors, journeys, and data entries keep their IDs unless two repos
+ * use the same one; then they're prefixed with the namespace. Owners that resolve to no
  * actor are errors here, unlike in a single repo.
  */
 export function composeLandscape(landscape: Model): ComposedLandscape {
@@ -70,6 +73,8 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
   };
   const actorIdOf = unique((m) => m.actors.keys());
   const journeyIdOf = unique((m) => m.journeys.keys());
+  const dataIdOf = unique((m) => m.data.keys());
+  const landscapeData = new Set(landscape.data.keys());
   const landscapeActors = new Set(landscape.actors.keys());
   const landscapeJourneys = new Set(landscape.journeys.keys());
   const actorId = (ns: string, id: string) =>
@@ -86,6 +91,47 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
     if (other?.elements.has(id)) return elementRef(ext.namespace, id);
     if (other?.actors.has(id)) return actorId(ext.namespace, id);
     return undefined;
+  };
+  /** A data reference written in repo `ns`, as the composed model's data ID. */
+  const dataRef = (ns: string, ref: string): string => {
+    const dot = ref.indexOf(".");
+    const prefix = dot > 0 ? ref.slice(0, dot) : undefined;
+    const [where, id] = prefix && models.has(prefix) ? [prefix, ref.slice(dot + 1)] : [ns, ref];
+    if (!models.get(where)?.data.has(id)) return ref;
+    return where === L ? id : dataIdOf(where, id, landscapeData);
+  };
+  const dataList = (ns: string, v: string | string[] | undefined) =>
+    v === undefined
+      ? undefined
+      : typeof v === "string"
+        ? dataRef(ns, v)
+        : v.map((d) => dataRef(ns, d));
+  const provide = (ns: string, p: ProvideSpec): ProvideSpec => ({
+    ...p,
+    ...(p.accepts ? { accepts: dataList(ns, p.accepts) } : {}),
+    ...(p.returns ? { returns: dataList(ns, p.returns) } : {}),
+    ...(p.carries ? { carries: dataList(ns, p.carries) } : {}),
+  });
+  /** "payments.Charge.status" written in rides, as "Charge.status" in the composed model. */
+  const fieldRef = (ns: string, key: string) => {
+    const dot = key.lastIndexOf(".");
+    return dot > 0 ? `${dataRef(ns, key.slice(0, dot))}.${key.slice(dot + 1)}` : key;
+  };
+  const stepData = (ns: string, s: JourneyStepSpec): Partial<JourneyStepSpec> => {
+    const out: Partial<JourneyStepSpec> = {};
+    if (s.sends !== undefined) out.sends = dataList(ns, s.sends);
+    if (s.creates !== undefined) {
+      out.creates =
+        typeof s.creates === "string" || Array.isArray(s.creates)
+          ? dataList(ns, s.creates)
+          : Object.fromEntries(Object.entries(s.creates).map(([k, v]) => [dataRef(ns, k), v]));
+    }
+    if (s.changes !== undefined) {
+      out.changes = Object.fromEntries(
+        Object.entries(s.changes).map(([k, v]) => [fieldRef(ns, k), v]),
+      );
+    }
+    return out;
   };
   const owner = (ns: string, o: string) => {
     const m = models.get(ns);
@@ -107,6 +153,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
         ...(r.description ? { description: r.description } : {}),
         ...(r.technology ? { technology: r.technology } : {}),
         ...(r.via ? { via: r.via } : {}),
+        ...(r.sends.length ? { sends: r.sends.map((d) => dataRef(ns, d)) } : {}),
         ...(r.status !== "active" ? { status: r.status } : {}),
         ...(r.provenance ? { provenance: r.provenance } : {}),
       };
@@ -115,7 +162,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
   };
 
   const elementSpec = (ns: string, m: Model, node: ElementNode, keepCode: boolean): ElementSpec => {
-    const { uses: _u, elements: _e, owners, code, ...rest } = node.spec;
+    const { uses: _u, elements: _e, owners, code, provides, stores, ...rest } = node.spec;
     const children = Object.fromEntries(
       node.childIds.flatMap((id) => {
         const child = m.elements.get(id);
@@ -127,12 +174,34 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
       ...rest,
       ...(owners?.length ? { owners: owners.map((o) => owner(ns, o)) } : {}),
       ...(keepCode && code ? { code } : {}),
+      ...(provides ? { provides: provides.map((p) => provide(ns, p)) } : {}),
+      ...(stores
+        ? {
+            stores: Object.fromEntries(
+              Object.entries(stores).map(([t, st]) => [
+                t,
+                { ...st, entity: dataRef(ns, st.entity) },
+              ]),
+            ),
+          }
+        : {}),
       ...(uses ? { uses } : {}),
       ...(Object.keys(children).length ? { elements: children } : {}),
     };
   };
   const topLevel = (m: Model) => [...m.elements.values()].filter((e) => !e.parentId);
 
+  const data: Record<string, DataEntrySpec> = {};
+  const addData = (ns: string, m: Model) => {
+    for (const d of m.data.values()) {
+      const id = ns === L ? d.id : dataIdOf(ns, d.id, landscapeData);
+      data[id] = {
+        ...d.spec,
+        ...(d.spec.owners ? { owners: d.spec.owners.map((o) => owner(ns, o)) } : {}),
+        ...(ns !== L ? { tags: [...(d.spec.tags ?? []), `repo:${ns}`] } : {}),
+      };
+    }
+  };
   const actors: Record<string, ActorSpec> = {};
   const elements: Record<string, ElementSpec> = {};
   const journeys: Record<string, JourneySpec> = {};
@@ -169,6 +238,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
           ...s.spec,
           from: refOf(s.from, s.spec.from),
           to: refOf(s.to, s.spec.to),
+          ...stepData(ns, s.spec),
         })),
       };
     }
@@ -191,6 +261,8 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
   }
   addJourneys(L, landscape);
   for (const d of deps) addJourneys(d.namespace, d.model);
+  addData(L, landscape);
+  for (const d of deps) addData(d.namespace, d.model);
 
   const spec: ModelFile = {
     archdoc: "2.0",
@@ -200,6 +272,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
     actors,
     elements,
     journeys,
+    ...(Object.keys(data).length ? { data } : {}),
     ...(landscape.rules.length ? { rules: landscape.rules } : {}),
   };
   const root = `${L}.landscape.json`;

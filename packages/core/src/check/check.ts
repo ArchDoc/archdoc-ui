@@ -1,4 +1,6 @@
 import { type CodeMap, locate, resolveCodeMap } from "../codemap/codemap.js";
+import { evaluateDataRules } from "../data/rules.js";
+import { type ImportedSchema, schemaDrift } from "../data/schemas.js";
 import type { Severity, SourceLocation } from "../diagnostics.js";
 import type { ElementNode, Model } from "../model.js";
 import { nodeKey } from "../model.js";
@@ -7,7 +9,7 @@ import { evaluateRules, type RuleEdge } from "./rules.js";
 
 export interface Finding {
   severity: Severity;
-  /** drift/undeclared-dependency, rule/violation, drift/stale-path, model/orphan-element, or a validation code. */
+  /** drift/undeclared-dependency, rule/violation, drift/stale-path, drift/schema-*, model/orphan-element, or a validation code. */
   code: string;
   message: string;
   /** The element the finding is about, if any. */
@@ -35,6 +37,8 @@ export interface CheckOptions {
   observed?: ObservedDependency[];
   /** Repository files, for stale code paths. */
   files?: readonly string[];
+  /** What schema importers read for data entries' sources, for schema drift. */
+  schemas?: readonly ImportedSchema[];
 }
 
 export interface CheckResult {
@@ -117,6 +121,22 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
       files: v.edge.files,
     });
   }
+  const quiet = new Set(org.map((r) => r.id));
+  const dataViolations = evaluateDataRules(model, [...model.rules, ...org], (rule, selector) => {
+    if (!quiet.has(rule)) rules.unknownSelectors.push({ rule, selector });
+  });
+  for (const v of dataViolations) {
+    findings.push({
+      severity: v.rule.severity === "warning" ? "warning" : "error",
+      code: "rule/violation",
+      message: `The model says ${v.message}`,
+      element: v.element,
+      rule: v.rule.id,
+      evidence: v.location ? [`${v.location.file}:${v.location.line}`] : [],
+      files: v.location ? [v.location.file] : [],
+      location: v.location,
+    });
+  }
   for (const u of rules.unknownSelectors) {
     findings.push({
       severity: "warning",
@@ -144,6 +164,8 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
       });
     }
   }
+
+  findings.push(...schemaDrift(model, options.schemas ?? []));
 
   for (const e of orphans(model)) {
     findings.push({

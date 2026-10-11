@@ -33,6 +33,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
     const marked = findings.map((f) => f);
     const r = prReport({
       model,
+      base: baseModel,
       changedFiles: changed,
       diff: diffModels(baseModel, model),
       findings: marked,
