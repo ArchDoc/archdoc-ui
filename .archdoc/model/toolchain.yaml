@@ -118,12 +118,15 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           data:
             kind: component
-            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new.
+            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage and journey simulation.
             code: [{ path: packages/core/src/data/** }]
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:
                 description: Matches rule selectors the same way relationship rules do
+                provenance: { source: suggested, by: agent:claude-code }
+              imports:
+                description: Reads other repos' data, mappings, and logic for lineage and simulation
                 provenance: { source: suggested, by: agent:claude-code }
 
       analyzers:
@@ -152,7 +155,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
