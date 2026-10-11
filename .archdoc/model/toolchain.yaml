@@ -176,7 +176,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer. Tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. Tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)
@@ -189,7 +189,7 @@ elements:
               graph: Hands the model to the canvas
           graph:
             kind: component
-            description: Decides what's visible (expand, focus, journeys), lifts relationships to visible boxes, and lays them out with ELK.
+            description: Decides what's visible (expand, focus, journeys, and a landscape's boxes by repo, team, or domain), lifts relationships to visible boxes, and lays them out with ELK.
             code: [{ path: apps/web/src/graph/** }]
           ui:
             kind: component

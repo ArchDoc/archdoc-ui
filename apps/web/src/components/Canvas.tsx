@@ -11,12 +11,15 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
+import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
 import { type Box, layoutGraph } from "../graph/layout.js";
 import { type CardNode, type Emphasis, nodeTypes } from "./nodes.js";
 
 export interface CanvasProps {
   model: Model;
   view: ViewState;
+  /** For a landscape: how repos, teams, or domains are boxed. */
+  grouping?: Grouping | undefined;
   selected?: string | undefined;
   journey?: JourneyNode | undefined;
   step: number;
@@ -30,7 +33,11 @@ export interface CanvasProps {
 }
 
 export function Canvas(props: CanvasProps) {
-  const { model, view, selected, journey, step, centerOn, compare } = props;
+  const { model, view, journey, step, centerOn, compare, grouping } = props;
+  // A domain is selected from the sidebar; on the canvas it's its box.
+  const selected = props.selected?.startsWith("domain:")
+    ? `group:domain:${props.selected.slice(7)}`
+    : props.selected;
   const overlay = useMemo<DiffGraph | undefined>(
     () => (compare ? buildDiffGraph(model, compare.base, compare.diff, view) : undefined),
     [model, view, compare],
@@ -55,6 +62,16 @@ export function Canvas(props: CanvasProps) {
     () => (journey ? journeyEdges(model, view, journey) : []),
     [model, view, journey],
   );
+  // Steps that go from one repo (or team, or domain) to another, and the box each one enters.
+  const crossings = useMemo(() => {
+    const out = new Map<number, string>();
+    if (!journey || !grouping) return out;
+    for (const s of journey.steps) {
+      const c = s.from && s.to ? crossingOf(model, grouping, s.from, s.to) : undefined;
+      if (c) out.set(s.index, boundaryKey(grouping, c.to));
+    }
+    return out;
+  }, [model, journey, grouping]);
 
   const emphasis = useMemo(() => {
     const map = new Map<string, Emphasis>();
@@ -68,6 +85,15 @@ export function Canvas(props: CanvasProps) {
       }
     } else if (selected) {
       map.set(selected, "current");
+      if (selected.startsWith("group:")) {
+        // A selected team or domain lights up what's in it.
+        const parent = new Map(graph.nodes.map((n) => [n.id, n.parentId]));
+        for (const n of graph.nodes) {
+          for (let p = n.parentId; p; p = parent.get(p)) {
+            if (p === selected) map.set(n.id, "highlight");
+          }
+        }
+      }
       for (const e of graph.edges) {
         if (e.source === selected) map.set(e.target, "highlight");
         if (e.target === selected) map.set(e.source, "highlight");
@@ -83,7 +109,7 @@ export function Canvas(props: CanvasProps) {
       const box = layout.boxes.get(n.id);
       if (!box) return [];
       const ghost = overlay?.ghosts.has(n.id) && compare;
-      const info = describe(ghost ? compare.base : model, n.id);
+      const info = describe(ghost ? compare.base : model, n.id, grouping);
       const element = n.kind === "element" ? model.elements.get(n.id.slice(8)) : undefined;
       return [
         {
@@ -104,13 +130,26 @@ export function Canvas(props: CanvasProps) {
             containsChanges: overlay?.containsChanges.has(n.id),
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
+            entered: crossings.get(step) === n.id,
             onToggle:
               element && element.childIds.length > 0 ? () => props.onToggle(element.id) : undefined,
           },
         },
       ];
     });
-  }, [layout, model, emphasis, dimming, selected, props.onToggle, overlay, compare]);
+  }, [
+    layout,
+    model,
+    emphasis,
+    dimming,
+    selected,
+    props.onToggle,
+    overlay,
+    compare,
+    grouping,
+    crossings,
+    step,
+  ]);
 
   const edges = useMemo<Edge[]>(() => {
     if (!layout) return [];
@@ -153,7 +192,13 @@ export function Canvas(props: CanvasProps) {
         source: s.source,
         target: s.target,
         markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-        className: ["journey", s.step === step ? "is-current" : ""].join(" "),
+        className: [
+          "journey",
+          s.step === step ? "is-current" : "",
+          crossings.has(s.step) ? "is-crossing" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         label: String(s.step + 1),
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 10,
@@ -161,7 +206,7 @@ export function Canvas(props: CanvasProps) {
         zIndex: s.step === step ? 10 : 6,
       }));
     return [...regular, ...journeyOverlay];
-  }, [layout, journey, steps, step, selected, dimming, hoverEdge, overlay]);
+  }, [layout, journey, steps, step, selected, dimming, hoverEdge, overlay, crossings]);
 
   // Fit everything on the first layout; afterwards only move when asked to.
   useEffect(() => {
@@ -196,6 +241,15 @@ export function Canvas(props: CanvasProps) {
     requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 450, maxZoom: 1.15 }));
   }, [layout, graph, view.focus, flow]);
 
+  // Regrouping moves everything: show all of it.
+  const lastBy = useRef(grouping?.by);
+  useEffect(() => {
+    if (!layout || layout.graph !== graph || lastBy.current === grouping?.by) return;
+    lastBy.current = grouping?.by;
+    if (centerOn) return;
+    requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 450 }));
+  }, [layout, graph, grouping?.by, centerOn, flow]);
+
   // Keep the current journey step in view.
   useEffect(() => {
     const current = steps.find((s) => s.step === step);
@@ -215,7 +269,12 @@ export function Canvas(props: CanvasProps) {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
-      onNodeClick={(_, node) => props.onSelect(node.id)}
+      onNodeClick={(_, node) => {
+        if (!node.id.startsWith("group:")) return props.onSelect(node.id);
+        // A team's box selects the team; a domain's box, the domain.
+        const g = grouping?.groups.get(node.id);
+        if (g?.id) props.onSelect(g.by === "team" ? `actor:${g.id}` : `domain:${g.id}`);
+      }}
       onNodeDoubleClick={(_, node) => {
         if (node.id.startsWith("element:")) props.onToggle(node.id.slice(8));
       }}
@@ -236,7 +295,23 @@ export function Canvas(props: CanvasProps) {
 }
 
 /** Label, kind, and secondary line for a node key. */
-export function describe(model: Model, key: string) {
+export function describe(model: Model, key: string, grouping?: Grouping) {
+  if (key.startsWith("group:")) {
+    const g = grouping?.groups.get(key);
+    return {
+      family: "group" as const,
+      label: g?.label ?? key,
+      kind: g?.id
+        ? g.by === "team"
+          ? "team"
+          : "domain"
+        : g?.by === "team"
+          ? "no owner"
+          : "domain",
+      detail: g?.detail,
+      status: undefined,
+    };
+  }
   if (key.startsWith("actor:")) {
     const a = model.actors.get(key.slice(6));
     return {
@@ -250,6 +325,17 @@ export function describe(model: Model, key: string) {
   }
   if (key.startsWith("element:")) {
     const e = model.elements.get(key.slice(8));
+    const repo = grouping?.repos.get(key.slice(8));
+    if (repo) {
+      return {
+        family: "element" as const,
+        label: e?.spec.name ?? repo.namespace,
+        kind: "repo",
+        detail: e?.spec.description,
+        status: e?.spec.status,
+        version: repo.version ?? repo.commit?.slice(0, 7),
+      };
+    }
     return {
       family: "element" as const,
       label: e?.spec.name ?? e?.key ?? key,

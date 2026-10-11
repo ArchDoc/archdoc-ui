@@ -35,3 +35,60 @@ export function ridesModel(): Model {
   if (model.diagnostics.length) throw new Error(JSON.stringify(model.diagnostics));
   return model;
 }
+
+// A composed landscape, as `archdoc landscape build` writes it: each repo is a system.
+const landscapeText = `
+archdoc: "2.0"
+namespace: acme
+actors:
+  payments-team: { kind: team }
+  rides-team: { kind: team }
+  support-agent: { kind: role, uses: { rides.api-gateway: Issues refunds } }
+  rider: { kind: person, tags: ["repo:rides"], uses: { rides.app: Requests refunds } }
+elements:
+  payments:
+    kind: system
+    tags: [repo]
+    elements:
+      charges:
+        kind: container
+        owners: [payments-team]
+        uses: { payments.ledger: Records }
+        elements:
+          refunds: { kind: component }
+      ledger: { kind: datastore, owners: [payments-team] }
+  rides:
+    kind: system
+    tags: [repo]
+    elements:
+      app: { kind: container, owners: [rides-team], uses: { rides.api-gateway: Calls } }
+      api-gateway: { kind: container, owners: [rides-team], uses: { payments.charges.refunds: Refunds } }
+      scratch: { kind: container }
+  status-page: { kind: container, description: The landscape's own element }
+journeys:
+  request-refund:
+    actor: rider
+    goal: Get money back
+    steps:
+      - { from: rider, to: rides.app }
+      - { from: rides.app, to: rides.api-gateway }
+      - { from: rides.api-gateway, to: payments.charges.refunds }
+      - { from: payments.charges, to: payments.ledger }
+`;
+
+export function landscapeModel(): Model {
+  const model = buildModel([{ path: "acme.landscape.json", text: landscapeText }]);
+  if (model.diagnostics.length) throw new Error(JSON.stringify(model.diagnostics));
+  return model;
+}
+
+export const landscapeInfo = {
+  repos: [
+    { namespace: "payments", name: "Payments", version: "5.0.0" },
+    { namespace: "rides", version: "1.0.0" },
+  ],
+  domains: [
+    { id: "money", name: "Money", owners: ["payments-team"], members: ["payments"] },
+    { id: "riders", owners: [], members: ["rides.app", "rides.api-gateway"] },
+  ],
+};

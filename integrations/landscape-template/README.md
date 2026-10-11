@@ -6,7 +6,7 @@ A landscape repo composes every team's model into one, and adds what no single t
 
 1. Create a repository, such as `your-org/architecture`, and copy [`.archdoc/`](./.archdoc) into it. List every team's repo under `imports`, with the version range to follow.
 2. Run `archdoc sync` and commit `.archdoc/archdoc.lock` and `.archdoc/vendor/`. Teams' repos need release tags (`v1.2.0`) for sync to find.
-3. Run `archdoc landscape build` to check the composed landscape: journeys across repos, owners that resolve to no team (an error here), and org rules on every declared relationship. It writes the explorer to `site/`. `archdoc view --landscape --watch` shows the same thing while you edit.
+3. Run `archdoc landscape build` to check the composed landscape: journeys across repos, owners that resolve to no team (an error here), and org rules on every declared relationship. It writes the explorer to `site/`, where you can group the landscape by repo, team, or domain and follow journeys across repos. `archdoc view --landscape --watch` shows the same thing while you edit.
 4. Copy [`workflows/archdoc-landscape.yml`](./workflows/archdoc-landscape.yml) to `.github/workflows/`. It opens a weekly pull request that takes every team's newest release, and publishes the site to GitHub Pages on every push to main. For private repos, add an `ARCHDOC_READ_TOKEN` secret that can read them.
 5. Tag a release (`v1.0.0`), so team repos can import the landscape.
 

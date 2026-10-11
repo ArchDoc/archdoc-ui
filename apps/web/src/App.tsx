@@ -12,7 +12,14 @@ import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
-import { type RepoLinks, useModel } from "./model/useModel.js";
+import {
+  boundaryLabel,
+  crossingOf,
+  type GroupBy,
+  type Grouping,
+  groupLandscape,
+} from "./graph/groups.js";
+import { type LandscapeInfo, type RepoLinks, useModel } from "./model/useModel.js";
 
 export function App() {
   const state = useModel();
@@ -35,6 +42,7 @@ export function App() {
         files={state.files}
         repo={state.repo}
         base={state.base}
+        landscape={state.landscape}
       />
     </ReactFlowProvider>
   );
@@ -47,6 +55,7 @@ interface ExplorerProps {
   files: string[];
   repo: RepoLinks;
   base?: { ref: string; model: Model } | undefined;
+  landscape?: LandscapeInfo | undefined;
 }
 
 /** What the explorer needs to show changes against a base. */
@@ -58,8 +67,9 @@ export interface Compare {
   journeys: Set<string>;
 }
 
-function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
+function Explorer({ model, watch, reloads, files, repo, base, landscape }: ExplorerProps) {
   const [compareOn, setCompareOn] = useState(true);
+  const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
@@ -86,13 +96,17 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
   // After a live reload, drop references to things that no longer exist.
   useEffect(() => {
     setExpanded((prev) => new Set([...prev].filter((id) => model.elements.has(id))));
-    setSelected((prev) => (prev && exists(model, prev) ? prev : undefined));
+    setSelected((prev) => (prev && exists(model, prev, landscape) ? prev : undefined));
     setJourneyId((prev) => (prev && model.journeys.has(prev) ? prev : undefined));
-  }, [model]);
+  }, [model, landscape]);
 
+  const grouping = useMemo<Grouping | undefined>(
+    () => (landscape ? groupLandscape(model, landscape, groupBy) : undefined),
+    [model, landscape, groupBy],
+  );
   const view = useMemo(
-    () => ({ expanded, focus: focused && !journey ? selected : undefined }),
-    [expanded, focused, journey, selected],
+    () => ({ expanded, focus: focused && !journey ? selected : undefined, grouping }),
+    [expanded, focused, journey, selected, grouping],
   );
 
   const select = useCallback(
@@ -109,6 +123,12 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
         setExpanded((prev) =>
           hidden.every((a) => prev.has(a)) ? prev : new Set([...prev, ...hidden]),
         );
+      }
+      if (key.startsWith("domain:")) {
+        // A domain is a box only when grouping by domain.
+        setGroupBy("domain");
+        setCenterOn(`group:domain:${key.slice(7)}`);
+        return;
       }
       setCenterOn(key);
     },
@@ -178,6 +198,10 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
   }, [journey, step, go, select]);
 
   const currentStep = journey?.steps[step];
+  const crossing =
+    grouping && currentStep?.from && currentStep.to
+      ? crossingOf(model, grouping, currentStep.from, currentStep.to)
+      : undefined;
   const errors = model.diagnostics.filter((d) => d.severity === "error");
   const warnings = model.diagnostics.filter((d) => d.severity === "warning");
 
@@ -190,6 +214,28 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
           <span className="model-name">{model.name ?? model.namespace}</span>
         </div>
         <div className="topbar-right">
+          {landscape ? (
+            <fieldset className="segmented" aria-label="Group the landscape by">
+              <legend>Group by</legend>
+              {(["repo", "team", "domain"] as const).map((by) => (
+                <button
+                  key={by}
+                  type="button"
+                  className={`btn${groupBy === by ? " is-on" : ""}`}
+                  aria-pressed={groupBy === by}
+                  disabled={by === "domain" && landscape.domains.length === 0}
+                  title={
+                    by === "domain" && landscape.domains.length === 0
+                      ? "The landscape defines no domains"
+                      : undefined
+                  }
+                  onClick={() => setGroupBy(by)}
+                >
+                  {by === "repo" ? "Repo" : by === "team" ? "Team" : "Domain"}
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
           {base ? (
             <button
               type="button"
@@ -242,11 +288,14 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
         onToggle={toggle}
         onJourney={openJourney}
         compare={compare}
+        landscape={landscape}
+        onGroupBy={setGroupBy}
       />
 
       <main className="canvas" aria-label="Architecture diagram">
         <Canvas
           model={model}
+          grouping={grouping}
           view={view}
           selected={selected}
           journey={journey}
@@ -271,6 +320,12 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
               </span>
               {currentStep.spec.action ? <span> {currentStep.spec.action}</span> : null}
             </p>
+            {crossing ? (
+              <p className="journey-bar-crossing">
+                Crosses from {boundaryLabel(grouping as Grouping, crossing.from)} to{" "}
+                {boundaryLabel(grouping as Grouping, crossing.to)}
+              </p>
+            ) : null}
             <div className="journey-bar-controls">
               <button
                 type="button"
@@ -325,6 +380,7 @@ function Explorer({ model, watch, reloads, files, repo, base }: ExplorerProps) {
           onToggle={toggle}
           code={code}
           compare={compare}
+          landscape={landscape}
         />
       </aside>
     </div>
@@ -388,7 +444,8 @@ function usePanelWidth(): [number, (w: number) => void] {
   return [width, set];
 }
 
-function exists(model: Model, key: string): boolean {
+function exists(model: Model, key: string, landscape?: LandscapeInfo): boolean {
+  if (key.startsWith("domain:")) return !!landscape?.domains.some((d) => d.id === key.slice(7));
   if (key.startsWith("actor:")) return model.actors.has(key.slice(6));
   if (key.startsWith("element:")) return model.elements.has(key.slice(8));
   return model.relationships.some(

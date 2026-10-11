@@ -13,6 +13,7 @@ import {
 } from "@archdoc/core/browser";
 import type { ReactNode } from "react";
 import type { Compare } from "../App.js";
+import type { LandscapeInfo } from "../model/useModel.js";
 import { type CodeContext, CodeSection, StepCode } from "./code.js";
 
 export interface DetailsProps {
@@ -29,6 +30,7 @@ export interface DetailsProps {
   onToggle: (elementId: string) => void;
   code: CodeContext;
   compare?: Compare | undefined;
+  landscape?: LandscapeInfo | undefined;
 }
 
 export function Details(props: DetailsProps) {
@@ -41,11 +43,16 @@ export function Details(props: DetailsProps) {
   if (selected?.startsWith("actor:")) return <ActorDetails {...props} id={selected.slice(6)} />;
   if (selected?.startsWith("external:"))
     return <ExternalDetails {...props} ref_={selected.slice(9)} />;
+  if (selected?.startsWith("domain:")) return <DomainDetails {...props} id={selected.slice(7)} />;
 
   const o = overview(model);
   return (
     <div className="details">
-      <p className="eyebrow">Model · {model.namespace}</p>
+      <p className="eyebrow">
+        {props.landscape
+          ? `Landscape · ${props.landscape.repos.length} repos`
+          : `Model · ${model.namespace}`}
+      </p>
       <h1>{model.name ?? model.namespace}</h1>
       {model.description ? <p className="lede">{model.description}</p> : null}
       {props.compare ? (
@@ -183,6 +190,49 @@ function ActorDetails(props: DetailsProps & { id: string }) {
         roles={new Map(view.journeys.map((j) => [j.journey.id, j.role]))}
         onJourney={props.onJourney}
       />
+    </div>
+  );
+}
+
+function DomainDetails(props: DetailsProps & { id: string }) {
+  const domain = props.landscape?.domains.find((d) => d.id === props.id);
+  if (!domain) return <Missing />;
+  const { model } = props;
+  const members = domain.members.map((id) => model.elements.get(id)).filter((e) => e !== undefined);
+  // Journeys that pass through the domain, from any repo.
+  const inside = (t: Target | undefined) =>
+    t?.type === "element" && domain.members.some((m) => t.id === m || t.id.startsWith(`${m}.`));
+  const journeys = [...model.journeys.values()].filter((j) =>
+    j.steps.some((s) => inside(s.from) || inside(s.to)),
+  );
+  return (
+    <div className="details">
+      <p className="eyebrow">Domain</p>
+      <h1>{domain.name ?? domain.id}</h1>
+      {domain.description ? <p className="lede">{domain.description}</p> : null}
+      {domain.owners.length ? (
+        <Block title="Owners">
+          <Links
+            items={domain.owners.map((o) => ({
+              key: `actor:${o}`,
+              label: model.actors.get(o)?.spec.name ?? o,
+              hint: model.actors.get(o)?.spec.kind,
+            }))}
+            onSelect={props.onSelect}
+          />
+        </Block>
+      ) : null}
+      <Block title="Members">
+        <Links
+          items={members.map((e) => ({
+            key: `element:${e.id}`,
+            label: e.spec.name ?? e.id,
+            hint: e.spec.tags?.includes("repo") && !e.parentId ? "repo" : e.spec.kind,
+          }))}
+          onSelect={props.onSelect}
+        />
+      </Block>
+      <JourneyLinks journeys={journeys} onJourney={props.onJourney} />
     </div>
   );
 }
