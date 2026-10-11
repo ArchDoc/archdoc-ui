@@ -18,7 +18,7 @@ description: Use at the start of every coding task in a repository that has an .
 ## While you edit
 
 - Stay inside the element boundaries you found. If the change needs code in one element to depend on another element and the model doesn't declare that relationship (`uses`), say so. Don't add the dependency silently.
-- If the change makes a component send, accept, or store different data, update `data:` and the `sends`, `accepts`, `returns`, or `stores` that name it, and classify sensitive fields (`classification: pii`). `check` flags data rules, such as personal data sent to an external service.
+- If the change makes a component send, accept, or store different data, update `data:` and the `sends`, `accepts`, `returns`, or `stores` that name it, and classify sensitive fields (`classification: pii`). Before changing a field, a mapping, or a decision, `archdoc_lineage` and `archdoc_simulate` show where its value goes and which path a request takes. `check` flags data rules, such as personal data sent to an external service.
 - Elements in other repos are referenced by namespace, such as `payments.charges`. To depend on a repo the model doesn't import yet, add it to `imports` in `archdoc.yaml` and run `archdoc sync`. Never edit `.archdoc/archdoc.lock` or `.archdoc/vendor/` by hand.
 
 ## After you edit

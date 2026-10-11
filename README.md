@@ -186,7 +186,9 @@ journeys:
       - { from: charges, to: ledger, via: refund-to-ledger, when: auto-approve }
 ```
 
-`archdoc lineage Refund.amount_cents` lists every place a value is copied or derived, across repos, and the tables it lands in. `archdoc simulate refund --sample request.json` runs a journey against a sample request without running anything: the branch each decision takes and why, the records each step creates and changes, and where they're stored. `validate` checks that mappings and logic read fields that exist, parse, and cover every case, and that journeys only take branches their logic can decide.
+`archdoc lineage Refund.amount_cents` (and the `archdoc_lineage` MCP tool) lists every place a value is copied or derived, across repos, and the tables it lands in. `archdoc simulate refund --sample request.json` runs a journey against a sample request without running anything: the branch each decision takes and why, the records each step creates and changes, and where they're stored. `validate` checks that mappings and logic read fields that exist, parse, and cover every case, and that journeys only take branches their logic can decide.
+
+The explorer shows the same things. Pick a data entry to see its fields and classifications, light up where it's stored and the relationships it travels along, and click a field to draw its lineage graph across repos. Open a journey that carries data, edit a sample request (`archdoc view` loads any `samples/*.json` in the repo), and run it: the timeline shows the branch each decision takes and the records each step writes, and the journey bar shows them as you step through. Agents get the same answers from the `archdoc_data`, `archdoc_lineage`, and `archdoc_simulate` MCP tools.
 
 The pull request report lists the data entries a change touches, the mappings and decisions it changes (with the expressions before and after), and calls out sensitive data that goes somewhere new, external services first.
 

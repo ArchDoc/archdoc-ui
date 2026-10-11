@@ -103,16 +103,16 @@ Decided 2026-10-11: CEL expressions are evaluated with [`@marcbachmann/cel-js`](
   - [x] invalid state transitions, unknown fields, and values outside an enum (5a)
   - [x] steps and relationships that send data the target doesn't accept (5a)
   - [x] broken mappings and logic: inputs, targets, and fields that don't exist, expressions that don't parse, rules after `else`, decisions without a default, and branches, `when`, and `via` that name nothing (5c)
-- [ ] MCP: `archdoc_data`, `archdoc_lineage`, `archdoc_simulate`.
+- [x] MCP: `archdoc_data`, `archdoc_lineage`, `archdoc_simulate` (5d).
 - [x] PR comment: changed fields and sensitive data that goes somewhere new, external elements first (5a); mappings and logic thresholds, with the expressions before and after (5c).
-- [ ] Explorer:
-  - data view (entities and where they're stored)
-  - field lineage graph
-  - journey data timeline with a sample-request simulator
+- [x] Explorer (5d):
+  - data view: entries, fields and classifications, and where they're stored and sent, lit up on the canvas
+  - field lineage graph across repos
+  - journey data timeline with a sample-request simulator that runs in the browser; `archdoc view` sends `samples/*.json` and other repos' vendored models
 
 **Exit:** for *Refund a fare*, the explorer shows which branch a sample request takes, which records are created or changed at each step, and which tables they land in across `payments` and `trips`. A PR that starts sending a PII field to an external element is flagged.
 
-**Progress, 2026-10-11:** the second half of the exit passes on the demo org (5a): a payments PR that sends `RefundRequest` (with `rider_email`, pii) to the external fraud scorer fails `check` on the org rule and gets a caution in the PR report. The first half passes in the CLI (5c): `archdoc simulate request-refund --sample samples/refund-overcharge.json` in rides shows `payments.refund-approval` choosing auto-approve by rule 2, the refund, charge, and ledger records in `payments.ledger`, and the trip's refund in `trips.trips-db`. 5d puts the same simulation in the explorer.
+**Progress, 2026-10-11:** the second half of the exit passes on the demo org (5a): a payments PR that sends `RefundRequest` (with `rider_email`, pii) to the external fraud scorer fails `check` on the org rule and gets a caution in the PR report. The first half passes in the CLI (5c): `archdoc simulate request-refund --sample samples/refund-overcharge.json` in rides shows `payments.refund-approval` choosing auto-approve by rule 2, the refund, charge, and ledger records in `payments.ledger`, and the trip's refund in `trips.trips-db`. **Exit test, 2026-10-11: passed on the demo org (5d).** In rides, `archdoc view` opens *request-refund*; running `samples/refund-overcharge.json` shows `payments.refund-approval` choosing auto-approve, the records created and changed at each step, and the tables they land in across `payments` and `trips`, step by step on the canvas.
 
 ## Phase 6: Bootstrap + interoperability (M)
 
