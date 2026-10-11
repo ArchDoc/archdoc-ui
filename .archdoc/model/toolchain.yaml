@@ -128,8 +128,8 @@ elements:
 
       analyzers:
         kind: container
-        technology: TypeScript (ts.preProcessFile)
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports).
+        technology: TypeScript (ts.preProcessFile), yaml
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files

@@ -131,6 +131,19 @@ elements:
       ledger: { description: Records charges, sends: Charge }
 ```
 
+Fields don't have to be retyped. Point an entry at the schema it comes from, and keep only what the schema can't say, such as classifications:
+
+```yaml
+data:
+  Charge:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Charge }
+    fields:
+      card_last4: { classification: pci }
+```
+
+`archdoc check` reads sources with schema importers: SQL migrations (`sql: migrations#charges`, replayed in order), Prisma, OpenAPI and JSON Schema (`openapi: openapi/trips.yaml#Trip`), and Protobuf (`proto: proto/charges.proto#RefundRequest`). It reports schema drift: a modeled field the schema no longer has (an error when it's classified, because a renamed column loses its classification), fields the schema has that the model doesn't, and types or enum values that differ.
+
 Relationships `send` data, contracts `accept`, `return`, or `carry` it, datastores `store` it, and journey steps say what they `send`, `create`, and `change` (`Charge.status: captured -> refunded`). Data in another repo is referenced by namespace, like elements (`payments.Charge`). `validate` reports data that isn't defined, fields that don't exist, values outside an enum, state changes the lifecycle doesn't allow, and data sent to an element that doesn't accept it. Rules can say where classified data may be stored and where it may never go:
 
 ```yaml
