@@ -1,5 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import {
+  applySchemas,
   type CheckResult,
   changedFiles,
   check as checkModel,
@@ -11,6 +12,7 @@ import {
 } from "@archdoc/core";
 import { contextFor } from "./api.js";
 import { analyze } from "./run.js";
+import { importSchemas } from "./schemas/index.js";
 
 export interface CheckRepositoryOptions {
   /** Repository, .archdoc directory, or model file. Defaults to ".". */
@@ -43,8 +45,12 @@ export async function checkRepository(
     throw new Error(model.diagnostics[0]?.message ?? "No model found.");
   }
   const files = await listRepoFiles(model.baseDir);
-  const observed = options.code === false ? [] : await analyze(contextFor(model.baseDir, files));
-  const result = checkModel(model, { observed, files });
+  const ctx = contextFor(model.baseDir, files);
+  const observed = options.code === false ? [] : await analyze(ctx);
+  // Data entries' sources: their fields fill in what the model leaves out, and drift is reported.
+  const schemas = options.code === false ? [] : await importSchemas(ctx, model);
+  applySchemas(model, schemas);
+  const result = checkModel(model, { observed, files, schemas });
 
   let findings: MarkedFinding[] = result.findings;
   if (options.base) {

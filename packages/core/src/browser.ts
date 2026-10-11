@@ -45,6 +45,14 @@ export {
   splitField,
 } from "./data/resolve.js";
 export { type DataRuleViolation, evaluateDataRules } from "./data/rules.js";
+export {
+  applySchemas,
+  type ImportedField,
+  type ImportedSchema,
+  normalizeType,
+  parseSourceRef,
+  schemaDrift,
+} from "./data/schemas.js";
 export * from "./diagnostics.js";
 export {
   type Change,

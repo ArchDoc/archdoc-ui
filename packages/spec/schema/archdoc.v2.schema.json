@@ -400,7 +400,7 @@
                 }
               },
               "source": {
-                "description": "The real schema this is imported from, such as { prisma: prisma/schema.prisma#Charge }",
+                "description": "The real schema it comes from, checked for drift: { prisma: prisma/schema.prisma#Charge }, { sql: migrations#charges }, { openapi: openapi/trips.yaml#Trip }, { jsonschema: schemas/trip.json }, or { proto: proto/charges.proto#RefundRequest }",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
@@ -418,8 +418,8 @@
                   "type": "object",
                   "properties": {
                     "type": {
-                      "type": "string",
-                      "description": "int, string, uuid, enum, timestamp, or another entry's name"
+                      "description": "int, number, string, bool, uuid, timestamp, date, json, bytes, enum, or another entry's name. Can be left out when the entry has a source.",
+                      "type": "string"
                     },
                     "description": {
                       "type": "string"
@@ -444,7 +444,6 @@
                       "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
                     }
                   },
-                  "required": ["type"],
                   "additionalProperties": false
                 }
               },

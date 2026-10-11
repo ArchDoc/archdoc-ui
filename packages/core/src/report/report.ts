@@ -187,7 +187,7 @@ export function formatData(model: Model, ref: string): string | undefined {
       const extra = [f.classification, f.required ? "required" : undefined, f.status]
         .filter((x) => x && x !== "active")
         .join(", ");
-      out.push(`  ${name}: ${f.type}${values}${extra ? ` · ${extra}` : ""}`);
+      out.push(`  ${name}${f.type ? `: ${f.type}` : ""}${values}${extra ? ` · ${extra}` : ""}`);
     }
   }
   const life = parseStates(d.spec.states ?? []);

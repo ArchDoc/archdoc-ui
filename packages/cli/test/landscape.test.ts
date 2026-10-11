@@ -182,7 +182,7 @@ describe("the landscape", () => {
     expect(show.out).toContain(
       "payments.RefundRequest (message) · in payments@5.0.0, another repo",
     );
-    expect(show.out).toContain("  rider_email: string · pii");
+    expect(show.out).toContain("  rider_email · pii");
     expect(show.out).toContain("  app → api-gateway (sends)");
     expect(show.out).toContain("  api-gateway → payments.charges (journey request-refund, step 4)");
   });
@@ -210,6 +210,24 @@ describe("the landscape", () => {
     );
     expect(report.out).toContain(
       "| `RefundRequest` | rider_email (pii) | `charges` → `fraud-scoring` (external) | sends |",
+    );
+  });
+  it("a migration that renames a classified column fails check, and the new column needs classifying", async () => {
+    expect((await run("trips", "check")).out).not.toContain("drift/schema");
+    git("trips", "checkout", "-q", "-b", "rename-email");
+    await writeFile(
+      join(org, "trips/migrations/002_rename_email.sql"),
+      "ALTER TABLE trips RENAME COLUMN rider_email TO email;\n",
+    );
+    git("trips", "add", "-A");
+    git("trips", "commit", "-q", "-m", "rename email");
+    const r = await run("trips", "check", "--base", "main");
+    expect(r.code).toBe(1);
+    expect(r.out).toContain(
+      "✗ error drift/schema-field-missing: The model has Trip.rider_email (pii), but migrations#trips doesn't. If it was renamed, move its classification to the new name.",
+    );
+    expect(r.out).toContain(
+      "! warning drift/schema-field-unmodeled: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
     );
   });
 });

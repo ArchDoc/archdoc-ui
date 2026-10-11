@@ -33,11 +33,12 @@ data:
   Trip:
     kind: entity
     owners: [trips-team]
+    source: { sql: migrations#trips }
     fields:
-      id: { type: uuid }
-      rider_id: { type: uuid }
-      rider_email: { type: string, classification: pii }
-      fare_cents: { type: int }
-      status: { type: enum, values: [requested, completed, refunded] }
+      id: {}
+      rider_id: {}
+      rider_email: { classification: pii }
+      fare_cents: {}
+      status: {}
     states:
       - requested -> completed -> refunded

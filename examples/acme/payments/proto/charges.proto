@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package acme.payments.v1;
+
+service Charges {
+  rpc Refund(RefundRequest) returns (Refund);
+}
+
+enum Reason {
+  REASON_UNSPECIFIED = 0;
+  REASON_OVERCHARGE = 1;
+  REASON_NO_SHOW = 2;
+  REASON_SAFETY = 3;
+}
+
+message RefundRequest {
+  string trip_id = 1;
+  int64 amount_cents = 2;
+  Reason reason = 3;
+  string rider_email = 4;
+}
+
+enum RefundStatus {
+  REFUND_STATUS_UNSPECIFIED = 0;
+  REFUND_STATUS_PENDING_APPROVAL = 1;
+  REFUND_STATUS_APPROVED = 2;
+  REFUND_STATUS_SENT = 3;
+}
+
+message Refund {
+  string id = 1;
+  string charge_id = 2;
+  int64 amount_cents = 3;
+  RefundStatus status = 4;
+}
+
+// Published on the refund.issued topic.
+message RefundIssued {
+  string refund_id = 1;
+  string trip_id = 2;
+  int64 amount_cents = 3;
+}

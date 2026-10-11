@@ -73,6 +73,17 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
 
   if (scope === "local") {
     for (const d of model.data.values()) {
+      if (!d.spec.source) {
+        const untyped = Object.entries(d.spec.fields ?? {}).filter(([, f]) => f.type === undefined);
+        if (untyped.length) {
+          out.push({
+            severity: "warning",
+            code: "data/missing-type",
+            message: `${d.id} doesn't say the type of ${untyped.map(([n]) => n).join(", ")}. Add type, or a source to read it from.`,
+            location: d.location,
+          });
+        }
+      }
       const { invalid } = parseStates(d.spec.states ?? []);
       for (const line of invalid) {
         out.push({

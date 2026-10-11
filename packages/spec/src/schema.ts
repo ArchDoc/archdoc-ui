@@ -221,7 +221,12 @@ const journeyShape = {
 export const JourneySchema = z.strictObject(journeyShape);
 
 export const DataFieldSchema = z.strictObject({
-  type: z.string().describe("int, string, uuid, enum, timestamp, or another entry's name"),
+  type: z
+    .string()
+    .optional()
+    .describe(
+      "int, number, string, bool, uuid, timestamp, date, json, bytes, enum, or another entry's name. Can be left out when the entry has a source.",
+    ),
   description: z.string().optional(),
   classification: z
     .string()
@@ -248,7 +253,7 @@ export const DataEntrySchema = z.strictObject({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "The real schema this is imported from, such as { prisma: prisma/schema.prisma#Charge }",
+      "The real schema it comes from, checked for drift: { prisma: prisma/schema.prisma#Charge }, { sql: migrations#charges }, { openapi: openapi/trips.yaml#Trip }, { jsonschema: schemas/trip.json }, or { proto: proto/charges.proto#RefundRequest }",
     ),
   fields: z.record(z.string(), DataFieldSchema).optional(),
   states: StringList.optional().describe(
