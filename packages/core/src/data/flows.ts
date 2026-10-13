@@ -177,9 +177,10 @@ export function stepMessage(
       const b = toChain[Math.min(depth, toChain.length - 1)] as string;
       const found = flows.filter((f) => f.how !== "step" && key(f.from) === a && key(f.to) === b);
       if (found.length) return pick(found);
-      // A call whose contract only says what it answers carries the answer.
+      // A call whose contract only says what it answers carries the answer, and a
+      // subscription carries what the topic does.
       const answers = flows.filter(
-        (f) => f.how === "returns" && key(f.from) === b && key(f.to) === a,
+        (f) => (f.how === "returns" || f.how === "carries") && key(f.from) === b && key(f.to) === a,
       );
       if (answers.length) return pick(answers);
     }

@@ -80,6 +80,8 @@ pnpm install && pnpm playground --open      # builds if needed, then opens the w
 
 `.playground/PLAYGROUND.md` ([what it sets up](./examples/acme/README.md#playground)) lists what to try: simulating a refund, field lineage across repos, and what a pull request would be told when it sends personal data to a third party, breaks an API another repo uses, loosens a decision, or renames a classified column. Run it again for a fresh copy.
 
+For single systems, [`examples/industries`](./examples/industries) has six from different industries (a telehealth clinic, a card issuer, an online store, a parcel network, motor claims, and an electricity utility), each one model file you can open with `archdoc view examples/industries/banking.yaml`.
+
 The packages aren't published yet, so run the CLI from a clone:
 
 ```bash

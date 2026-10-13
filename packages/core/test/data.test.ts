@@ -241,6 +241,7 @@ describe("journey step messages", () => {
         kind: system
         elements:
           front: { kind: container, uses: { charges: { description: Pays, sends: Charge } } }
+      listener: { kind: container, uses: { charges: { description: Hears refunds, via: refund.issued } } }
     mappings:
       to-ledger:
         from: { refund: Refund }
@@ -260,6 +261,7 @@ describe("journey step messages", () => {
           - { from: auditor, to: ledger, via: to-ledger }
           - { from: auditor, to: ledger, changes: { Charge.status: captured -> refunded } }
           - { from: auditor, to: ledger }
+          - { from: listener, to: charges }
   `);
   const steps = m.journeys.get("refund")?.steps ?? [];
 
@@ -276,6 +278,8 @@ describe("journey step messages", () => {
       { data: ["payments.LedgerEntry"], how: "writes" },
       { data: ["Charge"], how: "writes" },
       undefined,
+      // A subscriber's step carries what the topic does.
+      { data: ["RefundIssued"], how: "carries" },
     ]);
   });
 
@@ -286,7 +290,7 @@ describe("journey step messages", () => {
         code: "journey/step-without-message",
         message:
           'Journey "refund", step 9 (auditor → ledger) doesn\'t say what it sends. Add sends: to the step, or to the relationship it travels along.',
-        location: { file: "extra.yaml", line: 27, column: 9 },
+        location: { file: "extra.yaml", line: 28, column: 9 },
       },
     ]);
   });

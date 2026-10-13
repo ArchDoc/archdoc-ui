@@ -1,8 +1,9 @@
 import type { BranchSpec, JourneyStepSpec } from "@archdoc/spec";
 import type { Model, Target } from "../model.js";
-import { evaluate } from "./cel.js";
+import { CelDouble, evaluate } from "./cel.js";
 import { DataRegistry, type StoredIn } from "./registry.js";
 import { parseChange, qualifyData, splitField } from "./resolve.js";
+import { normalizeType } from "./schemas.js";
 
 export type DataRecord = Record<string, unknown>;
 
@@ -218,10 +219,23 @@ export function simulate(
     for (const [alias, ref] of Object.entries(inputs)) {
       const entry = qualifyData(ref, at);
       const record = records.get(entry);
-      if (record) context[alias] = record;
+      if (record) context[alias] = typed(entry, record);
       else problems.push(`no ${short(entry)} to read as ${alias}; add it to the sample`);
     }
     return context;
+  }
+
+  /** A record with its `number` fields kept as doubles, so 300 * 24.5 works in CEL. */
+  function typed(entry: string, record: DataRecord): Record<string, unknown> {
+    const fields = registry.entry(entry)?.node.spec.fields ?? {};
+    return Object.fromEntries(
+      Object.entries(record).map(([k, v]) => [
+        k,
+        typeof v === "number" && fields[k]?.type && normalizeType(fields[k].type) === "number"
+          ? new CelDouble(v)
+          : v,
+      ]),
+    );
   }
 
   /** What a step or branch creates and changes. */

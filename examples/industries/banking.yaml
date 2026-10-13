@@ -1,0 +1,239 @@
+# Banking: card authorization at a card issuer. A purchase comes in from the
+# card network, gets scored for fraud, is approved or declined against the
+# account's balance, and lands in the ledger. Exercises card data (pci) rules,
+# a decision with several outcomes, and a hold that is captured later.
+archdoc: "2.0"
+namespace: issuer
+name: Card issuer
+description: Authorizes card purchases and keeps cardholders' balances.
+
+actors:
+  cardholder:
+    kind: person
+    uses:
+      mobile-banking: { description: Checks balances and freezes cards, sends: CardControl }
+  fraud-analyst:
+    kind: role
+    description: Reviews purchases the model holds for review.
+    uses:
+      case-manager: { description: Works the review queue, sends: ReviewDecision }
+  cards-team:
+    kind: team
+  risk-team:
+    kind: team
+
+elements:
+  card-network:
+    kind: external
+    description: Visa and Mastercard. Sends authorization requests, expects an answer in 100 ms.
+    uses:
+      authorizer: { description: Asks to authorize a purchase, sends: AuthRequest }
+  authorizer:
+    kind: container
+    technology: Java, ISO 8583
+    owners: [cards-team]
+    provides:
+      - { api: iso8583/auth, accepts: AuthRequest, returns: AuthResponse }
+      - { topic: authorizations, carries: AuthorizationMade }
+    uses:
+      fraud-model: { description: Scores the purchase, sends: FraudFeatures }
+      core-ledger: { description: Places a hold, sends: [Authorization, Hold] }
+      vault: { description: Swaps the card number for a token, sends: CardLookup }
+  vault:
+    kind: datastore
+    technology: HSM-backed tokenization
+    owners: [cards-team]
+    tags: [pci-zone]
+    stores:
+      cards: { entity: Card, key: token }
+  fraud-model:
+    kind: container
+    technology: Python, gRPC
+    owners: [risk-team]
+    description: Scores purchases from tokens and amounts only.
+  core-ledger:
+    kind: datastore
+    technology: Postgres
+    owners: [cards-team]
+    stores:
+      accounts: { entity: Account, key: id }
+      authorizations: { entity: Authorization, key: id, retention: 7y }
+      holds: { entity: Hold, key: id }
+  case-manager:
+    kind: container
+    technology: Rails
+    owners: [risk-team]
+    uses:
+      authorizations-topic: { description: Picks up held purchases, sends: AuthorizationMade }
+      core-ledger: { description: Releases or confirms holds, sends: ReviewDecision }
+  authorizations-topic:
+    kind: queue
+    technology: Kafka
+    owners: [cards-team]
+  mobile-banking:
+    kind: container
+    technology: Swift, Kotlin
+    owners: [cards-team]
+    tags: [app]
+    uses:
+      card-controls: { description: Freezes and unfreezes cards, sends: CardControl }
+  card-controls:
+    kind: container
+    technology: Go
+    owners: [cards-team]
+    uses:
+      vault: { description: Marks the card frozen, sends: CardControl }
+
+data:
+  Card:
+    kind: entity
+    fields:
+      token: { type: string }
+      pan: { type: string, classification: pci }
+      expiry: { type: string, classification: pci }
+      account_id: { type: uuid, references: Account }
+      frozen: { type: bool }
+  Account:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      holder_name: { type: string, classification: pii }
+      available_cents: { type: int }
+  AuthRequest:
+    kind: message
+    description: An ISO 8583 0100 message.
+    fields:
+      pan: { type: string, classification: pci }
+      amount_cents: { type: int }
+      merchant_category: { type: string }
+      country: { type: string }
+  CardLookup:
+    kind: message
+    fields:
+      pan: { type: string, classification: pci }
+  FraudFeatures:
+    kind: message
+    description: Tokens and amounts. Never the card number.
+    fields:
+      card_token: { type: string }
+      amount_cents: { type: int }
+      merchant_category: { type: string }
+      country: { type: string }
+  AuthResponse:
+    kind: message
+    fields:
+      approved: { type: bool }
+      code: { type: enum, values: ["00", "05", "51", "59"] }
+  Authorization:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      card_token: { type: string, references: Card }
+      amount_cents: { type: int }
+      outcome: { type: enum, values: [approved, declined, held] }
+      status: { type: enum, values: [pending, captured, reversed, expired] }
+    states:
+      - pending -> captured | reversed | expired
+  Hold:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      authorization_id: { type: uuid, references: Authorization }
+      amount_cents: { type: int }
+  AuthorizationMade:
+    kind: event
+    fields:
+      authorization_id: { type: uuid, references: Authorization }
+      outcome: { type: enum, values: [approved, declined, held] }
+  ReviewDecision:
+    kind: message
+    fields:
+      authorization_id: { type: uuid, references: Authorization }
+      confirmed: { type: bool }
+  CardControl:
+    kind: message
+    fields:
+      card_token: { type: string, references: Card }
+      frozen: { type: bool }
+  Score:
+    kind: message
+    fields:
+      risk: { type: number }
+
+logic:
+  authorize:
+    description: Decline what the account can't cover or the card can't be used for; hold what looks risky.
+    runs-in: authorizer
+    input: { request: AuthRequest, account: Account, card: Card, score: Score }
+    rules:
+      - when: card.frozen
+        then: declined-frozen
+      - when: "request.amount_cents > account.available_cents"
+        then: declined-funds
+      - when: "score.risk >= 0.9"
+        then: held-for-review
+      - else: approved
+
+mappings:
+  request-to-features:
+    from: { request: AuthRequest, card: Card }
+    to: FraudFeatures
+    fields:
+      card_token: card.token
+      amount_cents: request.amount_cents
+      merchant_category: request.merchant_category
+      country: request.country
+  request-to-authorization:
+    from: { request: AuthRequest, card: Card }
+    to: core-ledger.authorizations
+    fields:
+      id: "'auth-' + card.token"
+      card_token: card.token
+      amount_cents: request.amount_cents
+      status: "'pending'"
+
+journeys:
+  authorize-purchase:
+    actor: cardholder
+    goal: Pay at a shop and have the purchase go through
+    importance: critical
+    steps:
+      - { from: card-network, to: authorizer, action: Forwards the purchase }
+      - { from: authorizer, to: vault, action: Looks up the card by number }
+      - { from: authorizer, to: fraud-model, action: Scores the purchase, via: request-to-features }
+      - from: authorizer
+        to: core-ledger
+        action: Decides, records the authorization, and answers the network within 100 ms
+        via: request-to-authorization
+        decides: authorize
+        branches:
+          approved: { creates: { Authorization: { outcome: approved }, Hold: {} } }
+          held-for-review: { creates: { Authorization: { outcome: held } } }
+          declined-funds: { creates: { Authorization: { outcome: declined } } }
+          declined-frozen: { creates: { Authorization: { outcome: declined } } }
+  review-held-purchase:
+    actor: fraud-analyst
+    goal: Clear or stop a purchase the model held
+    importance: high
+    steps:
+      - { from: case-manager, to: authorizations-topic, action: Picks up the held purchase }
+      - { from: fraud-analyst, to: case-manager, action: Confirms it with the cardholder }
+      - { from: case-manager, to: core-ledger, action: Releases or confirms the hold }
+  freeze-card:
+    actor: cardholder
+    goal: Stop a lost card from being used
+    importance: high
+    steps:
+      - { from: cardholder, to: mobile-banking, action: Taps "Freeze card" }
+      - { from: mobile-banking, to: card-controls, action: Asks to freeze it }
+      - { from: card-controls, to: vault, action: Marks the card frozen, changes: { Card.frozen: "false -> true" } }
+
+rules:
+  - id: card-numbers-stay-in-the-vault
+    description: Full card numbers are only stored in the PCI zone.
+    data: { classification: pci, stored-in: { tag: pci-zone } }
+  - id: no-card-numbers-to-models
+    description: The fraud model scores tokens, never card numbers.
+    data: { classification: pci, not-sent-to: fraud-model }
+  - id: apps-go-through-services
+    deny: { from: { tag: app }, to: { kind: datastore } }

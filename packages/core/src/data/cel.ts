@@ -82,7 +82,8 @@ export function compile(
 
 /**
  * Evaluates a CEL expression over plain JSON values. Whole numbers are CEL
- * ints, so `fare_cents / 2` divides the way CEL says; results come back as
+ * ints, so `fare_cents / 2` divides the way CEL says, unless wrapped in
+ * CelDouble; results come back as
  * plain JSON (ints as numbers, timestamps as ISO strings).
  */
 export function evaluate(
@@ -99,7 +100,13 @@ export function evaluate(
   }
 }
 
+/** A number that stays a CEL double even when it's whole, for a field declared `number`. */
+export class CelDouble {
+  constructor(readonly value: number) {}
+}
+
 function toCel(v: unknown): unknown {
+  if (v instanceof CelDouble) return v.value;
   if (typeof v === "number" && Number.isInteger(v)) return BigInt(v);
   if (Array.isArray(v)) return v.map(toCel);
   if (v && typeof v === "object") {

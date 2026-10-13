@@ -47,6 +47,24 @@ describe.each([
   });
 });
 
+// The industry examples, with every datastore opened into its tables.
+describe.each(
+  ["healthcare", "banking", "ecommerce", "logistics", "insurance", "energy"].map((name) => [
+    name,
+    example(`industries/${name}`),
+  ]),
+)("layoutGraph: the %s example", (_name, model) => {
+  it("places every node and routes every edge, tables and foreign keys too", async () => {
+    const tables = new Set(
+      [...model.elements.values()].filter((e) => e.spec.stores).map((e) => e.id),
+    );
+    const graph = buildGraph(model, { expanded: defaultExpanded(model), tables });
+    expect(graph.nodes.some((n) => n.table)).toBe(true);
+    expect(graph.edges.some((e) => e.reference)).toBe(true);
+    await expectClean(graph);
+  });
+});
+
 describe.each(["repo", "team", "domain"] as const)("layoutGraph: a landscape by %s", (by) => {
   it("places every node at a finite position, with no sibling overlaps", async () => {
     const model = landscapeModel();

@@ -1,0 +1,240 @@
+# Healthcare: a telehealth clinic. Patients book visits, see a clinician by
+# video, and get prescriptions sent to their pharmacy. Exercises protected
+# health information (phi) rules, a triage decision, and a prescription
+# lifecycle.
+archdoc: "2.0"
+namespace: clinic
+name: Telehealth clinic
+description: Online visits with a clinician, from booking to prescription.
+
+actors:
+  patient:
+    kind: person
+    description: Someone booking and attending a visit.
+    uses:
+      patient-app: { description: Books visits and joins them, sends: VisitRequest }
+  clinician:
+    kind: role
+    description: A doctor or nurse practitioner seeing patients.
+    uses:
+      clinician-console: { description: Reviews the chart and writes orders, sends: PrescriptionOrder }
+  care-team:
+    kind: team
+    description: Owns the clinical systems.
+  data-team:
+    kind: team
+    description: Owns reporting.
+
+elements:
+  patient-app:
+    kind: container
+    technology: React Native
+    owners: [care-team]
+    tags: [app]
+    uses:
+      scheduling: { description: Books a visit, sends: VisitRequest }
+      video: { description: Joins the call, sends: JoinToken }
+  clinician-console:
+    kind: container
+    technology: React
+    owners: [care-team]
+    tags: [app]
+    uses:
+      ehr: { description: Reads the chart and writes notes, sends: Encounter }
+      prescribing: { description: Orders prescriptions, sends: PrescriptionOrder }
+  scheduling:
+    kind: container
+    technology: Kotlin
+    owners: [care-team]
+    provides:
+      - { api: openapi/scheduling.yaml, accepts: VisitRequest, returns: Appointment }
+    uses:
+      ehr: { description: Opens an encounter for the visit, sends: Encounter }
+      clinical-db: { description: Stores appointments, sends: Appointment }
+  ehr:
+    kind: system
+    description: The electronic health record.
+    owners: [care-team]
+    elements:
+      fhir-api:
+        kind: container
+        technology: FHIR R4
+        provides:
+          - { api: fhir/encounter, accepts: Encounter, returns: Encounter }
+        uses:
+          clinical-db: { description: Reads and writes charts, sends: [Encounter, Patient] }
+      clinical-db:
+        kind: datastore
+        technology: Postgres (HIPAA)
+        tags: [hipaa]
+        stores:
+          patients: { entity: Patient, key: id }
+          appointments: { entity: Appointment, key: id }
+          encounters: { entity: Encounter, key: id, retention: 10y }
+          prescriptions: { entity: Prescription, key: id, retention: 10y }
+  prescribing:
+    kind: container
+    technology: Go
+    owners: [care-team]
+    provides:
+      - { api: openapi/prescribing.yaml, accepts: PrescriptionOrder, returns: Prescription }
+    uses:
+      ehr.clinical-db: { description: Records prescriptions, sends: Prescription }
+      pharmacy-network: { description: Sends the prescription to the pharmacy, sends: EPrescription }
+      reporting: { description: Counts prescriptions, sends: PrescriptionStats }
+  video:
+    kind: external
+    description: A video vendor with a business associate agreement.
+  pharmacy-network:
+    kind: external
+    description: The national e-prescribing network.
+  reporting:
+    kind: container
+    technology: dbt, BigQuery
+    owners: [data-team]
+    description: De-identified reporting.
+
+data:
+  Patient:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      name: { type: string, classification: phi }
+      date_of_birth: { type: date, classification: phi }
+      email: { type: string, classification: pii }
+  VisitRequest:
+    kind: message
+    fields:
+      patient_id: { type: uuid, references: Patient }
+      reason: { type: string, classification: phi }
+      urgency: { type: enum, values: [routine, soon, urgent] }
+  Appointment:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      patient_id: { type: uuid, references: Patient }
+      starts_at: { type: timestamp }
+      status: { type: enum, values: [booked, in_progress, completed, cancelled] }
+    states:
+      - booked -> in_progress | cancelled
+      - in_progress -> completed
+  JoinToken:
+    kind: message
+    fields:
+      appointment_id: { type: uuid, references: Appointment }
+      token: { type: string }
+  Encounter:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      appointment_id: { type: uuid, references: Appointment }
+      notes: { type: string, classification: phi }
+      diagnosis_code: { type: string, classification: phi }
+  PrescriptionOrder:
+    kind: message
+    fields:
+      encounter_id: { type: uuid, references: Encounter }
+      drug_code: { type: string, classification: phi }
+      quantity: { type: int }
+  Prescription:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      encounter_id: { type: uuid, references: Encounter }
+      drug_code: { type: string, classification: phi }
+      quantity: { type: int }
+      status: { type: enum, values: [ordered, sent, filled, rejected] }
+    states:
+      - ordered -> sent
+      - sent -> filled | rejected
+  EPrescription:
+    kind: message
+    description: What the pharmacy network needs, and no more.
+    fields:
+      prescription_id: { type: uuid, references: Prescription }
+      drug_code: { type: string, classification: phi }
+      quantity: { type: int }
+  PrescriptionStats:
+    kind: message
+    description: Counts only. No patient details.
+    fields:
+      drug_code: { type: string }
+      count: { type: int }
+
+logic:
+  triage:
+    description: Urgent requests go to the on-call clinician; the rest are booked.
+    runs-in: scheduling
+    input: { request: VisitRequest }
+    rules:
+      - when: "request.urgency == 'urgent'"
+        then: on-call
+      - else: book
+
+mappings:
+  request-to-appointment:
+    from: { request: VisitRequest }
+    to: ehr.clinical-db.appointments
+    fields:
+      id: "'appt-' + request.patient_id"
+      patient_id: request.patient_id
+      starts_at: now()
+      status: "'booked'"
+  order-to-prescription:
+    from: { order: PrescriptionOrder }
+    to: ehr.clinical-db.prescriptions
+    fields:
+      id: "'rx-' + order.encounter_id"
+      encounter_id: order.encounter_id
+      drug_code: order.drug_code
+      quantity: order.quantity
+      status: "'ordered'"
+  prescription-to-erx:
+    from: { rx: Prescription }
+    to: EPrescription
+    fields:
+      prescription_id: rx.id
+      drug_code: rx.drug_code
+      quantity: rx.quantity
+
+journeys:
+  book-a-visit:
+    actor: patient
+    goal: See a clinician today
+    importance: critical
+    steps:
+      - { from: patient, to: patient-app, action: Describes the problem }
+      - from: patient-app
+        to: scheduling
+        action: Asks for a visit
+        via: request-to-appointment
+        decides: triage
+        branches:
+          on-call: { creates: { Appointment: { status: in_progress } } }
+          book: { creates: { Appointment: { status: booked } } }
+      - { from: scheduling, to: ehr.clinical-db, action: Saves the appointment }
+      - { from: patient-app, to: video, action: Joins the call }
+  prescribe:
+    actor: clinician
+    goal: Get a patient their medication
+    importance: critical
+    steps:
+      - { from: clinician, to: clinician-console, action: Writes the order }
+      - { from: clinician-console, to: prescribing, action: Submits it, via: order-to-prescription }
+      - from: prescribing
+        to: pharmacy-network
+        action: Sends it to the pharmacy
+        via: prescription-to-erx
+        changes: { Prescription.status: ordered -> sent }
+      - { from: prescribing, to: reporting, action: Counts it }
+
+rules:
+  - id: apps-go-through-services
+    description: Apps never read the clinical database directly.
+    deny: { from: { tag: app }, to: { kind: datastore } }
+  - id: phi-stays-in-hipaa-stores
+    description: Health information is only stored where HIPAA controls apply.
+    data: { classification: phi, stored-in: { tag: hipaa } }
+  - id: no-phi-to-reporting
+    description: Reporting only gets de-identified data.
+    data: { classification: phi, not-sent-to: reporting }
