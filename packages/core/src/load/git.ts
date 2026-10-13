@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { relative, resolve } from "node:path";
+import { posix, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type { Model } from "../model.js";
 import { buildModel, type ModelSource } from "./build.js";
@@ -62,7 +62,12 @@ export async function readModelSourcesAtRef(
   const local = await readModelSources(target, options);
   const top = (await git(cwd, "rev-parse", "--show-toplevel")).trim();
   const source = local?.source ?? resolve(cwd, target);
-  const rel = relative(top, source).replace(/\\/g, "/");
+  // Git reports the top level with symlinks resolved (macOS's /var is
+  // /private/var), so place the model by git's own prefix for cwd instead.
+  const prefix = (await git(cwd, "rev-parse", "--show-prefix")).trim();
+  const rel = posix
+    .normalize(posix.join(prefix, relative(cwd, source).replace(/\\/g, "/")))
+    .replace(/^\.\/?$|\/$/g, "");
 
   const listing = await git(
     top,
