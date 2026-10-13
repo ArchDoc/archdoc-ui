@@ -3,6 +3,7 @@ import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
 import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
+import { lineageCommand, simulateCommand } from "./commands/data.js";
 import { diff } from "./commands/diff.js";
 import { publish, sync } from "./commands/federation.js";
 import { landscapeBuild } from "./commands/landscape.js";
@@ -126,6 +127,34 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       const { runStdio } = await import("@archdoc/mcp");
       await runStdio({ model: opts.model, cwd: io.cwd, version });
     });
+
+  program
+    .command("lineage")
+    .description(
+      "Where a field's value comes from and where it goes, through mappings across repos, and the tables it lands in",
+    )
+    .argument("<field>", "Entry.field, such as Refund.amount_cents or payments.Refund.amount_cents")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((field: string, opts: { model?: string; json?: boolean }) =>
+      run(lineageCommand(field, opts, io)),
+    );
+
+  program
+    .command("simulate")
+    .description(
+      "Run a journey against a sample request: the branch its logic picks, the records each step creates and changes, and the tables they land in",
+    )
+    .argument("<journey>", "journey ID")
+    .option(
+      "-s, --sample <file>",
+      "JSON or YAML records that exist when the journey starts, by data entry, such as { RefundRequest: {...} }",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((journey: string, opts: { model?: string; json?: boolean; sample?: string }) =>
+      run(simulateCommand(journey, opts, io)),
+    );
 
   program
     .command("check")

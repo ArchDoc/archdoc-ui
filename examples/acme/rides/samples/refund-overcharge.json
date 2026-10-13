@@ -1,0 +1,23 @@
+{
+  "payments.RefundRequest": {
+    "trip_id": "trip-81",
+    "amount_cents": 400,
+    "reason": "overcharge",
+    "rider_email": "ana@example.com"
+  },
+  "payments.Charge": {
+    "id": "ch-81",
+    "trip_id": "trip-81",
+    "amount_cents": 1200,
+    "card_last4": "4242",
+    "status": "captured"
+  },
+  "trips.Trip": {
+    "id": "trip-81",
+    "rider_id": "rider-7",
+    "rider_email": "ana@example.com",
+    "fare_cents": 1200,
+    "refunded_cents": 0,
+    "status": "completed"
+  }
+}

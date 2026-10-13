@@ -1,6 +1,7 @@
 import type { Model } from "@archdoc/core/browser";
 import { forwardRef, type ReactNode, useMemo } from "react";
 import type { Compare } from "../App.js";
+import { sensitivity } from "../graph/data.js";
 import type { GroupBy } from "../graph/groups.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 
@@ -96,6 +97,30 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
               </Item>
             ))}
           </Section>
+          {model.data.size ? (
+            <Section title="Data">
+              {[...model.data.values()].map((d) => {
+                const key = `data:${model.namespace}.${d.id}`;
+                const sensitive = sensitivity(d);
+                return (
+                  <Item
+                    key={d.id}
+                    active={
+                      props.selected === key ||
+                      props.selected?.startsWith(`field:${model.namespace}.${d.id}.`) === true
+                    }
+                    onClick={() => props.onSelect(key)}
+                    hint={
+                      sensitive.length ? `${d.spec.kind} · ${sensitive.join(", ")}` : d.spec.kind
+                    }
+                    hintClass={sensitive.length ? "is-sensitive" : undefined}
+                  >
+                    {d.spec.name ?? d.id}
+                  </Item>
+                );
+              })}
+            </Section>
+          ) : null}
           <Section title="Elements">
             <Tree {...props} parentId={undefined} />
           </Section>
@@ -301,6 +326,15 @@ export function search(model: Model, query: string): Hit[] {
   for (const a of model.actors.values()) {
     if (match(a.id, a.spec.name, a.spec.description)) {
       hits.push({ key: `actor:${a.id}`, label: a.spec.name ?? a.id, hint: a.spec.kind });
+    }
+  }
+  for (const d of model.data.values()) {
+    if (match(d.id, d.spec.name, d.spec.description, ...Object.keys(d.spec.fields ?? {}))) {
+      hits.push({
+        key: `data:${model.namespace}.${d.id}`,
+        label: d.spec.name ?? d.id,
+        hint: d.spec.kind,
+      });
     }
   }
   for (const e of model.elements.values()) {

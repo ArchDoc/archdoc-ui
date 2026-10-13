@@ -230,4 +230,101 @@ describe("the landscape", () => {
       "! warning drift/schema-field-unmodeled: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
     );
   });
+  it("simulates Refund a fare: the branch a sample takes, and the records and tables it writes across repos", async () => {
+    const r = await run(
+      "rides",
+      "simulate",
+      "request-refund",
+      "--sample",
+      "samples/refund-overcharge.json",
+    );
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Journey request-refund · decided: auto-approve");
+    expect(r.out).toContain(
+      "     decides payments.refund-approval → auto-approve (rule 2: request.amount_cents <= charge.amount_cents / 2)",
+    );
+    expect(r.out).toContain(
+      "     + creates payments.Refund { id: refund-ch-81, charge_id: ch-81, amount_cents: 400, status: approved } via payments.request-to-refund → payments.ledger (refunds)",
+    );
+    expect(r.out).toContain(
+      "     ~ changes payments.Charge.status: captured → partially_refunded → payments.ledger (charges)",
+    );
+    expect(r.out).toContain("amount_cents: -400, source_ref: refund-ch-81");
+    expect(r.out).toContain(
+      "     ~ changes trips.Trip.refunded_cents: 0 → 400 → trips.trips-db (trips)",
+    );
+    expect(r.out).toContain(
+      "     ~ changes trips.Trip.status: completed → refunded → trips.trips-db (trips)",
+    );
+
+    // A large refund needs finance, so nothing is written to the ledger or the trip.
+    const sample = JSON.parse(
+      await readFile(join(org, "rides/samples/refund-overcharge.json"), "utf8"),
+    );
+    sample["payments.RefundRequest"].amount_cents = 1000;
+    await writeFile(join(org, "rides/large.json"), JSON.stringify(sample));
+    const large = await run(
+      "rides",
+      "simulate",
+      "request-refund",
+      "--sample",
+      "large.json",
+      "--json",
+    );
+    const sim = JSON.parse(large.out);
+    expect(sim.outcomes).toEqual(["needs-finance-approval"]);
+    expect(sim.records["payments.Refund"].status).toBe("pending_approval");
+    expect(sim.steps.slice(4).map((s: { skipped?: string }) => s.skipped)).toEqual([
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      "runs only when auto-approve; the decision was needs-finance-approval",
+    ]);
+  });
+
+  it("follows a field's lineage from one repo's mappings into another's tables", async () => {
+    const r = await run("rides", "lineage", "payments.RefundRequest.amount_cents");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(
+      "  payments.LedgerEntry.amount_cents = -refund.amount_cents  (payments.refund-to-ledger) · written to payments.ledger (ledger_entries)",
+    );
+    expect(r.out).toContain(
+      "  trips.Trip.refunded_cents = issued.amount_cents  (trips.refund-marks-trip, copied) · written to trips.trips-db (trips)",
+    );
+  });
+
+  it("a PR that changes a decision's threshold shows the rule before and after", async () => {
+    git("payments", "checkout", "-q", "-f", "main");
+    git("payments", "checkout", "-q", "-b", "looser-refunds");
+    const file = join(org, "payments/.archdoc/data.yaml");
+    await writeFile(
+      file,
+      (await readFile(file, "utf8")).replace(
+        "request.amount_cents <= charge.amount_cents / 2",
+        "request.amount_cents <= charge.amount_cents * 3 / 4",
+      ),
+    );
+    const r = await run("payments", "report", "--base", "main");
+    expect(r.out).toContain("**Logic and mappings changed (1)**");
+    expect(r.out).toContain(
+      "  - rule 2: when request.amount_cents <= charge.amount_cents / 2 then auto-approve → when request.amount_cents <= charge.amount_cents * 3 / 4 then auto-approve",
+    );
+  });
+  it("view sends samples and other repos' models, so the explorer simulates across repos", async () => {
+    const server = await startViewServer({
+      target: ".",
+      cwd: join(org, "rides"),
+      webDir: join(org, "web"),
+    });
+    try {
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        samples: { path: string }[];
+        federation: { bundles: { key: string; text?: string }[] };
+      };
+      expect(payload.samples.map((s) => s.path)).toEqual(["samples/refund-overcharge.json"]);
+      expect(payload.federation.bundles.map((b) => b.key).sort()).toEqual(["payments", "trips"]);
+      expect(payload.federation.bundles.every((b) => b.text?.startsWith("{"))).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
 });

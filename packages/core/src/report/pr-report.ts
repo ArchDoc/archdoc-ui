@@ -12,7 +12,7 @@ import type { Model } from "../model.js";
 import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
-import { describeChange, formatDiff, summary } from "./diff-report.js";
+import { blockChanges, describeChange, formatDiff, summary } from "./diff-report.js";
 import { CHANGE_LEGEND, changeDiagram, journeyDiagram, type RemoteUse } from "./mermaid.js";
 
 /** Marks the comment so the Action can find and update it. */
@@ -390,7 +390,14 @@ function dataSection(
   diff: ModelDiff,
   data: { flows: NewSensitiveFlow[]; stores: NewSensitiveStore[] },
 ): string[] {
-  if (!diff.data.length && !data.flows.length && !data.stores.length) return [];
+  if (
+    !diff.data.length &&
+    !diff.mappings.length &&
+    !diff.logic.length &&
+    !data.flows.length &&
+    !data.stores.length
+  )
+    return [];
   const md = ["### Data", ""];
   const name = (t: NewSensitiveFlow["flow"]["from"]) => (t.type === "external" ? t.ref : t.id);
   const fields = (list: { field: string; classification: string }[]) =>
@@ -432,6 +439,23 @@ function dataSection(
         .join("; ")}`,
       "",
     );
+  }
+  const blocks = [
+    ...diff.logic.map((c) => ({ c, section: "logic" as const })),
+    ...diff.mappings.map((c) => ({ c, section: "mappings" as const })),
+  ];
+  if (blocks.length) {
+    md.push(`**Logic and mappings changed (${blocks.length})**`, "");
+    for (const { c, section } of blocks) {
+      const kind = section === "logic" ? "logic" : "mapping";
+      if (c.kind !== "changed") {
+        md.push(`- **${c.kind}** ${kind} \`${c.id}\``);
+        continue;
+      }
+      md.push(`- ${kind} \`${c.id}\`:`);
+      for (const part of blockChanges(section, c).split("; ")) md.push(`  - ${part}`);
+    }
+    md.push("");
   }
   if (diff.data.length) {
     md.push(

@@ -39,7 +39,8 @@ beforeAll(async () => {
     .replace("  trips: { git: ../trips, version: ^3 }\n", "")
     .replace(/ {6}trips\.trips-api:\n(?: {8}.*\n)+/, "")
     .replace(/ {6}- \{ from: api-gateway, to: trips\.trips-api.*\n/, "")
-    .replace(/ {6}- \{ from: payments\.charges, to: trips\.trips-api.*\n/, "");
+    .replace(/ {6}- \{ from: payments\.charges, to: trips\.trips-api.*\n/, "")
+    .replace(/ {6}- \{ from: trips\.trips-api.*\n/, "");
   await writeFile(rides, text);
   for (const repo of ["payments", "rides"]) {
     git(repo, "add", "-A");

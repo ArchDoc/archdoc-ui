@@ -3,23 +3,28 @@ import { checkRepository } from "@archdoc/analyzers";
 import {
   diffModels,
   formatActor,
+  formatData,
   formatDiagnostics,
   formatDiff,
   formatElement,
   formatFindings,
   formatImpact,
   formatJourney,
+  formatLineage,
   formatLocate,
   formatOverview,
   formatSearch,
+  formatSimulation,
   impact,
   type LoadedModel,
+  lineage,
   loadModel,
   loadModelAtRef,
   locate,
   propose,
   resolveRef,
   search,
+  simulate,
 } from "@archdoc/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -40,6 +45,8 @@ Start every coding task here, before you grep or read files:
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
 archdoc_locate tells you which element owns a file.
+
+When a change touches data (what a component sends or stores, how a record is mapped, or a decision such as an approval rule), call archdoc_data on the entry to see its fields, classifications, and where it's stored and sent; archdoc_lineage on a field to see every place its value is copied or derived, across repos; and archdoc_simulate to see which branch a journey takes for a sample request and which records it writes.
 
 After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Use archdoc_diff to describe your model changes in the PR.`;
 
@@ -218,6 +225,93 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
             `No journey "${id}". Known: ${[...m.journeys.keys()].join(", ") || "none"}.`,
           );
         return formatJourney(m, j);
+      }),
+  );
+
+  server.registerTool(
+    "archdoc_data",
+    {
+      title: "Data entry",
+      description:
+        "A data entry (a stored record, a message, or an event): its fields and their classifications (pii, pci, ...), its lifecycle, the schema it comes from, where it's stored, and where it's sent. Works for entries in other repos too, such as payments.Charge. Without an ID, lists the data entries.",
+      inputSchema: {
+        id: z
+          .string()
+          .optional()
+          .describe("Data entry, such as Charge or payments.RefundRequest; omit to list them"),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ id }) =>
+      withModel((m) => {
+        if (!id) {
+          return (
+            [...m.data.values()]
+              .map((d) => {
+                const classified = Object.entries(d.spec.fields ?? {})
+                  .filter(([, f]) => f.classification)
+                  .map(([n, f]) => `${n}: ${f.classification}`);
+                return `${d.id} (${d.spec.kind})${classified.length ? ` · ${classified.join(", ")}` : ""}${d.spec.description ? `: ${d.spec.description}` : ""}`;
+              })
+              .join("\n") || "No data entries in this model."
+          );
+        }
+        const out = formatData(m, id);
+        if (!out) {
+          throw new Error(
+            `No data entry "${id}". Known: ${[...m.data.keys()].join(", ") || "none"}. Entries in other repos are named by namespace, such as payments.Charge.`,
+          );
+        }
+        return out;
+      }),
+  );
+
+  server.registerTool(
+    "archdoc_lineage",
+    {
+      title: "Field lineage",
+      description:
+        "Where a field's value comes from and where it goes: every mapping that copies or derives it, across repos, with the expression and the tables it lands in. Use it before changing or renaming a field, or a mapping.",
+      inputSchema: {
+        field: z
+          .string()
+          .describe("Entry.field, such as Refund.amount_cents or payments.Refund.amount_cents"),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ field }) =>
+      withModel((m) => {
+        const l = lineage(m, field);
+        if (!l) throw new Error(`No data entry for "${field}". Name a field as Entry.field.`);
+        return formatLineage(l);
+      }),
+  );
+
+  server.registerTool(
+    "archdoc_simulate",
+    {
+      title: "Simulate a journey",
+      description:
+        'Run a journey against sample records without running the system: the branch each decision takes and why, the records each step creates and changes, and the tables they land in. Use it to answer "what happens if..." before changing logic or mappings.',
+      inputSchema: {
+        journey: z.string().describe("Journey ID"),
+        sample: z
+          .record(z.string(), z.record(z.string(), z.unknown()))
+          .describe(
+            'Records that exist when the journey starts, by data entry, such as { "payments.RefundRequest": { "amount_cents": 400 }, "payments.Charge": { "amount_cents": 1200 } }',
+          ),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ journey, sample }) =>
+      withModel((m) => {
+        const result = simulate(m, journey, sample);
+        if (!result) {
+          throw new Error(
+            `No journey "${journey}". Known: ${[...m.journeys.keys()].join(", ") || "none"}.`,
+          );
+        }
+        return formatSimulation(result);
       }),
   );
 

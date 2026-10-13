@@ -1,5 +1,7 @@
+import type { JourneyStepSpec } from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
 import type { Model, Target } from "../model.js";
+import { checkLogic } from "./logic.js";
 import {
   type DataResolution,
   findContract,
@@ -101,72 +103,9 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
       const label = `Journey "${j.id}", step ${s.index + 1}`;
       for (const data of [s.spec.sends ?? []].flat()) ref(data, `${label} sends`, s.location);
 
-      const creates = s.spec.creates;
-      const created =
-        creates === undefined
-          ? []
-          : typeof creates === "string" || Array.isArray(creates)
-            ? [creates].flat().map((name) => [name, {}] as const)
-            : Object.entries(creates);
-      for (const [name, values] of created) {
-        const entry = ref(name, `${label} creates`, s.location);
-        if (!entry) continue;
-        for (const [field, value] of Object.entries(values)) {
-          const problem = fieldProblem(entry, field, value === null ? undefined : String(value));
-          if (problem)
-            out.push({
-              ...problem,
-              message: `${label} creates ${name}: ${problem.message}`,
-              location: s.location,
-            });
-        }
-      }
-
-      for (const [key, value] of Object.entries(s.spec.changes ?? {})) {
-        const split = splitField(key);
-        if (!split) {
-          if (scope === "local")
-            out.push({
-              severity: "error",
-              code: "data/invalid-change",
-              message: `${label} changes "${key}". Name the entry and the field, such as Charge.status.`,
-              location: s.location,
-            });
-          continue;
-        }
-        const entry = ref(split.entry, `${label} changes`, s.location);
-        if (!entry) continue;
-        const change = parseChange(value);
-        if (!change) {
-          out.push({
-            severity: "error",
-            code: "data/invalid-change",
-            message: `${label} changes ${key} to "${value}". Write it as "before -> after".`,
-            location: s.location,
-          });
-          continue;
-        }
-        const problem =
-          fieldProblem(entry, split.field, change.from) ??
-          fieldProblem(entry, split.field, change.to);
-        if (problem) {
-          out.push({
-            ...problem,
-            message: `${label} changes ${key}: ${problem.message}`,
-            location: s.location,
-          });
-          continue;
-        }
-        const life = parseStates(entry.node.spec.states ?? []);
-        if (!life.states.has(change.from) && !life.states.has(change.to)) continue;
-        if (life.next.get(change.from)?.has(change.to)) continue;
-        const allowed = [...(life.next.get(change.from) ?? [])];
-        out.push({
-          severity: "error",
-          code: "data/invalid-transition",
-          message: `${label} changes ${key} from ${change.from} to ${change.to}, which ${entry.node.id}'s states don't allow.${allowed.length ? ` From ${change.from} it can go to ${allowed.join(", ")}.` : life.states.has(change.from) ? ` ${change.from} is a final state.` : ` ${change.from} isn't one of its states.`}`,
-          location: s.location,
-        });
+      effects(label, s.spec, s.location);
+      for (const [outcome, branch] of Object.entries(s.spec.branches ?? {})) {
+        effects(`${label}, when ${outcome}`, branch, s.location);
       }
 
       // Data sent to an element that declares what it accepts.
@@ -196,7 +135,83 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
         });
     }
   }
+  out.push(...checkLogic(model, scope));
   return out;
+
+  /** What a step (or one of its branches) creates and changes: entries, fields, values, and transitions. */
+  function effects(
+    label: string,
+    spec: { creates?: JourneyStepSpec["creates"]; changes?: JourneyStepSpec["changes"] },
+    location: SourceLocation | undefined,
+  ) {
+    const creates = spec.creates;
+    const created =
+      creates === undefined
+        ? []
+        : typeof creates === "string" || Array.isArray(creates)
+          ? [creates].flat().map((name) => [name, {}] as const)
+          : Object.entries(creates);
+    for (const [name, values] of created) {
+      const entry = ref(name, `${label} creates`, location);
+      if (!entry) continue;
+      for (const [field, value] of Object.entries(values)) {
+        const problem = fieldProblem(entry, field, value === null ? undefined : String(value));
+        if (problem)
+          out.push({
+            ...problem,
+            message: `${label} creates ${name}: ${problem.message}`,
+            location: location,
+          });
+      }
+    }
+
+    for (const [key, value] of Object.entries(spec.changes ?? {})) {
+      const split = splitField(key);
+      if (!split) {
+        if (scope === "local")
+          out.push({
+            severity: "error",
+            code: "data/invalid-change",
+            message: `${label} changes "${key}". Name the entry and the field, such as Charge.status.`,
+            location: location,
+          });
+        continue;
+      }
+      const entry = ref(split.entry, `${label} changes`, location);
+      if (!entry) continue;
+      const change = parseChange(value);
+      if (!change) {
+        out.push({
+          severity: "error",
+          code: "data/invalid-change",
+          message: `${label} changes ${key} to "${value}". Write it as "before -> after".`,
+          location: location,
+        });
+        continue;
+      }
+      const problem =
+        fieldProblem(entry, split.field, change.from) ??
+        fieldProblem(entry, split.field, change.to);
+      if (problem) {
+        out.push({
+          ...problem,
+          message: `${label} changes ${key}: ${problem.message}`,
+          location: location,
+        });
+        continue;
+      }
+      const life = parseStates(entry.node.spec.states ?? []);
+      if (!life.states.has(change.from) && !life.states.has(change.to)) continue;
+      if (life.next.get(change.from)?.has(change.to)) continue;
+      const allowed = [...(life.next.get(change.from) ?? [])];
+      out.push({
+        severity: "error",
+        code: "data/invalid-transition",
+        message: `${label} changes ${key} from ${change.from} to ${change.to}, which ${entry.node.id}'s states don't allow.${allowed.length ? ` From ${change.from} it can go to ${allowed.join(", ")}.` : life.states.has(change.from) ? ` ${change.from} is a final state.` : ` ${change.from} isn't one of its states.`}`,
+        location: location,
+      });
+    }
+  }
 
   /**
    * Why the target doesn't accept the data, if it declares what it accepts.

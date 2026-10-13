@@ -21,3 +21,11 @@ done
 (cd payments && git tag v5.0.0) && (cd trips && git tag v3.0.0)
 cd rides && archdoc sync && archdoc validate
 ```
+
+The repos also carry data: payments reads its entries from a Prisma schema and a `.proto`, trips from a SQL migration, and the refund journey in rides decides with payments' `refund-approval` logic. After syncing:
+
+```bash
+cd rides
+archdoc simulate request-refund --sample samples/refund-overcharge.json   # the branch, records, and tables
+archdoc lineage payments.RefundRequest.amount_cents                       # where the amount goes, across repos
+```

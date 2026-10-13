@@ -118,12 +118,15 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           data:
             kind: component
-            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new.
+            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage and journey simulation.
             code: [{ path: packages/core/src/data/** }]
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:
                 description: Matches rule selectors the same way relationship rules do
+                provenance: { source: suggested, by: agent:claude-code }
+              imports:
+                description: Reads other repos' data, mappings, and logic for lineage and simulation
                 provenance: { source: suggested, by: agent:claude-code }
 
       analyzers:
@@ -152,7 +155,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core: Commands delegate to core
@@ -177,13 +180,13 @@ elements:
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
-            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself.
+            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models and sample requests for simulation.
             code: [packages/cli/src/server.ts]
 
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, check, diff, validate), plus propose, which adds suggested facts to the model.
+        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
           core: Tool calls delegate to core
@@ -197,7 +200,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. Tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. A data view (entries, classifications, where they're stored and sent), a field lineage graph, and a journey simulator that runs a sample request in the browser. Tours next.
         code: [{ path: apps/web/** }]
         uses:
           core: Builds and queries the model in the browser (@archdoc/core/browser)

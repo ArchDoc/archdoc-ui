@@ -4,7 +4,7 @@ import type { MouseEvent } from "react";
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
 export interface CardData extends Record<string, unknown> {
-  family: "actor" | "element" | "external" | "group";
+  family: "actor" | "element" | "external" | "group" | "data" | "field";
   label: string;
   kind: string;
   detail?: string | undefined;
@@ -22,6 +22,10 @@ export interface CardData extends Record<string, unknown> {
   selected: boolean;
   /** The box the current journey step crosses into. */
   entered?: boolean | undefined;
+  /** A field with a classification, in a lineage graph. */
+  classified?: boolean | undefined;
+  /** In the data view: the box stores the selected data entry. */
+  stores?: boolean | undefined;
   onToggle?: (() => void) | undefined;
 }
 
@@ -35,6 +39,7 @@ const ACTOR_ICONS: Record<string, string> = {
   agent: "M5 9h14v10H5zM12 5v4M9 13h.01M15 13h.01M9 16h6M3 13h2m14 0h2",
   repo: "M6 3h10l3 3v15H6zM6 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2M10 8h5M10 12h5",
   domain: "M12 3l9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5",
+  data: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
 };
 
 function Icon({ kind }: { kind: string }) {
@@ -61,6 +66,8 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
     data.entered ? "is-entered" : "",
+    data.classified ? "is-classified" : "",
+    data.stores ? "is-store" : "",
   ]
     .filter(Boolean)
     .join(" ");

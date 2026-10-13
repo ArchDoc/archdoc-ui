@@ -95,22 +95,24 @@ Decided 2026-10-11: CEL expressions are evaluated with [`@marcbachmann/cel-js`](
 - [x] Spec: `data` entities, messages, and events with fields, `classification`, and lifecycle `states`. `stores:` maps tables and collections to entities. `sends` / `accepts` / `returns` / `carries` attach data to relationships and contracts. Journey steps say what they `send`, `create`, and `change` (5a). Data in other repos is referenced by namespace and checked once synced; the landscape composes every repo's data.
 - [x] Schema importers (as analyzers): SQL migrations, Prisma, OpenAPI/JSON Schema components, and Protobuf, named in a data entry's `source:`. Fields left untyped in the model are filled from the source. Schema-drift findings in `check`: classified fields the schema lost (an error), unmodeled fields, and type or enum mismatches (5b).
 - [ ] Schema importers for TypeORM and Avro, on the same `SchemaImporter` API.
-- [ ] `mappings:` with CEL field expressions, which give field-level lineage across tables, datastores, and repos. `archdoc lineage <entity.field>`.
-- [ ] `logic:` blocks: decisions on request data written as CEL rules, linked to the implementing code.
-- [ ] Journey data annotations (`sends`, `decides`, `branches`, `creates`, `changes`) and `archdoc simulate <journey> --sample <file>`.
+- [x] `mappings:` with CEL field expressions, which give field-level lineage across tables, datastores, and repos. `archdoc lineage <entity.field>` (5c).
+- [x] `logic:` blocks: decisions on request data written as CEL rules, linked to the implementing code (5c).
+- [x] Journey data annotations (`sends`, `decides`, `branches`, `creates`, `changes`, `via`, `when`) and `archdoc simulate <journey> --sample <file>` (5c). Simulation is deterministic: `now()` is a fixed time.
 - [ ] Checks:
   - [x] classification rules: `data: { classification, stored-in }` and `data: { classification, not-sent-to }`, as repo or org rules (5a)
   - [x] invalid state transitions, unknown fields, and values outside an enum (5a)
   - [x] steps and relationships that send data the target doesn't accept (5a)
-  - [ ] broken mappings
-- [ ] MCP: `archdoc_data`, `archdoc_lineage`, `archdoc_simulate`.
-- [ ] PR comment: changed fields and sensitive data that goes somewhere new, external elements first (5a); mappings and logic thresholds (5c).
-- [ ] Explorer:
-  - data view (entities and where they're stored)
-  - field lineage graph
-  - journey data timeline with a sample-request simulator
+  - [x] broken mappings and logic: inputs, targets, and fields that don't exist, expressions that don't parse, rules after `else`, decisions without a default, and branches, `when`, and `via` that name nothing (5c)
+- [x] MCP: `archdoc_data`, `archdoc_lineage`, `archdoc_simulate` (5d).
+- [x] PR comment: changed fields and sensitive data that goes somewhere new, external elements first (5a); mappings and logic thresholds, with the expressions before and after (5c).
+- [x] Explorer (5d):
+  - data view: entries, fields and classifications, and where they're stored and sent, lit up on the canvas
+  - field lineage graph across repos
+  - journey data timeline with a sample-request simulator that runs in the browser; `archdoc view` sends `samples/*.json` and other repos' vendored models
 
 **Exit:** for *Refund a fare*, the explorer shows which branch a sample request takes, which records are created or changed at each step, and which tables they land in across `payments` and `trips`. A PR that starts sending a PII field to an external element is flagged.
+
+**Progress, 2026-10-11:** the second half of the exit passes on the demo org (5a): a payments PR that sends `RefundRequest` (with `rider_email`, pii) to the external fraud scorer fails `check` on the org rule and gets a caution in the PR report. The first half passes in the CLI (5c): `archdoc simulate request-refund --sample samples/refund-overcharge.json` in rides shows `payments.refund-approval` choosing auto-approve by rule 2, the refund, charge, and ledger records in `payments.ledger`, and the trip's refund in `trips.trips-db`. **Exit test, 2026-10-11: passed on the demo org (5d).** In rides, `archdoc view` opens *request-refund*; running `samples/refund-overcharge.json` shows `payments.refund-approval` choosing auto-approve, the records created and changed at each step, and the tables they land in across `payments` and `trips`, step by step on the canvas.
 
 ## Phase 6: Bootstrap + interoperability (M)
 

@@ -32,15 +32,18 @@ describe("archdoc MCP server", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "archdoc_check",
+      "archdoc_data",
       "archdoc_diff",
       "archdoc_get_actor",
       "archdoc_get_element",
       "archdoc_impact",
       "archdoc_journey",
+      "archdoc_lineage",
       "archdoc_locate",
       "archdoc_overview",
       "archdoc_propose",
       "archdoc_search",
+      "archdoc_simulate",
       "archdoc_validate",
     ]);
     const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);

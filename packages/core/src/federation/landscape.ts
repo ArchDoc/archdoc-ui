@@ -74,6 +74,9 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
   const actorIdOf = unique((m) => m.actors.keys());
   const journeyIdOf = unique((m) => m.journeys.keys());
   const dataIdOf = unique((m) => m.data.keys());
+  const mappingIdOf = unique((m) => m.mappings.keys());
+  const logicIdOf = unique((m) => m.logic.keys());
+  const landscapeBlocks = new Set([...landscape.mappings.keys(), ...landscape.logic.keys()]);
   const landscapeData = new Set(landscape.data.keys());
   const landscapeActors = new Set(landscape.actors.keys());
   const landscapeJourneys = new Set(landscape.journeys.keys());
@@ -117,9 +120,9 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
     const dot = key.lastIndexOf(".");
     return dot > 0 ? `${dataRef(ns, key.slice(0, dot))}.${key.slice(dot + 1)}` : key;
   };
-  const stepData = (ns: string, s: JourneyStepSpec): Partial<JourneyStepSpec> => {
-    const out: Partial<JourneyStepSpec> = {};
-    if (s.sends !== undefined) out.sends = dataList(ns, s.sends);
+  /** What a step or branch creates and changes, with data references rewritten. */
+  const effectsOf = (ns: string, s: Pick<JourneyStepSpec, "creates" | "changes">) => {
+    const out: Pick<JourneyStepSpec, "creates" | "changes"> = {};
     if (s.creates !== undefined) {
       out.creates =
         typeof s.creates === "string" || Array.isArray(s.creates)
@@ -133,6 +136,62 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
     }
     return out;
   };
+  /** A mapping or logic reference written in repo `ns`, as the composed model's ID. */
+  const blockRef =
+    (pick: (m: Model) => ReadonlyMap<string, unknown>, idOf: typeof mappingIdOf) =>
+    (ns: string, ref: string): string => {
+      const dot = ref.indexOf(".");
+      const prefix = dot > 0 ? ref.slice(0, dot) : undefined;
+      const [where, id] = prefix && models.has(prefix) ? [prefix, ref.slice(dot + 1)] : [ns, ref];
+      const model = models.get(where);
+      if (!model || !pick(model).has(id)) return ref;
+      return where === L ? id : idOf(where, id, where === L ? new Set() : landscapeBlocks);
+    };
+  const mappingRef = blockRef((m) => m.mappings, mappingIdOf);
+  const logicRef = blockRef((m) => m.logic, logicIdOf);
+  const stepData = (ns: string, s: JourneyStepSpec): Partial<JourneyStepSpec> => {
+    const out: Partial<JourneyStepSpec> = effectsOf(ns, s);
+    if (s.sends !== undefined) out.sends = dataList(ns, s.sends);
+    if (s.decides !== undefined) out.decides = logicRef(ns, s.decides);
+    if (s.via !== undefined) out.via = mappingRef(ns, s.via);
+    if (s.branches !== undefined) {
+      out.branches = Object.fromEntries(
+        Object.entries(s.branches).map(([k, b]) => [
+          k,
+          {
+            ...b,
+            ...effectsOf(ns, b),
+            ...(b.next
+              ? {
+                  next: models.get(ns)?.journeys.has(b.next)
+                    ? journeyIdOf(ns, b.next, landscapeJourneys)
+                    : b.next,
+                }
+              : {}),
+          },
+        ]),
+      );
+    }
+    return out;
+  };
+  /** A mapping's `to`: an entry, or element.table with the element's composed ID. */
+  const targetRef = (ns: string, to: string): string => {
+    const asData = dataRef(ns, to);
+    if (asData !== to || models.get(ns)?.data.has(to)) return asData;
+    const dot = to.lastIndexOf(".");
+    if (dot <= 0) return to;
+    const element = to.slice(0, dot);
+    const table = to.slice(dot + 1);
+    if (models.get(ns)?.elements.has(element)) return `${elementRef(ns, element)}.${table}`;
+    const first = element.indexOf(".");
+    const where = first > 0 ? element.slice(0, first) : "";
+    if (models.get(where)?.elements.has(element.slice(first + 1))) {
+      return `${elementRef(where, element.slice(first + 1))}.${table}`;
+    }
+    return to;
+  };
+  const inputsOf = (ns: string, inputs: Record<string, string>) =>
+    Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, dataRef(ns, v)]));
   const owner = (ns: string, o: string) => {
     const m = models.get(ns);
     if (landscapeActors.has(o)) return o;
@@ -263,6 +322,29 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
   for (const d of deps) addJourneys(d.namespace, d.model);
   addData(L, landscape);
   for (const d of deps) addData(d.namespace, d.model);
+  const mappings: NonNullable<ModelFile["mappings"]> = {};
+  const logic: NonNullable<ModelFile["logic"]> = {};
+  for (const [ns, m] of models) {
+    for (const map of m.mappings.values()) {
+      mappings[mappingRef(ns, map.id)] = {
+        ...map.spec,
+        from: inputsOf(ns, map.spec.from),
+        to: targetRef(ns, map.spec.to),
+        ...(ns !== L ? { tags: [...(map.spec.tags ?? []), `repo:${ns}`] } : {}),
+      };
+    }
+    for (const l of m.logic.values()) {
+      const runsIn = l.spec["runs-in"];
+      const where = runsIn ? target(ns, { type: "element", id: runsIn } as Target) : undefined;
+      logic[logicRef(ns, l.id)] = {
+        ...l.spec,
+        input: inputsOf(ns, l.spec.input),
+        ...(runsIn ? { "runs-in": m.elements.has(runsIn) && where ? where : runsIn } : {}),
+        ...(l.spec.owners ? { owners: l.spec.owners.map((o) => owner(ns, o)) } : {}),
+        ...(ns !== L ? { tags: [...(l.spec.tags ?? []), `repo:${ns}`] } : {}),
+      };
+    }
+  }
 
   const spec: ModelFile = {
     archdoc: "2.0",
@@ -273,6 +355,8 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
     elements,
     journeys,
     ...(Object.keys(data).length ? { data } : {}),
+    ...(Object.keys(mappings).length ? { mappings } : {}),
+    ...(Object.keys(logic).length ? { logic } : {}),
     ...(landscape.rules.length ? { rules: landscape.rules } : {}),
   };
   const root = `${L}.landscape.json`;

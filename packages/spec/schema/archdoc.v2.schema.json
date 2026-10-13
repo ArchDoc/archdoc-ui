@@ -348,20 +348,80 @@
                       "description": "Where a fact came from. Absent means declared by a person."
                     },
                     "decides": {
-                      "type": "string"
-                    },
-                    "via": {
-                      "type": "string"
-                    },
-                    "when": {
+                      "description": "A logic block that decides where this step goes, such as payments.refund-approval",
                       "type": "string"
                     },
                     "branches": {
+                      "description": "What happens for each outcome of `decides`",
                       "type": "object",
                       "propertyNames": {
                         "type": "string"
                       },
-                      "additionalProperties": {}
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "creates": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": ["string", "number", "boolean", "null"]
+                                  }
+                                }
+                              }
+                            ],
+                            "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+                          },
+                          "changes": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string",
+                              "pattern": "->"
+                            },
+                            "description": "Fields this step changes, such as Charge.status: captured -> refunded"
+                          },
+                          "next": {
+                            "description": "Another journey this outcome continues as",
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "when": {
+                      "description": "Run this step only when an earlier decision had this outcome",
+                      "type": "string"
+                    },
+                    "via": {
+                      "description": "A mapping that produces the record this step writes, such as refund-to-ledger",
+                      "type": "string"
                     }
                   },
                   "required": ["from", "to"],
@@ -501,6 +561,7 @@
           }
         },
         "mappings": {
+          "description": "How records become other records, field by field, for lineage and simulation",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -508,11 +569,135 @@
           },
           "additionalProperties": {
             "type": "object",
-            "properties": {},
-            "additionalProperties": {}
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "from": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Named inputs: a name for each data entry, such as { refund: Refund, trip: trips.Trip }"
+              },
+              "to": {
+                "type": "string",
+                "description": "The entry it produces, or a datastore table, such as LedgerEntry or payments.ledger.ledger_entries"
+              },
+              "fields": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Each target field as a CEL expression over the inputs, such as -refund.amount_cents"
+              },
+              "code": {
+                "description": "The code that does it",
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A file, directory, or glob relative to the repo root"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["path"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A file, directory, or glob relative to the repo root"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["path"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "planned", "deprecated"],
+                "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": ["declared", "inferred", "suggested"],
+                    "description": "declared: written by a person (the default). inferred: produced by an analyzer. suggested: proposed by an AI agent and not yet accepted."
+                  },
+                  "by": {
+                    "description": "Who produced it: analyzer:ts-imports, agent:claude-code, human:@handle",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["source"],
+                "additionalProperties": false,
+                "description": "Where a fact came from. Absent means declared by a person."
+              }
+            },
+            "required": ["from", "to", "fields"],
+            "additionalProperties": false
           }
         },
         "logic": {
+          "description": "Decisions elements make on the data they receive",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -520,8 +705,169 @@
           },
           "additionalProperties": {
             "type": "object",
-            "properties": {},
-            "additionalProperties": {}
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "runs-in": {
+                "description": "The element that makes the decision",
+                "type": "string",
+                "minLength": 1
+              },
+              "input": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Named inputs: a name for each data entry, such as { refund: Refund, trip: trips.Trip }"
+              },
+              "rules": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "when": {
+                          "type": "string",
+                          "description": "A CEL condition over the inputs"
+                        },
+                        "then": {
+                          "type": "string",
+                          "description": "The outcome"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["when", "then"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "else": {
+                          "type": "string",
+                          "description": "The outcome when no rule above matches"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["else"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "description": "Checked in order; the first that matches wins"
+              },
+              "code": {
+                "description": "The code that implements it",
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A file, directory, or glob relative to the repo root"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["path"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A file, directory, or glob relative to the repo root"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["path"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "owners": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "planned", "deprecated"],
+                "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": ["declared", "inferred", "suggested"],
+                    "description": "declared: written by a person (the default). inferred: produced by an analyzer. suggested: proposed by an AI agent and not yet accepted."
+                  },
+                  "by": {
+                    "description": "Who produced it: analyzer:ts-imports, agent:claude-code, human:@handle",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["source"],
+                "additionalProperties": false,
+                "description": "Where a fact came from. Absent means declared by a person."
+              }
+            },
+            "required": ["input", "rules"],
+            "additionalProperties": false
           }
         },
         "tours": {
@@ -945,20 +1291,80 @@
                 "description": "Where a fact came from. Absent means declared by a person."
               },
               "decides": {
-                "type": "string"
-              },
-              "via": {
-                "type": "string"
-              },
-              "when": {
+                "description": "A logic block that decides where this step goes, such as payments.refund-approval",
                 "type": "string"
               },
               "branches": {
+                "description": "What happens for each outcome of `decides`",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
-                "additionalProperties": {}
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "creates": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": ["string", "number", "boolean", "null"]
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+                    },
+                    "changes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "pattern": "->"
+                      },
+                      "description": "Fields this step changes, such as Charge.status: captured -> refunded"
+                    },
+                    "next": {
+                      "description": "Another journey this outcome continues as",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "when": {
+                "description": "Run this step only when an earlier decision had this outcome",
+                "type": "string"
+              },
+              "via": {
+                "description": "A mapping that produces the record this step writes, such as refund-to-ledger",
+                "type": "string"
               }
             },
             "required": ["from", "to"],

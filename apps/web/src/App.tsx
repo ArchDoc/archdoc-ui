@@ -1,15 +1,20 @@
 import {
+  DataRegistry,
   diffModels,
   formatDiagnostic,
+  lineage,
   type Model,
   type ModelDiff,
   prReport,
   resolveCodeMap,
+  type Simulation,
+  simulate,
 } from "@archdoc/core/browser";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
+import { LineageCanvas } from "./components/LineageCanvas.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
@@ -43,6 +48,7 @@ export function App() {
         repo={state.repo}
         base={state.base}
         landscape={state.landscape}
+        samples={state.samples}
       />
     </ReactFlowProvider>
   );
@@ -56,6 +62,7 @@ interface ExplorerProps {
   repo: RepoLinks;
   base?: { ref: string; model: Model } | undefined;
   landscape?: LandscapeInfo | undefined;
+  samples: { path: string; text: string }[];
 }
 
 /** What the explorer needs to show changes against a base. */
@@ -67,9 +74,11 @@ export interface Compare {
   journeys: Set<string>;
 }
 
-function Explorer({ model, watch, reloads, files, repo, base, landscape }: ExplorerProps) {
+function Explorer({ model, watch, reloads, files, repo, base, landscape, samples }: ExplorerProps) {
   const [compareOn, setCompareOn] = useState(true);
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
+  // The last simulation, with its sample, so it reruns when the model reloads.
+  const [simRun, setSimRun] = useState<{ journey: string; sample: Record<string, unknown> }>();
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
@@ -82,6 +91,13 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
   const search = useRef<HTMLInputElement>(null);
 
   const journey = journeyId ? model.journeys.get(journeyId) : undefined;
+  const simulation = useMemo<Simulation | undefined>(
+    () =>
+      simRun && journey && simRun.journey === journey.id
+        ? simulate(model, journey.id, simRun.sample)
+        : undefined,
+    [model, journey, simRun],
+  );
   const compare = useMemo<Compare | undefined>(() => {
     if (!base || !compareOn) return undefined;
     const diff = diffModels(base.model, model);
@@ -97,6 +113,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
   useEffect(() => {
     setExpanded((prev) => new Set([...prev].filter((id) => model.elements.has(id))));
     setSelected((prev) => (prev && exists(model, prev, landscape) ? prev : undefined));
+    setSimRun((prev) => (prev && model.journeys.has(prev.journey) ? prev : undefined));
     setJourneyId((prev) => (prev && model.journeys.has(prev) ? prev : undefined));
   }, [model, landscape]);
 
@@ -124,6 +141,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
           hidden.every((a) => prev.has(a)) ? prev : new Set([...prev, ...hidden]),
         );
       }
+      if (key.startsWith("data:") || key.startsWith("field:")) return;
       if (key.startsWith("domain:")) {
         // A domain is a box only when grouping by domain.
         setGroupBy("domain");
@@ -293,19 +311,24 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
       />
 
       <main className="canvas" aria-label="Architecture diagram">
-        <Canvas
-          model={model}
-          grouping={grouping}
-          view={view}
-          selected={selected}
-          journey={journey}
-          step={step}
-          centerOn={centerOn}
-          onCentered={() => setCenterOn(undefined)}
-          onSelect={select}
-          onToggle={toggle}
-          compare={compare}
-        />
+        {selected?.startsWith("field:") ? (
+          <LineageCanvas model={model} field={selected.slice(6)} onSelect={select} />
+        ) : (
+          <Canvas
+            model={model}
+            grouping={grouping}
+            simulation={simulation}
+            view={view}
+            selected={selected}
+            journey={journey}
+            step={step}
+            centerOn={centerOn}
+            onCentered={() => setCenterOn(undefined)}
+            onSelect={select}
+            onToggle={toggle}
+            compare={compare}
+          />
+        )}
         {journey && currentStep ? (
           <section className="journey-bar" aria-label="Journey steps">
             <div className="journey-bar-title">
@@ -320,6 +343,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
               </span>
               {currentStep.spec.action ? <span> {currentStep.spec.action}</span> : null}
             </p>
+            {simulation ? <StepData simulation={simulation} step={step} /> : null}
             {crossing ? (
               <p className="journey-bar-crossing">
                 Crosses from {boundaryLabel(grouping as Grouping, crossing.from)} to{" "}
@@ -381,10 +405,33 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape }: Explo
           code={code}
           compare={compare}
           landscape={landscape}
+          samples={samples}
+          simulation={simulation}
+          onSimulate={(sample) => {
+            setSimRun(sample && journey ? { journey: journey.id, sample } : undefined);
+            setPlaying(false);
+          }}
         />
       </aside>
     </div>
   );
+}
+
+/** What the current step does to the data, in the simulation. */
+function StepData({ simulation, step }: { simulation: Simulation; step: number }) {
+  const s = simulation.steps[step];
+  if (!s) return null;
+  if (!s.ran) return <p className="journey-bar-data is-skipped">Skipped: {s.skipped}</p>;
+  const parts = [
+    s.decision ? `decides ${s.decision.outcome ?? "nothing"}` : "",
+    ...s.events
+      .filter((e) => e.kind !== "sent")
+      .map(
+        (e) =>
+          `${e.kind === "created" ? "+" : "~"} ${e.entry.split(".").slice(-1)[0]}${e.tables[0] ? ` → ${e.tables[0].table}` : ""}`,
+      ),
+  ].filter(Boolean);
+  return parts.length ? <p className="journey-bar-data">{parts.join(" · ")}</p> : null;
 }
 
 function ResizeHandle({ width, onResize }: { width: number; onResize: (w: number) => void }) {
@@ -445,6 +492,8 @@ function usePanelWidth(): [number, (w: number) => void] {
 }
 
 function exists(model: Model, key: string, landscape?: LandscapeInfo): boolean {
+  if (key.startsWith("data:")) return !!new DataRegistry(model).entry(key.slice(5));
+  if (key.startsWith("field:")) return lineage(model, key.slice(6)) !== undefined;
   if (key.startsWith("domain:")) return !!landscape?.domains.some((d) => d.id === key.slice(7));
   if (key.startsWith("actor:")) return model.actors.has(key.slice(6));
   if (key.startsWith("element:")) return model.elements.has(key.slice(8));

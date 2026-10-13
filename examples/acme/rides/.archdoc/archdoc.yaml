@@ -49,7 +49,16 @@ journeys:
         to: payments.charges
         action: Asks for a refund
         sends: payments.RefundRequest
-        creates: { payments.Refund: { status: approved } }
-        changes: { payments.Charge.status: captured -> partially_refunded }
-      - { from: payments.charges, to: payments.ledger, action: Records the refund, sends: payments.LedgerEntry }
-      - { from: payments.charges, to: trips.trips-api, action: Publishes refund.issued; the trip is marked refunded, sends: payments.RefundIssued, changes: { trips.Trip.status: completed -> refunded } }
+        via: payments.request-to-refund
+        decides: payments.refund-approval
+        branches:
+          auto-approve:
+            creates: { payments.Refund: { status: approved } }
+            changes: { payments.Charge.status: captured -> partially_refunded }
+          needs-finance-approval:
+            creates: { payments.Refund: { status: pending_approval } }
+          escalate-to-safety:
+            creates: { payments.Refund: { status: pending_approval } }
+      - { from: payments.charges, to: payments.ledger, action: Records the refund, when: auto-approve, via: payments.refund-to-ledger, sends: payments.LedgerEntry }
+      - { from: payments.charges, to: trips.trips-api, action: Publishes refund.issued, when: auto-approve, via: payments.refund-issued, sends: payments.RefundIssued }
+      - { from: trips.trips-api, to: trips.trips-db, action: Marks the trip refunded, when: auto-approve, via: trips.refund-marks-trip, changes: { trips.Trip.status: completed -> refunded } }

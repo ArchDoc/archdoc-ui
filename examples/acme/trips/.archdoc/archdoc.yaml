@@ -39,6 +39,16 @@ data:
       rider_id: {}
       rider_email: { classification: pii }
       fare_cents: {}
+      refunded_cents: {}
       status: {}
     states:
       - requested -> completed -> refunded
+
+mappings:
+  refund-marks-trip:
+    description: When payments issues a refund, the trip records how much was refunded.
+    from: { issued: payments.RefundIssued }
+    to: trips-db.trips
+    code: services/trips/refunds/listener.kt
+    fields:
+      refunded_cents: issued.amount_cents
