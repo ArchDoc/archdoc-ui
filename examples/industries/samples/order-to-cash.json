@@ -1,0 +1,129 @@
+{
+  "OrderRequest": {
+    "ref": "1001",
+    "customer_id": "cust-1",
+    "ship_to": "addr-1",
+    "total_cents": 81000
+  },
+  "BankTransaction": {
+    "reference": "1001",
+    "customer_id": "cust-1",
+    "amount_cents": 81000,
+    "currency": "GBP"
+  },
+  "Customer": [
+    {
+      "id": "cust-1",
+      "name": "Corner Shop Ltd",
+      "territory_id": "ter-north",
+      "sales_rep_id": "rep-1",
+      "currency": "GBP",
+      "credit_limit_cents": 500000,
+      "balance_cents": 50000,
+      "on_hold": false
+    },
+    {
+      "id": "cust-2",
+      "name": "Big Box Retail",
+      "territory_id": "ter-south",
+      "sales_rep_id": "rep-2",
+      "currency": "EUR",
+      "credit_limit_cents": 2000000,
+      "balance_cents": 1990000,
+      "on_hold": false
+    },
+    {
+      "id": "cust-3",
+      "name": "Late Payers plc",
+      "territory_id": "ter-north",
+      "sales_rep_id": "rep-1",
+      "currency": "GBP",
+      "credit_limit_cents": 100000,
+      "balance_cents": 0,
+      "on_hold": true
+    }
+  ],
+  "Currency": [{ "code": "GBP", "name": "Pound sterling" }, { "code": "EUR", "name": "Euro" }],
+  "TaxRate": [{ "id": "vat-20", "percent": 20 }, { "id": "vat-0", "percent": 0 }],
+  "Territory": [{ "id": "ter-north", "name": "North" }, { "id": "ter-south", "name": "South" }],
+  "SalesRep": [
+    { "id": "rep-1", "name": "Priya", "territory_id": "ter-north" },
+    { "id": "rep-2", "name": "Tom", "territory_id": "ter-south" }
+  ],
+  "Address": [
+    { "id": "addr-1", "customer_id": "cust-1", "line1": "1 High St", "country": "GB" },
+    { "id": "addr-2", "customer_id": "cust-2", "line1": "Retail Park", "country": "IE" }
+  ],
+  "Contact": [
+    { "id": "con-1", "customer_id": "cust-1", "email": "buying@corner.example" },
+    { "id": "con-2", "customer_id": "cust-2", "email": "ap@bigbox.example" }
+  ],
+  "Category": [
+    { "id": "cat-home", "name": "Home", "parent_id": "" },
+    { "id": "cat-gadgets", "name": "Gadgets", "parent_id": "cat-home" },
+    { "id": "cat-widgets", "name": "Widgets", "parent_id": "cat-home" }
+  ],
+  "Product": [
+    { "id": "prod-widget", "name": "Widget", "category_id": "cat-widgets" },
+    { "id": "prod-gadget", "name": "Gadget", "category_id": "cat-gadgets" }
+  ],
+  "Variant": [
+    { "sku": "WID-RED", "product_id": "prod-widget", "colour": "red" },
+    { "sku": "WID-BLK", "product_id": "prod-widget", "colour": "black" },
+    { "sku": "GAD-BLU", "product_id": "prod-gadget", "colour": "blue" }
+  ],
+  "PriceList": [{ "id": "pl-GBP", "currency": "GBP" }, { "id": "pl-EUR", "currency": "EUR" }],
+  "PriceItem": [
+    { "id": "pi-1", "price_list_id": "pl-GBP", "sku": "WID-RED", "unit_price_cents": 1200 },
+    { "id": "pi-2", "price_list_id": "pl-GBP", "sku": "GAD-BLU", "unit_price_cents": 4500 },
+    { "id": "pi-3", "price_list_id": "pl-EUR", "sku": "WID-BLK", "unit_price_cents": 1400 }
+  ],
+  "Warehouse": [{ "id": "wh-north", "name": "Leeds" }, { "id": "wh-south", "name": "Bristol" }],
+  "Stock": [
+    {
+      "id": "st-1",
+      "warehouse_id": "wh-north",
+      "sku": "WID-RED",
+      "on_hand": 120,
+      "status": "available"
+    },
+    {
+      "id": "st-2",
+      "warehouse_id": "wh-north",
+      "sku": "GAD-BLU",
+      "on_hand": 15,
+      "status": "available"
+    },
+    { "id": "st-3", "warehouse_id": "wh-south", "sku": "WID-BLK", "on_hand": 0, "status": "empty" }
+  ],
+  "Order": [
+    {
+      "id": "so-0950",
+      "customer_id": "cust-2",
+      "ship_to": "addr-2",
+      "price_list_id": "pl-EUR",
+      "sales_rep_id": "rep-2",
+      "total_cents": 70000,
+      "status": "invoiced"
+    }
+  ],
+  "OrderLine": [
+    {
+      "id": "ol-0950-1",
+      "order_id": "so-0950",
+      "sku": "WID-BLK",
+      "quantity": 50,
+      "unit_price_cents": 1400,
+      "tax_rate_id": "vat-0"
+    }
+  ],
+  "Invoice": [
+    {
+      "id": "inv-so-0950",
+      "order_id": "so-0950",
+      "customer_id": "cust-2",
+      "total_cents": 70000,
+      "status": "open"
+    }
+  ]
+}

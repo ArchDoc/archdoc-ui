@@ -1,13 +1,19 @@
-import type { JourneyNode, Model, ModelDiff, Simulation } from "@archdoc/core/browser";
+import {
+  fieldReferences,
+  type JourneyNode,
+  type Model,
+  type ModelDiff,
+  type Simulation,
+} from "@archdoc/core/browser";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type DataFocus, dataFocus, lineageFocus, stepData } from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
-import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
+import { buildGraph, type Graph, journeyEdges, rowFields, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
 import { type Layout, layoutGraph, type Point } from "../graph/layout.js";
 import { edgeTypes, type RoutedEdge } from "./edges.js";
-import { type CardNode, type Emphasis, nodeTypes, type TableNode } from "./nodes.js";
+import { type CardNode, type Emphasis, nodeTypes, type RowNode, type TableNode } from "./nodes.js";
 
 export interface CanvasProps {
   model: Model;
@@ -26,6 +32,8 @@ export interface CanvasProps {
   onToggle: (elementId: string) => void;
   /** Show or hide a datastore's tables. */
   onTables: (elementId: string) => void;
+  /** During a journey: show an open datastore's schema or its rows. */
+  onStoreView: (elementId: string, view: "erd" | "rows") => void;
   /** Show changes against a base model. */
   compare?: { base: Model; diff: ModelDiff } | undefined;
 }
@@ -82,6 +90,8 @@ export function Canvas(props: CanvasProps) {
     if (selected?.startsWith("field:")) return lineageFocus(model, view, selected.slice(6));
     return undefined;
   }, [model, view, selected]);
+  const fieldRefs = useMemo(() => fieldReferences(model), [model]);
+
   // What the current journey step sends, and the records it writes.
   const current = useMemo(
     () => (journey ? stepData(model, journey, step, props.simulation) : undefined),
@@ -93,11 +103,19 @@ export function Canvas(props: CanvasProps) {
     const out = new Map<string, "current" | "highlight">();
     if (!focus) return out;
     for (const n of graph.nodes) {
-      const i = n.table ? focus.entries.indexOf(n.table.entry) : -1;
+      const i = n.kind === "table" && n.table ? focus.entries.indexOf(n.table.entry) : -1;
       if (i >= 0) out.set(n.id, i === 0 ? "current" : "highlight");
     }
+    // In a big schema, the tables a selected one is linked to by foreign keys.
+    if (selected?.startsWith("data:")) {
+      for (const e of graph.edges) {
+        if (!e.reference) continue;
+        if (out.get(e.source) === "current" && !out.has(e.target)) out.set(e.target, "highlight");
+        if (out.get(e.target) === "current" && !out.has(e.source)) out.set(e.source, "highlight");
+      }
+    }
     return out;
-  }, [focus, graph]);
+  }, [focus, graph, selected]);
 
   const emphasis = useMemo(() => {
     const map = new Map<string, Emphasis>();
@@ -114,7 +132,16 @@ export function Canvas(props: CanvasProps) {
         ...(current?.message?.entries.map((e) => e.entry) ?? []),
       ]);
       for (const n of graph.nodes) {
-        if (n.table && touched.has(n.table.entry)) map.set(n.id, "current");
+        if (n.kind === "table" && n.table && touched.has(n.table.entry)) map.set(n.id, "current");
+        // Rows: the ones this step writes; the rows they point at are lit, the rest dim.
+        if (n.row) map.set(n.id, n.row.isNew || n.row.changed.size ? "current" : "dim");
+      }
+      for (const e of graph.edges) {
+        if (!e.id.startsWith("rowref:")) continue;
+        if (map.get(e.source) === "current" && map.get(e.target) === "dim")
+          map.set(e.target, "highlight");
+        if (map.get(e.target) === "current" && map.get(e.source) === "dim")
+          map.set(e.source, "highlight");
       }
       for (const s of steps) {
         const current = s.step === step;
@@ -143,16 +170,68 @@ export function Canvas(props: CanvasProps) {
   }, [journey, steps, step, selected, graph, focus, focusTables, current]);
   const dimming = journey !== undefined || selected !== undefined;
 
-  const nodes = useMemo<(CardNode | TableNode)[]>(() => {
+  const nodes = useMemo<(CardNode | TableNode | RowNode)[]>(() => {
     if (!layout) return [];
+    const shortEntry = (entry: string) =>
+      entry.startsWith(`${model.namespace}.`) ? entry.slice(model.namespace.length + 1) : entry;
     const references = new Map<string, Set<string>>();
     for (const e of layout.graph.edges) {
       if (!e.reference) continue;
       references.set(e.source, (references.get(e.source) ?? new Set()).add(e.reference.field));
     }
-    return layout.graph.nodes.flatMap((n): (CardNode | TableNode)[] => {
+    return layout.graph.nodes.flatMap((n): (CardNode | TableNode | RowNode)[] => {
       const box = layout.boxes.get(n.id);
       if (!box) return [];
+      if (n.row) {
+        const r = n.row;
+        return [
+          {
+            id: n.id,
+            type: "row" as const,
+            position: { x: box.x, y: box.y },
+            parentId: n.parentId,
+            width: box.width,
+            height: box.height,
+            selectable: false,
+            draggable: false,
+            zIndex: 3,
+            data: {
+              row: r,
+              label: shortEntry(r.entry),
+              fields: rowFields(r, fieldRefs),
+              references: new Set(fieldRefs.filter((x) => x.entry === r.entry).map((x) => x.field)),
+              emphasis: emphasis.get(n.id) ?? "normal",
+            },
+          },
+        ];
+      }
+      if (n.kind === "rowgroup" && n.table) {
+        const t = n.table;
+        const count = layout.graph.nodes.filter((x) => x.parentId === n.id).length;
+        return [
+          {
+            id: n.id,
+            type: "card" as const,
+            position: { x: box.x, y: box.y },
+            parentId: n.parentId,
+            width: box.width,
+            height: box.height,
+            selectable: false,
+            draggable: false,
+            zIndex: 1,
+            data: {
+              family: "group" as const,
+              label: shortEntry(t.entry),
+              kind: "rows",
+              detail: `${t.table} · ${count} row${count === 1 ? "" : "s"}`,
+              hiddenChildren: 0,
+              isGroup: true,
+              emphasis: "normal" as const,
+              selected: false,
+            },
+          },
+        ];
+      }
       if (n.table) {
         const t = n.table;
         const prefix = `${t.entry}.`;
@@ -221,6 +300,16 @@ export function Canvas(props: CanvasProps) {
                 ? () => props.onTables(element.id)
                 : undefined,
             tablesOpen: element ? view.tables?.has(element.id) : undefined,
+            storeView:
+              journey && element && view.tables?.has(element.id)
+                ? view.rows?.stores.has(element.id)
+                  ? ("rows" as const)
+                  : ("erd" as const)
+                : undefined,
+            onStoreView:
+              journey && element && view.tables?.has(element.id)
+                ? (v: "erd" | "rows") => props.onStoreView(element.id, v)
+                : undefined,
           },
         },
       ];
@@ -242,6 +331,10 @@ export function Canvas(props: CanvasProps) {
     step,
     focus,
     current,
+    fieldRefs,
+    view.rows,
+    props.onStoreView,
+    journey,
   ]);
 
   const edges = useMemo<RoutedEdge[]>(() => {
@@ -264,7 +357,11 @@ export function Canvas(props: CanvasProps) {
     }
     const regular: RoutedEdge[] = layout.graph.edges.map((e) => {
       if (e.reference) {
-        const lit = focusTables.has(e.source) || focusTables.has(e.target);
+        const lit =
+          focusTables.has(e.source) ||
+          focusTables.has(e.target) ||
+          emphasis.get(e.source) === "current" ||
+          emphasis.get(e.target) === "current";
         return {
           id: e.id,
           type: "routed" as const,
@@ -364,6 +461,7 @@ export function Canvas(props: CanvasProps) {
     focus,
     focusTables,
     current,
+    emphasis,
     props.simulation,
   ]);
 
@@ -433,19 +531,30 @@ export function Canvas(props: CanvasProps) {
     if (!focusKey) lastFocusKey.current = undefined;
   }, [focusKey]);
 
-  // Keep the current journey step in view.
+  // Keep the current journey step in view: its arrow, or the rows and tables it writes.
+  const written = useMemo(
+    () =>
+      layout && layout.graph === graph
+        ? graph.nodes
+            .filter((n) => (n.row || n.kind === "table") && emphasis.get(n.id) === "current")
+            .map((n) => n.id)
+        : undefined,
+    [layout, graph, emphasis],
+  );
   useEffect(() => {
     const current = steps.find((s) => s.step === step);
-    if (!current) return;
+    if (!current || !written) return;
+    // The rows or tables themselves: the step's target may be the whole datastore around them.
+    const targets = written.length ? written : [current.source, current.target];
     requestAnimationFrame(() => {
       void flow.fitView({
-        nodes: [{ id: current.source }, { id: current.target }],
+        nodes: targets.map((id) => ({ id })),
         duration: 450,
-        padding: 0.5,
+        padding: written.length ? 0.35 : 0.5,
         maxZoom: 1.1,
       });
     });
-  }, [steps, step, flow]);
+  }, [steps, step, flow, written]);
 
   return (
     <ReactFlow

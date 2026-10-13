@@ -1,5 +1,11 @@
 import type { JourneyNode, Model, Relationship, Target } from "@archdoc/core/browser";
-import { DataRegistry, fieldReferences, nodeKey, qualifyData } from "@archdoc/core/browser";
+import {
+  DataRegistry,
+  type FieldReference,
+  fieldReferences,
+  nodeKey,
+  qualifyData,
+} from "@archdoc/core/browser";
 import type { Grouping } from "./groups.js";
 
 /** What the canvas shows: which elements are open, and an optional focus. */
@@ -12,9 +18,37 @@ export interface ViewState {
   grouping?: Grouping | undefined;
   /** Datastore element IDs opened to show their tables. */
   tables?: ReadonlySet<string> | undefined;
+  /** Opened datastores that show their rows instead of their tables, and the rows, by qualified entry. */
+  rows?: { stores: ReadonlySet<string>; data: ReadonlyMap<string, RowInfo[]> } | undefined;
 }
 
-export type GraphNodeKind = "actor" | "element" | "external" | "group" | "table";
+/** A record in a datastore, as a journey has it at the current step. */
+export interface RowInfo {
+  /** Qualified entry. */
+  entry: string;
+  /** The value of its key, when it has one. */
+  id?: string | undefined;
+  record: Record<string, unknown>;
+  /** existing: in the sample before the journey; created: by a step. */
+  origin: "existing" | "created";
+  /** The step (0-based) that created or last changed it. */
+  step?: number | undefined;
+  /** Fields the current step set or changed. */
+  changed: ReadonlySet<string>;
+  /** Created by the current step. */
+  isNew: boolean;
+  /** Values are what the steps declare, not a simulation's. */
+  declared?: boolean | undefined;
+}
+
+export type GraphNodeKind =
+  | "actor"
+  | "element"
+  | "external"
+  | "group"
+  | "table"
+  | "rowgroup"
+  | "row";
 
 /** A datastore's table, drawn inside it: the entry it stores and its fields. */
 export interface TableInfo {
@@ -24,6 +58,8 @@ export interface TableInfo {
   entry: string;
   key?: string | undefined;
   fields: { name: string; type?: string | undefined; classification?: string | undefined }[];
+  /** Fields left out of a big schema's compact tables. */
+  hidden?: number | undefined;
 }
 
 export interface GraphNode {
@@ -39,8 +75,10 @@ export interface GraphNode {
   depth: number;
   /** A box sized by its content, such as a table. Defaults to a card's size. */
   size?: { width: number; height: number } | undefined;
-  /** For a table: what it stores. */
+  /** For a table (or a group of rows): what it stores. */
   table?: TableInfo | undefined;
+  /** For a row: the record. */
+  row?: RowInfo | undefined;
 }
 
 export interface GraphEdge {
@@ -128,45 +166,118 @@ export function buildGraph(model: Model, state: ViewState): Graph {
     });
   }
 
-  // Opened datastores show a table per entry they store, with lines for foreign keys.
+  // Opened datastores show a table per entry they store, with lines for foreign
+  // keys; in rows mode, the rows a journey has so far, with lines between them.
   const tableEdges: GraphEdge[] = [];
   if (state.tables?.size) {
     const registry = new DataRegistry(model);
+    const references = fieldReferences(model, registry);
     const byEntry = new Map<string, string>();
+    const rowNodes = new Map<string, { node: string; row: RowInfo }[]>();
     for (const id of state.tables) {
       const el = model.elements.get(id);
       if (!el || !nodes.has(`element:${id}`)) continue;
-      for (const [table, s] of Object.entries(el.spec.stores ?? {})) {
+      const stores = Object.entries(el.spec.stores ?? {});
+      const asRows = state.rows?.stores.has(id);
+      // A big schema shows keys, foreign keys, and sensitive fields; the rest are counted.
+      const compact = stores.length > COMPACT_OVER;
+      for (const [table, s] of stores) {
         const entry = qualifyData(s.entity, model.namespace);
-        const fields = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
+        const key = s.key ?? "id";
+        if (asRows) {
+          const rows = state.rows?.data.get(entry) ?? [];
+          if (!rows.length) continue;
+          const group = `rowgroup:${id}:${table}`;
+          nodes.set(group, {
+            id: group,
+            kind: "rowgroup",
+            parentId: `element:${id}`,
+            isGroup: true,
+            hiddenChildren: 0,
+            depth: el.depth + 1,
+            table: { element: id, table, entry, key, fields: [] },
+          });
+          const list = rowNodes.get(entry) ?? [];
+          rows.forEach((row, i) => {
+            const node = `row:${id}:${table}:${i}`;
+            nodes.set(node, {
+              id: node,
+              kind: "row",
+              parentId: group,
+              isGroup: false,
+              hiddenChildren: 0,
+              depth: el.depth + 2,
+              size: rowSize(row, references),
+              row,
+            });
+            list.push({ node, row });
+          });
+          rowNodes.set(entry, list);
+          continue;
+        }
+        const all = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
           ([name, f]) => ({ name, type: f.type, classification: f.classification }),
         );
-        const key = tableKey(id, table);
-        if (!byEntry.has(entry)) byEntry.set(entry, key);
-        nodes.set(key, {
-          id: key,
+        const linked = new Set(references.filter((r) => r.entry === entry).map((r) => r.field));
+        const fields = compact
+          ? all.filter(
+              (f) =>
+                f.name === key ||
+                linked.has(f.name) ||
+                (f.classification && !ROUTINE.has(f.classification)),
+            )
+          : all;
+        const node = tableKey(id, table);
+        if (!byEntry.has(entry)) byEntry.set(entry, node);
+        nodes.set(node, {
+          id: node,
           kind: "table",
           parentId: `element:${id}`,
           isGroup: false,
           hiddenChildren: 0,
           depth: el.depth + 1,
-          size: tableSize(fields.length),
-          table: { element: id, table, entry, key: s.key, fields },
+          size: tableSize(fields.length + (fields.length < all.length ? 1 : 0)),
+          table: {
+            element: id,
+            table,
+            entry,
+            key: s.key,
+            fields,
+            hidden: all.length - fields.length,
+          },
         });
       }
     }
-    for (const r of fieldReferences(model, registry)) {
+    for (const r of references) {
       const source = byEntry.get(r.entry);
       const target = byEntry.get(r.to.entry);
-      if (!source || !target || source === target) continue;
-      tableEdges.push({
-        id: `ref:${source}.${r.field}->${target}`,
-        source,
-        target,
-        relationships: [],
-        planned: false,
-        reference: { field: r.field, to: r.to.field },
-      });
+      if (source && target && source !== target) {
+        tableEdges.push({
+          id: `ref:${source}.${r.field}->${target}`,
+          source,
+          target,
+          relationships: [],
+          planned: false,
+          reference: { field: r.field, to: r.to.field },
+        });
+      }
+      // Row to row: the row whose key is the value this row's field holds.
+      for (const from of rowNodes.get(r.entry) ?? []) {
+        const value = from.row.record[r.field];
+        if (value === undefined || value === null || value === "") continue;
+        const to = (rowNodes.get(r.to.entry) ?? []).find(
+          (t) => t.node !== from.node && String(t.row.record[r.to.field]) === String(value),
+        );
+        if (!to) continue;
+        tableEdges.push({
+          id: `rowref:${from.node}.${r.field}->${to.node}`,
+          source: from.node,
+          target: to.node,
+          relationships: [],
+          planned: false,
+          reference: { field: r.field, to: r.to.field },
+        });
+      }
     }
   }
 
@@ -269,6 +380,24 @@ export function tableKey(element: string, table: string): string {
 
 function tableSize(rows: number): { width: number; height: number } {
   return { width: TABLE_WIDTH, height: TABLE_HEADER + Math.max(1, rows) * TABLE_ROW + 8 };
+}
+
+/** Stores with more tables than this show compact tables. */
+export const COMPACT_OVER = 6;
+const ROUTINE = new Set(["public", "internal"]);
+export const ROW_WIDTH = 210;
+
+/** The fields a row card shows: its key, what it points at, and what just changed. */
+export function rowFields(row: RowInfo, references: readonly FieldReference[]): string[] {
+  const linked = references.filter((r) => r.entry === row.entry).map((r) => r.field);
+  const shown = Object.keys(row.record).filter(
+    (f) => linked.includes(f) || row.changed.has(f) || f === "status",
+  );
+  return shown.slice(0, 6);
+}
+
+function rowSize(row: RowInfo, references: readonly FieldReference[]) {
+  return { width: ROW_WIDTH, height: 34 + rowFields(row, references).length * 18 + 6 };
 }
 
 /** The steps of a journey as edges between visible nodes. */

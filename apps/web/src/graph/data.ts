@@ -13,7 +13,7 @@ import {
   type StepMessage,
   stepMessage,
 } from "@archdoc/core/browser";
-import { liftKey, type ViewState } from "./graph.js";
+import { liftKey, type RowInfo, type ViewState } from "./graph.js";
 
 /** Classifications that don't need a reviewer's attention. */
 const ROUTINE = new Set(["public", "internal"]);
@@ -367,4 +367,110 @@ function shortRef(entry: string, ns: string): string {
 
 function show(v: unknown): string {
   return typeof v === "string" ? v : JSON.stringify(v);
+}
+
+/**
+ * The rows a journey has by step `index`, by qualified entry: the sample's
+ * rows, then every record a step created or changed. Without a simulation,
+ * the records the steps declare, from steps that always run.
+ */
+export function journeyRows(
+  model: Model,
+  journey: JourneyNode,
+  index: number,
+  simulation?: Simulation,
+): Map<string, RowInfo[]> {
+  const registry = new DataRegistry(model);
+  const keyOf = (entry: string) => {
+    const at = registry.storedIn(entry)[0];
+    if (!at) return "id";
+    const store = registry.models.get(at.namespace)?.elements.get(at.element);
+    return store?.spec.stores?.[at.table]?.key ?? "id";
+  };
+  const rows = new Map<string, RowInfo[]>();
+  const list = (entry: string) => {
+    const l = rows.get(entry) ?? [];
+    rows.set(entry, l);
+    return l;
+  };
+  const idOf = (entry: string, record: Record<string, unknown>) => {
+    const v = record[keyOf(entry)];
+    return v === undefined || v === null ? undefined : String(v);
+  };
+  const sim = simulation?.journey === journey.id ? simulation : undefined;
+
+  if (sim) {
+    for (const [entry, seeded] of Object.entries(sim.seed)) {
+      for (const record of seeded) {
+        list(entry).push({
+          entry,
+          id: idOf(entry, record),
+          record: { ...record },
+          origin: "existing",
+          changed: new Set(),
+          isNew: false,
+        });
+      }
+    }
+    for (const s of sim.steps.slice(0, index + 1)) {
+      if (!s.ran) continue;
+      const current = s.step - 1 === index;
+      for (const e of s.events) {
+        if (e.kind === "sent") continue;
+        const l = list(e.entry);
+        const id = idOf(e.entry, e.record);
+        // The row it is, by key; a change with no key changes the row the journey reads.
+        const existing =
+          (id !== undefined ? l.find((r) => r.id === id) : undefined) ??
+          (e.kind === "changed" ? l[0] : undefined);
+        const changed = new Set(e.fields.map((f) => f.field));
+        if (existing) {
+          existing.record = { ...existing.record, ...e.record };
+          existing.id = idOf(e.entry, existing.record);
+          existing.step = s.step - 1;
+          existing.changed = current ? changed : new Set();
+          existing.isNew = current && e.kind === "created" && existing.origin === "created";
+        } else {
+          l.push({
+            entry: e.entry,
+            id,
+            record: { ...e.record },
+            origin: "created",
+            step: s.step - 1,
+            changed: current ? changed : new Set(),
+            isNew: current,
+          });
+        }
+      }
+    }
+    return new Map([...rows].filter(([, l]) => l.length));
+  }
+
+  for (const s of journey.steps.slice(0, index + 1)) {
+    if (s.spec.when) continue;
+    const current = s.index === index;
+    for (const w of stepData(model, journey, s.index).writes) {
+      if (w.when) continue;
+      const record = Object.fromEntries(w.values);
+      const l = list(w.entry);
+      const existing = !w.created ? l[l.length - 1] : undefined;
+      if (existing) {
+        Object.assign(existing.record, record);
+        existing.step = s.index;
+        existing.changed = current ? new Set(w.values.keys()) : new Set();
+        continue;
+      }
+      l.push({
+        entry: w.entry,
+        id: idOf(w.entry, record),
+        record,
+        origin: "created",
+        step: s.index,
+        changed: current ? new Set(w.values.keys()) : new Set(),
+        isNew: current,
+        declared: true,
+      });
+    }
+  }
+  return new Map([...rows].filter(([, l]) => l.length));
 }

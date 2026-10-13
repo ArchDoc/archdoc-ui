@@ -258,9 +258,11 @@ export function SimulatePanel(props: {
   const [text, setText] = useState(skeleton);
   const [error, setError] = useState<string>();
   useEffect(() => {
-    setText(props.samples[0]?.text ?? skeleton);
+    // A sample named after the journey, else the first one.
+    const named = props.samples.find((s) => (s.path.split("/").pop() ?? "").startsWith(journey.id));
+    setText((named ?? props.samples[0])?.text ?? skeleton);
     setError(undefined);
-  }, [skeleton, props.samples]);
+  }, [skeleton, props.samples, journey.id]);
 
   const run = () => {
     try {

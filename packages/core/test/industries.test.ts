@@ -25,11 +25,12 @@ const load = (name: string, edit: (text: string) => string = (t) => t): Model =>
   ]);
 
 describe("industry examples", () => {
-  it("cover healthcare, banking, e-commerce, logistics, insurance, and energy", () => {
+  it("cover healthcare, banking, e-commerce, logistics, insurance, energy, and an ERP", () => {
     expect(names.sort()).toEqual([
       "banking",
       "ecommerce",
       "energy",
+      "erp",
       "healthcare",
       "insurance",
       "logistics",
@@ -201,6 +202,61 @@ describe("industry decisions", () => {
       MonthlyTotal: { account_id: "a-1", kwh: 300 },
     });
     expect(bill.records["grid.Bill"]).toMatchObject({ amount_pence: 8850, status: "issued" });
+  });
+});
+
+describe("a big schema", () => {
+  const m = load("erp");
+  const sample = JSON.parse(
+    readFileSync(new URL("samples/order-to-cash.json", dir), "utf8"),
+  ) as Record<string, unknown>;
+
+  it("keeps 24 tables in one database, most linked by foreign keys", () => {
+    expect(Object.keys(m.elements.get("erp-db")?.spec.stores ?? {})).toHaveLength(24);
+    expect(fieldReferences(m).length).toBeGreaterThan(30);
+  });
+
+  it("takes an order to cash, creating rows that point at the sample's and at each other", () => {
+    const sim = run(m, "order-to-cash", sample);
+    expect(sim.outcomes).toEqual(["confirm"]);
+    expect(sim.steps.every((s) => s.ran)).toBe(true);
+    // The sample's rows are passed on; the first of each is the one the journey read.
+    expect(sim.seed["erp.Customer"]?.map((c) => c.id)).toEqual(["cust-1", "cust-2", "cust-3"]);
+    // The new order is a new row, not the sample's older one.
+    expect(sim.records["erp.Order"]).toMatchObject({
+      id: "so-1001",
+      price_list_id: "pl-GBP",
+      sales_rep_id: "rep-1",
+      status: "paid",
+    });
+    expect(sim.records["erp.Invoice"]).toMatchObject({ id: "inv-so-1001", status: "paid" });
+    const created = sim.steps.flatMap((s) =>
+      s.events.filter((e) => e.kind === "created").map((e) => `${e.entry}:${e.record.id}`),
+    );
+    expect(created).toEqual([
+      "erp.Order:so-1001",
+      "erp.OrderLine:ol-1",
+      "erp.OrderLine:ol-2",
+      "erp.Shipment:sh-1",
+      "erp.ShipmentLine:sl-1",
+      "erp.ShipmentLine:sl-2",
+      "erp.Invoice:inv-so-1001",
+      "erp.InvoiceLine:il-1",
+      "erp.InvoiceLine:il-2",
+      "erp.Payment:pay-1001",
+      "erp.Allocation:al-1",
+    ]);
+  });
+
+  it("holds orders from customers over their limit or on hold", () => {
+    const customers = sample.Customer as Record<string, unknown>[];
+    const as = (i: number) =>
+      run(m, "order-to-cash", {
+        ...sample,
+        Customer: [customers[i], ...customers.filter((_, j) => j !== i)],
+      }).outcomes;
+    expect(as(1)).toEqual(["credit-hold"]);
+    expect(as(2)).toEqual(["credit-hold"]);
   });
 });
 

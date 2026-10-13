@@ -157,6 +157,8 @@ data:
         { name: "id", type: "uuid", classification: undefined },
         { name: "card_last4", type: "string", classification: "pci" },
       ],
+      // A small schema shows every field.
+      hidden: 0,
     });
     expect(open.edges.map((e) => `${e.source}.${e.reference?.field} -> ${e.target}`)).toEqual([
       "table:db:refunds.charge_id -> table:db:charges",

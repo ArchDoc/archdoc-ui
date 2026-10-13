@@ -1725,3 +1725,181 @@ table.fields.compact caption {
   padding: 0;
   font-size: 0.8rem;
 }
+
+/* An open datastore during a journey: its schema, or its rows. */
+.store-view {
+  display: inline-flex;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.store-view button {
+  padding: 2px 8px;
+  border: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.store-view button.is-on {
+  background: var(--k-data);
+  color: #ffffff;
+}
+
+.store-view + .card-tables {
+  margin-left: 4px;
+}
+
+.table-more {
+  padding: 2px 10px 0 34px;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.68rem;
+}
+
+/* One record, during a journey. */
+.row-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--k-data);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  transition:
+    opacity 200ms ease,
+    box-shadow 300ms ease;
+}
+
+.row-card.origin-existing {
+  border-left-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.row-card.emphasis-current {
+  border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
+}
+
+.row-card.is-new {
+  animation: table-written 900ms ease-out;
+}
+
+.row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-id {
+  font-family: var(--f-mono);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.row-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 99px;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.row-badge.badge-new,
+.row-badge.badge-changed {
+  color: #ffffff;
+  background: var(--k-data);
+  border-color: var(--k-data);
+}
+
+.row-fields {
+  list-style: none;
+  margin: 0;
+  padding: 3px 0;
+}
+
+.row-fields li {
+  display: flex;
+  gap: 4px;
+  height: 18px;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.row-fields li.is-changed {
+  background: color-mix(in srgb, var(--k-data) 20%, transparent);
+  font-weight: 600;
+}
+
+.row-mark {
+  width: 10px;
+  color: var(--k-data);
+}
+
+.row-field {
+  font-family: var(--f-mono);
+  color: var(--muted);
+}
+
+.row-value {
+  margin-left: auto;
+  max-width: 55%;
+  font-family: var(--f-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.react-flow__edge[id^="rowref:"] path {
+  stroke-dasharray: none;
+}
+
+/* The datastores a journey writes to, in the journey bar. */
+.journey-bar-stores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 6px 0 2px;
+  font-size: 0.8rem;
+}
+
+.journey-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.journey-store .store-view {
+  margin: 0;
+}
+
+.row-card.emphasis-dim {
+  opacity: 0.45;
+}
+
+.row-card.emphasis-highlight {
+  border-color: var(--k-data);
+}

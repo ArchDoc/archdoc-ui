@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
-import { dataPlaces, journeyStores } from "./graph/data.js";
+import { dataPlaces, journeyRows, journeyStores } from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
   boundaryLabel,
@@ -80,8 +80,9 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   // The last simulation, with its sample, so it reruns when the model reloads.
   const [simRun, setSimRun] = useState<{ journey: string; sample: Record<string, unknown> }>();
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
-  // Datastores opened to show their tables.
+  // Datastores opened to show their tables, and those showing a journey's rows instead.
   const [tables, setTables] = useState<ReadonlySet<string>>(() => new Set());
+  const [rowStores, setRowStores] = useState<ReadonlySet<string>>(() => new Set());
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
   const [journeyId, setJourneyId] = useState<string>();
@@ -124,9 +125,20 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     () => (landscape ? groupLandscape(model, landscape, groupBy) : undefined),
     [model, landscape, groupBy],
   );
+  // The rows the journey has at the current step, for stores showing rows.
+  const rows = useMemo(
+    () => (journey && rowStores.size ? journeyRows(model, journey, step, simulation) : undefined),
+    [model, journey, step, simulation, rowStores],
+  );
   const view = useMemo(
-    () => ({ expanded, focus: focused && !journey ? selected : undefined, grouping, tables }),
-    [expanded, focused, journey, selected, grouping, tables],
+    () => ({
+      expanded,
+      focus: focused && !journey ? selected : undefined,
+      grouping,
+      tables,
+      rows: rows && { stores: rowStores, data: rows },
+    }),
+    [expanded, focused, journey, selected, grouping, tables, rows, rowStores],
   );
 
   const select = useCallback(
@@ -173,6 +185,21 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     [model],
   );
 
+  // Show an open datastore's schema or the journey's rows, and bring it into view.
+  const storeView = useCallback((id: string, v: "erd" | "rows") => {
+    setRowStores((prev) => {
+      const next = new Set(prev);
+      if (v === "rows") next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setCenterOn(`element:${id}`);
+  }, []);
+  const journeyStoreIds = useMemo(
+    () => (journey ? journeyStores(model, journey).filter((id) => tables.has(id)) : []),
+    [model, journey, tables],
+  );
+
   const toggleTables = useCallback((id: string) => {
     setTables((prev) => {
       const next = new Set(prev);
@@ -214,8 +241,11 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
           ]),
       );
       setTables((prev) => new Set([...prev, ...stores]));
+      // A sample named after the journey (samples/<journey>*.json) runs right away.
+      const sample = matchingSample(samples, id);
+      if (sample) setSimRun({ journey: id, sample });
     },
-    [model],
+    [model, samples],
   );
 
   const stepCount = journey?.steps.length ?? 0;
@@ -365,6 +395,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
             onSelect={select}
             onToggle={toggle}
             onTables={toggleTables}
+            onStoreView={storeView}
             compare={compare}
           />
         }
@@ -388,6 +419,42 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
                 Crosses from {boundaryLabel(grouping as Grouping, crossing.from)} to{" "}
                 {boundaryLabel(grouping as Grouping, crossing.to)}
               </p>
+            ) : null}
+            {journeyStoreIds.length ? (
+              <div className="journey-bar-stores">
+                {journeyStoreIds.map((id) => (
+                  <fieldset key={id} className="journey-store" aria-label={`${id}: schema or rows`}>
+                    <button
+                      type="button"
+                      className="link"
+                      title="Show it"
+                      onClick={() => setCenterOn(`element:${id}`)}
+                    >
+                      {model.elements.get(id)?.spec.name ?? id}
+                    </button>
+                    <span className="store-view">
+                      {(["erd", "rows"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className={
+                            (rowStores.has(id) ? "rows" : "erd") === v ? "is-on" : undefined
+                          }
+                          aria-pressed={(rowStores.has(id) ? "rows" : "erd") === v}
+                          onClick={() => storeView(id, v)}
+                        >
+                          {v === "erd" ? "ERD" : "Rows"}
+                        </button>
+                      ))}
+                    </span>
+                  </fieldset>
+                ))}
+                {!simulation && rowStores.size ? (
+                  <span className="muted">
+                    Rows show what the steps declare; run a sample for real values.
+                  </span>
+                ) : null}
+              </div>
             ) : null}
             <div className="journey-bar-controls">
               <button
@@ -528,6 +595,23 @@ function usePanelWidth(): [number, (w: number) => void] {
     }
   }, []);
   return [width, set];
+}
+
+/** The parsed sample whose file is named after a journey, such as samples/order-to-cash.json. */
+export function matchingSample(
+  samples: { path: string; text: string }[],
+  journey: string,
+): Record<string, unknown> | undefined {
+  const s = samples.find((x) => (x.path.split("/").pop() ?? "").startsWith(journey));
+  if (!s) return undefined;
+  try {
+    const parsed = JSON.parse(s.text) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The entries a field's lineage goes through. */

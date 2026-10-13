@@ -176,7 +176,7 @@ export function stepMessage(
       const a = fromChain[Math.min(depth, fromChain.length - 1)] as string;
       const b = toChain[Math.min(depth, toChain.length - 1)] as string;
       const found = flows.filter((f) => f.how !== "step" && key(f.from) === a && key(f.to) === b);
-      if (found.length) return pick(found);
+      if (found.length) return pick(found, writtenBy(model, step));
       // A call whose contract only says what it answers carries the answer, and a
       // subscription carries what the topic does.
       const answers = flows.filter(
@@ -191,7 +191,7 @@ export function stepMessage(
         chainOf(model, f.from).includes(key(from)) &&
         chainOf(model, f.to).includes(key(to)),
     );
-    if (inside.length) return pick(inside);
+    if (inside.length) return pick(inside, writtenBy(model, step));
   }
   // What a mapping the step writes through produces.
   const registry = step.spec.via ? new DataRegistry(model) : undefined;
@@ -205,11 +205,16 @@ export function stepMessage(
   return effects.length ? { data: [...new Set(effects)], how: "writes" } : undefined;
 }
 
-/** The flows of one kind, a request through a contract before its response. */
-function pick(found: DataFlow[]): StepMessage {
+/**
+ * The flows of one kind, a request through a contract before its response;
+ * of what a relationship sends, the entries the step writes, when it says.
+ */
+function pick(found: DataFlow[], written: readonly string[] = []): StepMessage {
   const order = ["sends", "accepts", "carries", "returns"] as const;
   const how = order.find((h) => found.some((f) => f.how === h)) ?? "sends";
-  return { data: [...new Set(found.filter((f) => f.how === how).map((f) => f.data))], how };
+  const data = [...new Set(found.filter((f) => f.how === how).map((f) => f.data))];
+  const narrowed = data.filter((d) => written.includes(d));
+  return { data: narrowed.length ? narrowed : data, how };
 }
 
 /** A step's journey-level key for a target: `id` of an element or actor, the ref of an external. */
@@ -225,6 +230,21 @@ function chainOf(model: Model, t: Target): string[] {
     out.push(`element:${p}`);
   }
   return out;
+}
+
+/** The entries a step writes, as written in it (unqualified when they're local). */
+function writtenBy(model: Model, step: JourneyStep): string[] {
+  const all = [
+    ...writes(step.spec),
+    ...Object.values(step.spec.branches ?? {}).flatMap((b) => writes(b)),
+  ];
+  const mapping = step.spec.via ? new DataRegistry(model).mapping(step.spec.via) : undefined;
+  if (mapping) {
+    const t = new DataRegistry(model).target(mapping.node.spec.to, mapping.namespace);
+    if (t) all.push(t.entry);
+  }
+  const ns = `${model.namespace}.`;
+  return all.flatMap((e) => (e.startsWith(ns) ? [e, e.slice(ns.length)] : [e, `${ns}${e}`]));
 }
 
 /** The entries a step (or branch) creates or changes. */

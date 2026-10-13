@@ -1,6 +1,6 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import type { MouseEvent } from "react";
-import type { TableInfo } from "../graph/graph.js";
+import type { RowInfo, TableInfo } from "../graph/graph.js";
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
@@ -29,6 +29,9 @@ export interface CardData extends Record<string, unknown> {
   /** A datastore: show or hide the tables it stores. */
   onTables?: (() => void) | undefined;
   tablesOpen?: boolean | undefined;
+  /** An open datastore during a journey: show its schema, or the rows the journey has. */
+  storeView?: "erd" | "rows" | undefined;
+  onStoreView?: ((view: "erd" | "rows") => void) | undefined;
 }
 
 export type CardNode = Node<CardData, "card">;
@@ -95,6 +98,24 @@ export function Card({ data }: NodeProps<CardNode>) {
         ) : null}
         {data.status && data.status !== "active" ? (
           <span className="card-status">{data.status}</span>
+        ) : null}
+        {data.onStoreView ? (
+          <fieldset className="store-view nodrag" aria-label="Show the schema or the rows">
+            {(["erd", "rows"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={data.storeView === v ? "is-on" : undefined}
+                aria-pressed={data.storeView === v}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onStoreView?.(v);
+                }}
+              >
+                {v === "erd" ? "ERD" : "Rows"}
+              </button>
+            ))}
+          </fieldset>
         ) : null}
         {data.onTables ? (
           <button
@@ -210,7 +231,14 @@ export function Table({ data }: NodeProps<TableNode>) {
             </button>
           </li>
         ))}
-        {table.fields.length === 0 ? <li className="table-empty">No fields modeled</li> : null}
+        {table.fields.length === 0 && !table.hidden ? (
+          <li className="table-empty">No fields modeled</li>
+        ) : null}
+        {table.hidden ? (
+          <li className="table-more">
+            +{table.hidden} more field{table.hidden === 1 ? "" : "s"}
+          </li>
+        ) : null}
       </ul>
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
@@ -219,4 +247,59 @@ export function Table({ data }: NodeProps<TableNode>) {
 
 const ROUTINE = new Set(["public", "internal"]);
 
-export const nodeTypes = { card: Card, table: Table };
+export interface RowData extends Record<string, unknown> {
+  row: RowInfo;
+  /** The entry, short. */
+  label: string;
+  /** The fields to show, in order. */
+  fields: string[];
+  /** Fields that point at another row. */
+  references: ReadonlySet<string>;
+  emphasis: Emphasis;
+}
+
+export type RowNode = Node<RowData, "row">;
+
+/** One record in a datastore during a journey: its key, what it points at, and what just changed. */
+export function Row({ data }: NodeProps<RowNode>) {
+  const { row } = data;
+  const badge = row.isNew
+    ? "new"
+    : row.changed.size
+      ? "changed"
+      : row.origin === "existing"
+        ? "existing"
+        : `step ${(row.step ?? 0) + 1}`;
+  return (
+    <div
+      className={`row-card emphasis-${data.emphasis} origin-${row.origin}${row.isNew ? " is-new" : ""}${row.changed.size ? " is-changed" : ""}`}
+      key={`${row.step ?? "x"}-${row.changed.size}`}
+      title={JSON.stringify(row.record, null, 2)}
+    >
+      <Handle type="target" position={Position.Left} className="handle" />
+      <div className="row-head">
+        <span className="row-name">
+          {data.label}
+          {row.id ? <span className="row-id"> {row.id}</span> : null}
+        </span>
+        <span className={`row-badge badge-${badge.split(" ")[0]}`}>{badge}</span>
+      </div>
+      <ul className="row-fields">
+        {data.fields.map((f) => (
+          <li key={f} className={row.changed.has(f) ? "is-changed" : undefined}>
+            <span className="row-mark">{data.references.has(f) ? "→" : ""}</span>
+            <span className="row-field">{f}</span>
+            <span className="row-value">{show(row.record[f])}</span>
+          </li>
+        ))}
+      </ul>
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+function show(v: unknown): string {
+  return v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
+}
+
+export const nodeTypes = { card: Card, table: Table, row: Row };
