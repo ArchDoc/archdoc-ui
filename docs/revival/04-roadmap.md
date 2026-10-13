@@ -98,7 +98,7 @@ Decided 2026-10-11: CEL expressions are evaluated with [`@marcbachmann/cel-js`](
 - [x] `mappings:` with CEL field expressions, which give field-level lineage across tables, datastores, and repos. `archdoc lineage <entity.field>` (5c).
 - [x] `logic:` blocks: decisions on request data written as CEL rules, linked to the implementing code (5c).
 - [x] Journey data annotations (`sends`, `decides`, `branches`, `creates`, `changes`, `via`, `when`) and `archdoc simulate <journey> --sample <file>` (5c). Simulation is deterministic: `now()` is a fixed time.
-- [ ] Checks:
+- [x] Checks:
   - [x] classification rules: `data: { classification, stored-in }` and `data: { classification, not-sent-to }`, as repo or org rules (5a)
   - [x] invalid state transitions, unknown fields, and values outside an enum (5a)
   - [x] steps and relationships that send data the target doesn't accept (5a)
