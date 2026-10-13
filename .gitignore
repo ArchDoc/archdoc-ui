@@ -6,3 +6,4 @@ coverage/
 .vscode/*
 !.vscode/extensions.json
 packages/cli/web/
+.playground/

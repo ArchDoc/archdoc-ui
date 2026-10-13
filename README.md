@@ -72,6 +72,14 @@ ArchDoc's own model is in [`.archdoc/`](./.archdoc). A model can live in one fil
 
 ## Try it
 
+The quickest way to see everything is the playground: one command sets up the demo org in [`examples/acme`](./examples/acme) (four repos, released and synced, with a branch ready for each scenario) in `.playground/`:
+
+```bash
+pnpm install && pnpm playground --open      # builds if needed, then opens the whole org in the explorer
+```
+
+`.playground/PLAYGROUND.md` ([what it sets up](./examples/acme/README.md#playground)) lists what to try: simulating a refund, field lineage across repos, and what a pull request would be told when it sends personal data to a third party, breaks an API another repo uses, loosens a decision, or renames a classified column. Run it again for a fresh copy.
+
 The packages aren't published yet, so run the CLI from a clone:
 
 ```bash
