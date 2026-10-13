@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codes, model, root } from "./helpers.js";
+import { codes, diagnostics, model, root } from "./helpers.js";
 
 const base = root(`
   actors:
@@ -35,13 +35,13 @@ describe("journey validation", () => {
       - { from: app, to: passenger }
       `),
     );
-    expect(m.diagnostics).toEqual([]);
+    expect(diagnostics(m)).toEqual([]);
     expect(m.journeys.get("j")?.steps[2]?.to).toMatchObject({ type: "external" });
   });
 
   it("accepts a coarse step backed by a finer relationship", () => {
     const m = model(journey("      - { from: platform, to: db }"));
-    expect(m.diagnostics).toEqual([]);
+    expect(diagnostics(m)).toEqual([]);
   });
 
   it("rejects a step without a relationship, with its location", () => {
@@ -51,7 +51,7 @@ describe("journey validation", () => {
       - { from: db, to: app }
       `),
     );
-    expect(m.diagnostics).toMatchObject([
+    expect(diagnostics(m)).toMatchObject([
       {
         code: "journey/broken-step",
         message: expect.stringContaining("step 2: platform.db → app"),
@@ -80,6 +80,6 @@ describe("journey validation", () => {
 
   it("reports steps that start in another repo as unverified", () => {
     const m = model(journey("      - { from: payments.charges, to: app }"));
-    expect(m.diagnostics).toMatchObject([{ severity: "info", code: "journey/unverified-step" }]);
+    expect(diagnostics(m)).toMatchObject([{ severity: "info", code: "journey/unverified-step" }]);
   });
 });

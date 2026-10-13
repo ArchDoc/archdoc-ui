@@ -11,7 +11,7 @@ import {
   type Model,
   serializeBundle,
 } from "../src/index.js";
-import { dedent } from "./helpers.js";
+import { dedent, diagnostics } from "./helpers.js";
 
 const bundleOf = (text: string, version: string, includes?: IncludedBundle[]): Bundle => {
   const b = createBundle([{ path: "archdoc.yaml", text: dedent(text) }], "archdoc.yaml", {
@@ -199,7 +199,10 @@ describe("composeLandscape", () => {
       from: "rides.api",
       to: "payments.charges",
     });
-    const errors = m.diagnostics.filter((d) => d.severity !== "info").map((d) => d.code);
+    // The fixture's journeys don't model data.
+    const errors = diagnostics(m)
+      .filter((d) => d.severity !== "info")
+      .map((d) => d.code);
     expect(errors).toEqual(["landscape/outside-reference"]);
     expect(m.diagnostics.find((d) => d.code === "landscape/outside-reference")?.message).toBe(
       "rides.api → zendesk.tickets points outside the landscape. Import that namespace in the landscape to include it.",

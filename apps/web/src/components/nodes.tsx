@@ -152,6 +152,8 @@ export interface TableData extends Record<string, unknown> {
   references: ReadonlySet<string>;
   /** Fields to light up, such as a lineage's. */
   lit?: ReadonlySet<string> | undefined;
+  /** What the current journey step writes: a new row, or changed fields, with their values. */
+  write?: { created: boolean; values: ReadonlyMap<string, string>; step: number } | undefined;
   onField?: ((field: string) => void) | undefined;
 }
 
@@ -161,15 +163,31 @@ export type TableNode = Node<TableData, "table">;
 export function Table({ data }: NodeProps<TableNode>) {
   const { table } = data;
   return (
-    <div className={`table-card emphasis-${data.emphasis}`}>
+    <div
+      className={`table-card emphasis-${data.emphasis}${data.write ? " is-written" : ""}`}
+      key={data.write ? `step-${data.write.step}` : undefined}
+    >
       <Handle type="target" position={Position.Left} className="handle" />
       <div className="table-head">
         <span className="table-name">{data.label}</span>
-        <span className="table-table">{table.table}</span>
+        {data.write ? (
+          <span className="table-write">{data.write.created ? "+ new row" : "~ updated"}</span>
+        ) : (
+          <span className="table-table">{table.table}</span>
+        )}
       </div>
       <ul className="table-rows">
         {table.fields.map((f) => (
-          <li key={f.name} className={data.lit?.has(f.name) ? "is-lit" : undefined}>
+          <li
+            key={f.name}
+            className={
+              data.write?.values.has(f.name)
+                ? "is-written"
+                : data.lit?.has(f.name)
+                  ? "is-lit"
+                  : undefined
+            }
+          >
             <button
               type="button"
               className="table-row nodrag"
@@ -186,7 +204,9 @@ export function Table({ data }: NodeProps<TableNode>) {
               {f.classification && !ROUTINE.has(f.classification) ? (
                 <span className="table-class">{f.classification}</span>
               ) : null}
-              <span className="table-type">{f.type ?? ""}</span>
+              <span className="table-type" title={data.write?.values.get(f.name)}>
+                {data.write?.values.get(f.name) ?? f.type ?? ""}
+              </span>
             </button>
           </li>
         ))}

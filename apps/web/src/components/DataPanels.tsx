@@ -10,7 +10,7 @@ import {
   type Target,
 } from "@archdoc/core/browser";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { sampleSkeleton, sensitivity } from "../graph/data.js";
+import { sampleSkeleton, sensitivity, stepData } from "../graph/data.js";
 
 const ROUTINE = new Set(["public", "internal"]);
 const name = (t: Target) => (t.type === "external" ? t.ref : t.id);
@@ -392,6 +392,117 @@ export function SimulatePanel(props: {
         </ol>
       ) : null}
     </Block>
+  );
+}
+
+const HOW: Record<string, string> = {
+  step: "the step says",
+  sends: "the relationship sends it",
+  accepts: "the API it calls accepts it",
+  returns: "the API it calls returns it",
+  carries: "the topic carries it",
+  writes: "what the step writes",
+};
+
+/** The message a journey step carries, opened to its fields, and the records it writes. */
+export function StepMessagePanel(props: {
+  model: Model;
+  journey: JourneyNode;
+  index: number;
+  /** The step the journey is on: open by default. */
+  current: boolean;
+  simulation?: Simulation | undefined;
+  onSelect: (key: string) => void;
+}) {
+  const data = useMemo(
+    () => stepData(props.model, props.journey, props.index, props.simulation),
+    [props.model, props.journey, props.index, props.simulation],
+  );
+  // The current step's message is open; stepping on closes it again.
+  const [open, setOpen] = useState(props.current);
+  useEffect(() => setOpen(props.current), [props.current]);
+  const msg = data.message;
+  if (!msg) {
+    return (
+      <p
+        className="step-message is-missing"
+        title="Add sends: to the step, or to the relationship it travels along"
+      >
+        No message defined
+      </p>
+    );
+  }
+  return (
+    <div className={`step-message${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="step-message-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="side-chevron" aria-hidden="true">
+          ▸
+        </span>
+        <span className="step-message-name">{msg.entries.map((e) => e.label).join(", ")}</span>
+        <span className="muted"> · {HOW[msg.how]}</span>
+      </button>
+      {open ? (
+        <div className="step-message-body">
+          {msg.entries.map((e) => (
+            <table key={e.entry} className="fields compact">
+              <caption>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => props.onSelect(`data:${e.entry}`)}
+                >
+                  {e.label}
+                </button>
+                {e.kind ? <span className="muted"> {e.kind}</span> : null}
+              </caption>
+              <tbody>
+                {e.fields.map((f) => (
+                  <tr key={f.name}>
+                    <td>
+                      <button
+                        type="button"
+                        className="link"
+                        onClick={() => props.onSelect(`field:${e.entry}.${f.name}`)}
+                      >
+                        {f.name}
+                      </button>
+                      {f.classification && !ROUTINE.has(f.classification) ? (
+                        <span className="chip small classification">{f.classification}</span>
+                      ) : null}
+                    </td>
+                    <td className="muted">{f.value ?? f.type ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ))}
+          {data.writes.length ? (
+            <ul className="step-writes">
+              {data.writes.map((w) => (
+                <li key={`${w.entry}${w.when ?? ""}${w.created}`}>
+                  <span className="sim-mark">{w.created ? "+" : "~"}</span>{" "}
+                  {w.entry.startsWith(`${props.model.namespace}.`)
+                    ? w.entry.slice(props.model.namespace.length + 1)
+                    : w.entry}
+                  {w.when ? <span className="muted"> if {w.when}</span> : null}
+                  {w.values.size ? (
+                    <span className="muted">
+                      {" "}
+                      {[...w.values].map(([k, v]) => `${k}: ${v}`).join(", ")}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

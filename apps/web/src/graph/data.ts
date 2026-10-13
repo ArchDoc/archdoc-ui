@@ -9,6 +9,9 @@ import {
   nodeKey,
   qualifyData,
   SIMULATED_NOW,
+  type Simulation,
+  type StepMessage,
+  stepMessage,
 } from "@archdoc/core/browser";
 import { liftKey, type ViewState } from "./graph.js";
 
@@ -196,3 +199,172 @@ function example(type: string | undefined, values: (string | number)[] | undefin
 
 /** Node key for a target, for use outside the graph module. */
 export { nodeKey };
+
+/** A field as the explorer shows it, with its value in a simulation. */
+export interface FieldInfo {
+  name: string;
+  type?: string | undefined;
+  classification?: string | undefined;
+  value?: string | undefined;
+}
+
+/** What a journey step carries, and the records it writes. */
+export interface StepData {
+  message?:
+    | {
+        how: StepMessage["how"];
+        entries: { entry: string; label: string; kind?: string | undefined; fields: FieldInfo[] }[];
+      }
+    | undefined;
+  /** Records it creates or changes: as simulated, or else as declared. */
+  writes: StepWrite[];
+}
+
+export interface StepWrite {
+  /** Qualified entry. */
+  entry: string;
+  created: boolean;
+  /** Field to its new value, or "from → to". */
+  values: Map<string, string>;
+  /** The branch it's in, when declared and not simulated. */
+  when?: string | undefined;
+}
+
+/** What step `index` of a journey sends and writes, with values when it's simulated. */
+export function stepData(
+  model: Model,
+  journey: JourneyNode,
+  index: number,
+  simulation?: Simulation,
+): StepData {
+  const step = journey.steps[index];
+  if (!step) return { writes: [] };
+  const registry = new DataRegistry(model);
+  const ns = model.namespace;
+  const sim = simulation?.journey === journey.id ? simulation.steps[index] : undefined;
+  const sent = new Map(
+    (sim?.events ?? []).filter((e) => e.kind === "sent").map((e) => [e.entry, e.record]),
+  );
+  const msg = stepMessage(model, step);
+  const message = msg && {
+    how: msg.how,
+    entries: msg.data.map((ref) => {
+      const entry = qualifyData(ref, ns);
+      const node = registry.entry(entry)?.node;
+      const record = sent.get(entry);
+      return {
+        entry,
+        label: shortRef(entry, ns),
+        kind: node?.spec.kind,
+        fields: Object.entries(node?.spec.fields ?? {}).map(([name, f]) => ({
+          name,
+          type: f.type,
+          classification: f.classification,
+          value: record && name in record ? show(record[name]) : undefined,
+        })),
+      };
+    }),
+  };
+
+  if (sim) {
+    const writes = sim.events
+      .filter((e) => e.kind !== "sent")
+      .map((e) => ({
+        entry: e.entry,
+        created: e.kind === "created",
+        values: new Map(
+          e.fields.map((f) => [
+            f.field,
+            f.from === undefined ? show(f.to) : `${show(f.from)} → ${show(f.to)}`,
+          ]),
+        ),
+      }));
+    return { message, writes };
+  }
+  const writes: StepWrite[] = [];
+  const declare = (spec: Effects, when?: string) => {
+    const creates = spec.creates;
+    const created: [string, Record<string, unknown>][] =
+      typeof creates === "string"
+        ? [[creates, {}]]
+        : Array.isArray(creates)
+          ? creates.map((c) => [c, {}])
+          : Object.entries(creates ?? {});
+    for (const [ref, fields] of created) {
+      writes.push({
+        entry: qualifyData(ref, ns),
+        created: true,
+        values: new Map(Object.entries(fields).map(([k, v]) => [k, show(v)])),
+        when,
+      });
+    }
+    for (const [key, change] of Object.entries(spec.changes ?? {})) {
+      const dot = key.lastIndexOf(".");
+      const entry = qualifyData(key.slice(0, dot), ns);
+      const value = String(change).replace(/\s*->\s*/, " → ");
+      const existing = writes.find((w) => w.entry === entry && !w.created && w.when === when);
+      if (existing) existing.values.set(key.slice(dot + 1), value);
+      else
+        writes.push({
+          entry,
+          created: false,
+          values: new Map([[key.slice(dot + 1), value]]),
+          when,
+        });
+    }
+  };
+  // What a mapping the step writes through produces.
+  if (step.spec.via) {
+    const m = registry.mapping(step.spec.via);
+    const t = m && registry.target(m.node.spec.to, m.namespace);
+    if (t) {
+      writes.push({
+        entry: t.entry,
+        created: true,
+        values: new Map(Object.entries(m.node.spec.fields).map(([k, v]) => [k, `= ${v}`])),
+      });
+    }
+  }
+  declare(step.spec);
+  for (const [outcome, b] of Object.entries(step.spec.branches ?? {})) declare(b, outcome);
+  return { message, writes: merge(writes) };
+}
+
+/** One write per record and branch: a record the step also changes is updated, not created. */
+function merge(writes: StepWrite[]): StepWrite[] {
+  const out: StepWrite[] = [];
+  for (const w of writes) {
+    const same = out.find((o) => o.entry === w.entry && o.when === w.when);
+    if (!same) {
+      out.push({ ...w, values: new Map(w.values) });
+      continue;
+    }
+    same.created &&= w.created;
+    for (const [k, v] of w.values) same.values.set(k, v);
+  }
+  return out;
+}
+
+type Effects = {
+  creates?: string | string[] | Record<string, Record<string, unknown>> | undefined;
+  changes?: Record<string, string> | undefined;
+};
+
+/** Datastores that hold what a journey writes or sends, to open their tables. */
+export function journeyStores(model: Model, journey: JourneyNode): string[] {
+  const entries = new Set<string>();
+  for (const s of journey.steps) {
+    const d = stepData(model, journey, s.index);
+    for (const w of d.writes) entries.add(w.entry);
+    for (const e of d.message?.entries ?? []) entries.add(e.entry);
+  }
+  return [...new Set([...entries].flatMap((e) => dataPlaces(model, e).stores))];
+}
+
+function shortRef(entry: string, ns: string): string {
+  return entry.startsWith(`${ns}.`) ? entry.slice(ns.length + 1) : entry;
+}
+
+function show(v: unknown): string {
+  return typeof v === "string" ? v : JSON.stringify(v);
+}

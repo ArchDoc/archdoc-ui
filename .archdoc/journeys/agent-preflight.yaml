@@ -25,3 +25,4 @@ steps:
   - from: mcp
     to: coding-agent
     action: Returns the affected journeys and actors, which the agent names before editing
+    sends: ToolResult

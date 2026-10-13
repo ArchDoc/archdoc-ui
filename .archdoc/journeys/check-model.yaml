@@ -21,3 +21,4 @@ steps:
   - from: cli
     to: developer
     action: Prints diagnostics with file and line, and exits nonzero on errors
+    sends: Output

@@ -39,7 +39,14 @@ export {
   sensitiveDataChanges,
 } from "./data/changes.js";
 export { checkData } from "./data/check.js";
-export { type DataFlow, type DataStore, dataFlows, dataStores } from "./data/flows.js";
+export {
+  type DataFlow,
+  type DataStore,
+  dataFlows,
+  dataStores,
+  type StepMessage,
+  stepMessage,
+} from "./data/flows.js";
 export {
   type FieldId,
   type Lineage,

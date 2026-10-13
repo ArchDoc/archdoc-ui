@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
-import { dataPlaces } from "./graph/data.js";
+import { dataPlaces, journeyStores } from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
   boundaryLabel,
@@ -203,7 +203,17 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       setJourneyId(id);
       setStep(0);
       setPlaying(false);
-      setExpanded((prev) => new Set([...prev, ...journeyExpansion(model, j)]));
+      // Open the tables the journey writes to, so its data can be watched changing.
+      const stores = journeyStores(model, j);
+      setExpanded(
+        (prev) =>
+          new Set([
+            ...prev,
+            ...journeyExpansion(model, j),
+            ...stores.flatMap((id) => ancestorsOf(model, id)),
+          ]),
+      );
+      setTables((prev) => new Set([...prev, ...stores]));
     },
     [model],
   );

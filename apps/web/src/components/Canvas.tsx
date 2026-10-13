@@ -1,7 +1,7 @@
 import type { JourneyNode, Model, ModelDiff, Simulation } from "@archdoc/core/browser";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type DataFocus, dataFocus, lineageFocus } from "../graph/data.js";
+import { type DataFocus, dataFocus, lineageFocus, stepData } from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
@@ -82,6 +82,12 @@ export function Canvas(props: CanvasProps) {
     if (selected?.startsWith("field:")) return lineageFocus(model, view, selected.slice(6));
     return undefined;
   }, [model, view, selected]);
+  // What the current journey step sends, and the records it writes.
+  const current = useMemo(
+    () => (journey ? stepData(model, journey, step, props.simulation) : undefined),
+    [model, journey, step, props.simulation],
+  );
+
   // Tables of the focused entries, the field's own (or the entry's) first.
   const focusTables = useMemo(() => {
     const out = new Map<string, "current" | "highlight">();
@@ -102,6 +108,14 @@ export function Canvas(props: CanvasProps) {
       return map;
     }
     if (journey) {
+      // Tables the current step writes to, or the message it carries is stored in.
+      const touched = new Set([
+        ...(current?.writes.map((w) => w.entry) ?? []),
+        ...(current?.message?.entries.map((e) => e.entry) ?? []),
+      ]);
+      for (const n of graph.nodes) {
+        if (n.table && touched.has(n.table.entry)) map.set(n.id, "current");
+      }
       for (const s of steps) {
         const current = s.step === step;
         for (const k of [s.source, s.target]) {
@@ -126,7 +140,7 @@ export function Canvas(props: CanvasProps) {
       }
     }
     return map;
-  }, [journey, steps, step, selected, graph, focus, focusTables]);
+  }, [journey, steps, step, selected, graph, focus, focusTables, current]);
   const dimming = journey !== undefined || selected !== undefined;
 
   const nodes = useMemo<(CardNode | TableNode)[]>(() => {
@@ -160,6 +174,10 @@ export function Canvas(props: CanvasProps) {
                 : t.entry,
               emphasis: emphasis.get(n.id) ?? (dimming ? "dim" : "normal"),
               references: references.get(n.id) ?? new Set(),
+              write: (() => {
+                const w = current?.writes.find((x) => x.entry === t.entry);
+                return w ? { created: w.created, values: w.values, step } : undefined;
+              })(),
               lit: focus?.fields
                 ? new Set(
                     [...focus.fields]
@@ -223,6 +241,7 @@ export function Canvas(props: CanvasProps) {
     crossings,
     step,
     focus,
+    current,
   ]);
 
   const edges = useMemo<RoutedEdge[]>(() => {
@@ -308,6 +327,12 @@ export function Canvas(props: CanvasProps) {
           data: {
             points: routeBetween.get(`${s.source}->${s.target}`),
             labelAt: (shared.indexOf(s.step) + 1) / (shared.length + 1),
+            packet:
+              s.step === step
+                ? current?.message
+                  ? { label: current.message.entries.map((e) => e.label).join(", ") }
+                  : { label: "no message", missing: true }
+                : undefined,
           },
           markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
           className: [
@@ -338,6 +363,7 @@ export function Canvas(props: CanvasProps) {
     crossings,
     focus,
     focusTables,
+    current,
     props.simulation,
   ]);
 

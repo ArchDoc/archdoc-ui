@@ -27,7 +27,7 @@ journeys:
     importance: critical
     owners: [payments-team]
     steps:
-      - { from: support-agent, to: rides.api-gateway, action: Issues a goodwill refund }
+      - { from: support-agent, to: rides.api-gateway, action: Issues a goodwill refund, sends: payments.RefundRequest }
       - { from: rides.api-gateway, to: payments.charges, action: Refunds the charge }
       - { from: payments.charges, to: payments.ledger, action: Records the refund }
 

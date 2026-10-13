@@ -1,0 +1,123 @@
+# What ArchDoc's parts send each other, and what its datastores hold. Every
+# arrow on a journey carries one of these.
+data:
+  Command:
+    kind: message
+    description: An archdoc command line, from a person, an agent, or CI.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      command: { type: string, description: "validate, view, check, report, sync, and the rest" }
+      args: { type: "string[]" }
+      cwd: { type: string }
+
+  Output:
+    kind: message
+    description: What a command prints, as text or --json, and its exit code.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      text: { type: string }
+      json: { type: json }
+      exit_code: { type: int }
+
+  ToolCall:
+    kind: message
+    description: An MCP tool call from an agent.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      tool: { type: string, description: "archdoc_search, archdoc_impact, and the rest" }
+      arguments: { type: json }
+
+  ToolResult:
+    kind: message
+    description: What an MCP tool answers, in the same words the CLI prints.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      content: { type: string }
+      is_error: { type: bool }
+
+  AgentInstructions:
+    kind: message
+    description: The workflow a skill, CLAUDE.md, or AGENTS.md teaches an agent.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      path: { type: string }
+      text: { type: string }
+
+  ModelSources:
+    kind: message
+    description: The model's files, handed to core to build the model.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      root: { type: string }
+      sources: { type: "ModelFile[]" }
+
+  ModelFile:
+    kind: entity
+    description: One YAML file under .archdoc/.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      path: { type: string }
+      text: { type: string }
+
+  ExplorerPayload:
+    kind: message
+    description: What archdoc view serves the explorer at /api/model.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      root: { type: string }
+      sources: { type: "ModelFile[]" }
+      files: { type: "string[]" }
+      schemas: { type: json, description: What data entries' schema sources say }
+      samples: { type: json, description: Sample requests for simulation }
+      base: { type: json, description: The model's files at --base }
+      federation: { type: json, description: Vendored models of other repos }
+
+  ExplorerAction:
+    kind: message
+    description: Something a person does in the explorer.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      action: { type: enum, values: [open, focus, select, step, simulate] }
+      target: { type: string }
+
+  SyncRequest:
+    kind: message
+    description: What archdoc sync asks federation for.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      update: { type: bool }
+      frozen: { type: bool }
+
+  GitFetch:
+    kind: message
+    description: A shallow fetch of another repo at a release tag.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      url: { type: string }
+      ref: { type: string }
+
+  Lock:
+    kind: entity
+    description: archdoc.lock, the version and integrity each import is pinned at.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      imports: { type: json }
+      landscape: { type: json }
+
+  Bundle:
+    kind: entity
+    description: Another repo's model at a release, vendored under .archdoc/vendor/.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      namespace: { type: string }
+      version: { type: string }
+      sources: { type: "ModelFile[]" }
+
+  PullRequestEvent:
+    kind: event
+    description: A pull request opened or updated.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      number: { type: int }
+      base: { type: string }
+      head: { type: string }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatImpact, impact, impactToJSON } from "../src/index.js";
-import { model, root } from "./helpers.js";
+import { diagnostics, model, root } from "./helpers.js";
 
 const m = model({
   "archdoc.yaml": root(`
@@ -45,7 +45,7 @@ function ok(target: string) {
 
 describe("impact", () => {
   it("has a clean fixture", () => {
-    expect(m.diagnostics).toEqual([]);
+    expect(diagnostics(m)).toEqual([]);
   });
 
   it("walks consumers: direct, through a parent, and transitive", () => {

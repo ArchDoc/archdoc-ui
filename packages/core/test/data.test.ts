@@ -14,6 +14,7 @@ import {
   prReport,
   resolveData,
   serializeBundle,
+  stepMessage,
 } from "../src/index.js";
 import { dedent } from "./helpers.js";
 
@@ -226,6 +227,67 @@ describe("data entries", () => {
       "accepts: app → charges RefundRequest",
       "returns: charges → app Refund",
       "carries: charges → subscriber RefundIssued",
+    ]);
+  });
+});
+
+describe("journey step messages", () => {
+  const m = payments(`
+    actors:
+      clerk: { kind: role, uses: { charges: { description: Refunds, via: proto/charges.proto } } }
+      auditor: { kind: person, uses: { ledger: Audits } }
+    elements:
+      shop:
+        kind: system
+        elements:
+          front: { kind: container, uses: { charges: { description: Pays, sends: Charge } } }
+    mappings:
+      to-ledger:
+        from: { refund: Refund }
+        to: ledger.ledger_entries
+        fields: { amount_cents: refund.amount_cents }
+    journeys:
+      refund:
+        actor: clerk
+        goal: Refund
+        steps:
+          - { from: clerk, to: charges, sends: RefundRequest }
+          - { from: clerk, to: charges }
+          - { from: charges, to: clerk }
+          - { from: charges, to: ledger }
+          - { from: shop.front, to: charges }
+          - { from: shop, to: charges }
+          - { from: auditor, to: ledger, via: to-ledger }
+          - { from: auditor, to: ledger, changes: { Charge.status: captured -> refunded } }
+          - { from: auditor, to: ledger }
+  `);
+  const steps = m.journeys.get("refund")?.steps ?? [];
+
+  it("come from the step, the relationship it travels, its contract, or what it writes", () => {
+    expect(steps.map((s) => stepMessage(m, s))).toEqual([
+      { data: ["RefundRequest"], how: "step" },
+      // A call through a contract carries what it accepts; the way back, what it returns.
+      { data: ["RefundRequest"], how: "accepts" },
+      { data: ["Refund"], how: "returns" },
+      { data: ["LedgerEntry"], how: "sends" },
+      { data: ["Charge"], how: "sends" },
+      // A coarse step, backed by a relationship between what's inside the boxes.
+      { data: ["Charge"], how: "sends" },
+      { data: ["payments.LedgerEntry"], how: "writes" },
+      { data: ["Charge"], how: "writes" },
+      undefined,
+    ]);
+  });
+
+  it("warn about a step nothing says the message of, with its location", () => {
+    expect(m.diagnostics.filter((d) => d.code === "journey/step-without-message")).toEqual([
+      {
+        severity: "warning",
+        code: "journey/step-without-message",
+        message:
+          'Journey "refund", step 9 (auditor → ledger) doesn\'t say what it sends. Add sends: to the step, or to the relationship it travels along.',
+        location: { file: "extra.yaml", line: 27, column: 9 },
+      },
     ]);
   });
 });

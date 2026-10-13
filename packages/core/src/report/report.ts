@@ -1,5 +1,5 @@
 import type { Located } from "../codemap/codemap.js";
-import { dataFlows, dataStores } from "../data/flows.js";
+import { dataFlows, dataStores, stepMessage } from "../data/flows.js";
 import type { FieldId, Lineage } from "../data/lineage.js";
 import { parseStates, qualifyData, resolveData } from "../data/resolve.js";
 import type { Simulation } from "../data/simulate.js";
@@ -234,6 +234,15 @@ export function formatActor(model: Model, ref: string): string | undefined {
   return out.join("\n");
 }
 
+/** Where a step's message comes from, when the step doesn't say. */
+const MESSAGE_FROM: Record<string, string> = {
+  sends: "from the relationship",
+  accepts: "the API accepts it",
+  returns: "the API returns it",
+  carries: "the topic carries it",
+  writes: "what it writes",
+};
+
 export function formatJourney(model: Model, journey: JourneyNode): string {
   const s = journey.spec;
   const out = [
@@ -241,11 +250,18 @@ export function formatJourney(model: Model, journey: JourneyNode): string {
     `Actor: ${s.actor} · importance: ${s.importance ?? "normal"}${s.status && s.status !== "active" ? ` · ${s.status}` : ""}`,
   ];
   if (s.description) out.push(s.description);
+  const flows = dataFlows(model);
   for (const step of journey.steps) {
     const from = step.from ? targetLabel(model, step.from, false) : step.spec.from;
     const to = step.to ? targetLabel(model, step.to, false) : step.spec.to;
     out.push(
       `  ${step.index + 1}. ${from} → ${to}${step.spec.action ? `: ${step.spec.action}` : ""}`,
+    );
+    const message = stepMessage(model, step, flows);
+    out.push(
+      message
+        ? `     sends: ${message.data.join(", ")}${message.how === "step" ? "" : ` (${MESSAGE_FROM[message.how]})`}`
+        : "     sends: nothing the model says",
     );
     if (step.spec.code) out.push(`     code: ${step.spec.code}`);
   }

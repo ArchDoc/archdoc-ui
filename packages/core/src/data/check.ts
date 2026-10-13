@@ -1,6 +1,8 @@
 import type { JourneyStepSpec } from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
+import { otherModels } from "../federation/consumers.js";
 import type { Model, Target } from "../model.js";
+import { dataFlows, stepMessage } from "./flows.js";
 import { checkLogic } from "./logic.js";
 import { checkReferences } from "./references.js";
 import {
@@ -134,6 +136,28 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
           message: `${rel.from.id} → ${rel.ref} sends ${data}, ${problem}`,
           location: rel.location,
         });
+    }
+  }
+  // Every arrow on a journey carries something: the step says, or what it travels along does.
+  const flows = dataFlows(model);
+  for (const j of model.journeys.values()) {
+    for (const step of j.steps) {
+      if (!step.from || !step.to) continue;
+      const imported = [step.from, step.to].some(
+        (t) => t.type === "external" && !!model.imports[t.namespace],
+      );
+      if (imported !== (scope === "imported")) continue;
+      // Into a repo that isn't synced yet: its relationships and contracts aren't known.
+      const synced = otherModels(model);
+      if ([step.from, step.to].some((t) => t.type === "external" && !synced.has(t.namespace)))
+        continue;
+      if (stepMessage(model, step, flows)) continue;
+      out.push({
+        severity: "warning",
+        code: "journey/step-without-message",
+        message: `Journey "${j.id}", step ${step.index + 1} (${short(step.from)} → ${short(step.to)}) doesn't say what it sends. Add sends: to the step, or to the relationship it travels along.`,
+        location: step.location,
+      });
     }
   }
   out.push(...checkLogic(model, scope));

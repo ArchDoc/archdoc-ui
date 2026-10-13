@@ -6,11 +6,11 @@ const base = dedent(`
   archdoc: "2.0"
   namespace: payments
   actors:
-    clerk: { kind: role, uses: { charges: Refunds } }
+    clerk: { kind: role, uses: { charges: { description: Refunds, sends: RefundRequest } } }
   elements:
     charges:
       kind: container
-      uses: { ledger: Posts entries }
+      uses: { ledger: { description: Posts entries, sends: LedgerEntry } }
     ledger:
       kind: datastore
       stores:

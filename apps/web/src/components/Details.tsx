@@ -12,12 +12,12 @@ import {
   type Simulation,
   type Target,
 } from "@archdoc/core/browser";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import type { Compare } from "../App.js";
 import { hasData } from "../graph/data.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 import { type CodeContext, CodeSection, StepCode } from "./code.js";
-import { DataDetails, FieldDetails, SimulatePanel } from "./DataPanels.js";
+import { DataDetails, FieldDetails, SimulatePanel, StepMessagePanel } from "./DataPanels.js";
 
 export interface DetailsProps {
   model: Model;
@@ -269,6 +269,11 @@ function ExternalDetails(props: DetailsProps & { ref_: string }) {
 
 function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
   const { journey, step } = props;
+  // Keep the current step in view as the journey plays.
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    list.current?.children[step]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [step]);
   return (
     <div className="details">
       <p className="eyebrow">Journey · {journey.spec.importance ?? "normal"}</p>
@@ -283,7 +288,7 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
         />
       </Block>
       <Block title="Steps">
-        <ol className="steps">
+        <ol className="steps" ref={list}>
           {journey.steps.map((s) => (
             <li key={s.index} className={s.index === step ? "is-current" : ""}>
               <button type="button" onClick={() => props.onStep(s.index)}>
@@ -294,6 +299,14 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
                 {s.spec.action ? <span className="step-action">{s.spec.action}</span> : null}
                 {s.spec.code ? <StepCode step={s} ctx={props.code} /> : null}
               </button>
+              <StepMessagePanel
+                model={props.model}
+                journey={journey}
+                index={s.index}
+                current={s.index === step}
+                simulation={props.simulation}
+                onSelect={props.onSelect}
+              />
             </li>
           ))}
         </ol>

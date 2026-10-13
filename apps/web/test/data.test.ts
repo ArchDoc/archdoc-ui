@@ -4,9 +4,11 @@ import {
   dataFocus,
   dataPlaces,
   hasData,
+  journeyStores,
   lineageFocus,
   sampleSkeleton,
   sensitivity,
+  stepData,
 } from "../src/graph/data.js";
 import { buildGraph, defaultExpanded } from "../src/graph/graph.js";
 
@@ -14,7 +16,7 @@ const text = `
 archdoc: "2.0"
 namespace: payments
 actors:
-  clerk: { kind: role, uses: { app: Refunds } }
+  clerk: { kind: role, uses: { app: { description: Refunds, sends: RefundRequest } } }
 elements:
   app: { kind: container, uses: { charges: { description: Asks, sends: RefundRequest } } }
   core:
@@ -79,7 +81,7 @@ describe("explorer data helpers", () => {
     const open = dataFocus(m, { expanded: defaultExpanded(m) }, "payments.Refund");
     expect([...open.stores]).toEqual(["element:core.ledger"]);
     const closed = dataFocus(m, { expanded: new Set() }, "payments.RefundRequest");
-    expect([...closed.nodes].sort()).toEqual(["element:app", "element:core"]);
+    expect([...closed.nodes].sort()).toEqual(["actor:clerk", "element:app", "element:core"]);
     expect(closed.edges.has("element:app->element:core")).toBe(true);
   });
 
@@ -159,6 +161,72 @@ data:
     expect(open.edges.map((e) => `${e.source}.${e.reference?.field} -> ${e.target}`)).toEqual([
       "table:db:refunds.charge_id -> table:db:charges",
       "table:db:refunds.charge -> table:db:charges",
+    ]);
+  });
+
+  it("say what each step carries, and what it writes, declared or simulated", () => {
+    const journey = m.journeys.get("refund");
+    if (!journey) throw new Error("no journey");
+    const declared = stepData(m, journey, 1);
+    expect(declared.message?.how).toBe("step");
+    expect(declared.message?.entries.map((e) => [e.label, e.fields.map((f) => f.name)])).toEqual([
+      ["RefundRequest", ["amount_cents", "email", "note"]],
+    ]);
+    // A branch's writes are declared with the outcome they need.
+    expect(declared.writes).toEqual([
+      {
+        entry: "payments.Charge",
+        created: false,
+        values: new Map([["status", "captured → refunded"]]),
+        when: "auto",
+      },
+    ]);
+    // Writing through a mapping creates what it maps to, with the mapping's expressions.
+    expect(stepData(m, journey, 2).writes).toEqual([
+      {
+        entry: "payments.Refund",
+        created: true,
+        values: new Map([["amount_cents", "= request.amount_cents"]]),
+      },
+    ]);
+
+    const sample = {
+      RefundRequest: { amount_cents: 300, email: "a@b.c", note: "" },
+      Charge: { amount_cents: 1000, status: "captured" },
+    };
+    const sim = simulate(m, "refund", sample);
+    const run = stepData(m, journey, 1, sim);
+    expect(run.message?.entries[0]?.fields[0]).toMatchObject({
+      name: "amount_cents",
+      value: "300",
+    });
+    expect(run.writes).toEqual([
+      {
+        entry: "payments.Charge",
+        created: false,
+        values: new Map([["status", "captured → refunded"]]),
+      },
+    ]);
+    expect(journeyStores(m, journey)).toEqual(["core.ledger"]);
+
+    // A step that maps into a record and changes it too updates the record.
+    const both = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: text.replace(
+          "{ from: core.charges, to: core.ledger, via: to-refund, when: auto }",
+          "{ from: core.charges, to: core.ledger, via: to-refund, when: auto, changes: { Refund.amount_cents: 0 -> 1 } }",
+        ),
+      },
+    ]);
+    const j = both.journeys.get("refund");
+    if (!j) throw new Error("no journey");
+    expect(stepData(both, j, 2).writes).toEqual([
+      {
+        entry: "payments.Refund",
+        created: false,
+        values: new Map([["amount_cents", "0 → 1"]]),
+      },
     ]);
   });
 
