@@ -247,52 +247,85 @@ export function Table({ data }: NodeProps<TableNode>) {
 
 const ROUTINE = new Set(["public", "internal"]);
 
-export interface RowData extends Record<string, unknown> {
-  row: RowInfo;
+export interface RowTableData extends Record<string, unknown> {
+  table: TableInfo;
   /** The entry, short. */
   label: string;
-  /** The fields to show, in order. */
-  fields: string[];
-  /** Fields that point at another row. */
+  rows: RowInfo[];
+  columns: string[];
+  /** Columns that point at another row. */
   references: ReadonlySet<string>;
+  /** Each line's emphasis: the current step's rows, the rows they point at, the rest. */
+  lines: Emphasis[];
   emphasis: Emphasis;
 }
 
-export type RowNode = Node<RowData, "row">;
+export type RowTableNode = Node<RowTableData, "rowtable">;
 
-/** One record in a datastore during a journey: its key, what it points at, and what just changed. */
-export function Row({ data }: NodeProps<RowNode>) {
-  const { row } = data;
-  const badge = row.isNew
-    ? "new"
-    : row.changed.size
-      ? "changed"
-      : row.origin === "existing"
-        ? "existing"
-        : `step ${(row.step ?? 0) + 1}`;
+/** A datastore table's rows during a journey: a line per record, with what changed lit. */
+export function RowTable({ data }: NodeProps<RowTableNode>) {
+  const { table, rows, columns } = data;
   return (
-    <div
-      className={`row-card emphasis-${data.emphasis} origin-${row.origin}${row.isNew ? " is-new" : ""}${row.changed.size ? " is-changed" : ""}`}
-      key={`${row.step ?? "x"}-${row.changed.size}`}
-      title={JSON.stringify(row.record, null, 2)}
-    >
-      <Handle type="target" position={Position.Left} className="handle" />
-      <div className="row-head">
-        <span className="row-name">
-          {data.label}
-          {row.id ? <span className="row-id"> {row.id}</span> : null}
+    <div className={`rows-card emphasis-${data.emphasis}`}>
+      <div className="rows-head">
+        <span className="table-name">{data.label}</span>
+        <span className="table-table">
+          {table.table} · {rows.length} row{rows.length === 1 ? "" : "s"}
         </span>
-        <span className={`row-badge badge-${badge.split(" ")[0]}`}>{badge}</span>
       </div>
-      <ul className="row-fields">
-        {data.fields.map((f) => (
-          <li key={f} className={row.changed.has(f) ? "is-changed" : undefined}>
-            <span className="row-mark">{data.references.has(f) ? "→" : ""}</span>
-            <span className="row-field">{f}</span>
-            <span className="row-value">{show(row.record[f])}</span>
-          </li>
-        ))}
-      </ul>
+      <table className="rows-grid">
+        <thead>
+          <tr>
+            <th aria-label="Row" />
+            {columns.map((c) => (
+              <th key={c}>
+                {data.references.has(c) ? <span className="row-mark">→</span> : null}
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const badge = row.isNew
+              ? "new"
+              : row.changed.size
+                ? "changed"
+                : row.origin === "existing"
+                  ? ""
+                  : `${(row.step ?? 0) + 1}`;
+            return (
+              <tr
+                // Restart the highlight when a step writes the row again.
+                key={`${row.id ?? i}-${row.step ?? "x"}-${row.changed.size}`}
+                className={`line-${data.lines[i] ?? "normal"}${row.isNew ? " is-new" : ""} origin-${row.origin}`}
+                title={JSON.stringify(row.record, null, 2)}
+              >
+                <td className="rows-badge">
+                  {badge ? (
+                    <span
+                      className={`row-badge badge-${row.isNew ? "new" : row.changed.size ? "changed" : "step"}`}
+                      title={
+                        row.isNew || row.changed.size
+                          ? undefined
+                          : `Written at step ${(row.step ?? 0) + 1}`
+                      }
+                    >
+                      {badge}
+                    </span>
+                  ) : null}
+                </td>
+                {columns.map((c) => (
+                  <td key={c} className={row.changed.has(c) ? "is-changed" : undefined}>
+                    {show(row.record[c])}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <Handle type="target" position={Position.Left} className="handle" />
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );
@@ -302,4 +335,4 @@ function show(v: unknown): string {
   return v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
 }
 
-export const nodeTypes = { card: Card, table: Table, row: Row };
+export const nodeTypes = { card: Card, table: Table, rowtable: RowTable };

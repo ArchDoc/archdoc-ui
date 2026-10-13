@@ -1762,58 +1762,6 @@ table.fields.compact caption {
   font-size: 0.68rem;
 }
 
-/* One record, during a journey. */
-.row-card {
-  width: 100%;
-  height: 100%;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--k-data);
-  border-radius: 6px;
-  overflow: hidden;
-  font-size: 0.72rem;
-  transition:
-    opacity 200ms ease,
-    box-shadow 300ms ease;
-}
-
-.row-card.origin-existing {
-  border-left-color: var(--line-strong);
-  background: var(--surface-2);
-}
-
-.row-card.emphasis-current {
-  border-color: var(--k-data);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
-}
-
-.row-card.is-new {
-  animation: table-written 900ms ease-out;
-}
-
-.row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  height: 28px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--line);
-}
-
-.row-name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-id {
-  font-family: var(--f-mono);
-  font-weight: 400;
-  color: var(--muted);
-}
-
 .row-badge {
   flex: none;
   padding: 0 6px;
@@ -1831,42 +1779,9 @@ table.fields.compact caption {
   border-color: var(--k-data);
 }
 
-.row-fields {
-  list-style: none;
-  margin: 0;
-  padding: 3px 0;
-}
-
-.row-fields li {
-  display: flex;
-  gap: 4px;
-  height: 18px;
-  align-items: center;
-  padding: 0 8px;
-}
-
-.row-fields li.is-changed {
-  background: color-mix(in srgb, var(--k-data) 20%, transparent);
-  font-weight: 600;
-}
-
 .row-mark {
   width: 10px;
   color: var(--k-data);
-}
-
-.row-field {
-  font-family: var(--f-mono);
-  color: var(--muted);
-}
-
-.row-value {
-  margin-left: auto;
-  max-width: 55%;
-  font-family: var(--f-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .react-flow__edge[id^="rowref:"] path {
@@ -1896,10 +1811,108 @@ table.fields.compact caption {
   margin: 0;
 }
 
-.row-card.emphasis-dim {
-  opacity: 0.45;
+/* A datastore table's rows during a journey: a line per record. */
+.rows-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--k-data);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  transition:
+    opacity 200ms ease,
+    box-shadow 300ms ease;
 }
 
-.row-card.emphasis-highlight {
+.rows-card.emphasis-current {
   border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
+}
+
+.rows-card.emphasis-dim {
+  opacity: 0.5;
+}
+
+.rows-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  height: 40px;
+  padding: 8px 10px 0;
+  background: var(--surface-2);
+}
+
+.rows-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--f-mono);
+}
+
+.rows-grid th,
+.rows-grid td {
+  height: 22px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.rows-grid th {
+  height: 22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.66rem;
+}
+
+.rows-grid th:first-child,
+.rows-grid td.rows-badge {
+  width: 52px;
+}
+
+.rows-grid tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.rows-grid tr.origin-existing td {
+  color: var(--muted);
+}
+
+.rows-grid tr.line-current td {
+  background: color-mix(in srgb, var(--k-data) 14%, transparent);
+  color: var(--ink);
+}
+
+.rows-grid tr.line-current td.is-changed {
+  background: color-mix(in srgb, var(--k-data) 30%, transparent);
+  font-weight: 600;
+}
+
+.rows-grid tr.line-highlight td {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--k-data) 6%, transparent);
+}
+
+.rows-grid tr.line-dim td {
+  opacity: 0.55;
+}
+
+.rows-grid tr.is-new td {
+  animation: row-written 1.2s ease-out;
+}
+
+.rows-badge .row-badge {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+}
+
+.row-badge.badge-step {
+  color: var(--muted);
 }

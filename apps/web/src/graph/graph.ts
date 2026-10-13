@@ -41,14 +41,7 @@ export interface RowInfo {
   declared?: boolean | undefined;
 }
 
-export type GraphNodeKind =
-  | "actor"
-  | "element"
-  | "external"
-  | "group"
-  | "table"
-  | "rowgroup"
-  | "row";
+export type GraphNodeKind = "actor" | "element" | "external" | "group" | "table" | "rowtable";
 
 /** A datastore's table, drawn inside it: the entry it stores and its fields. */
 export interface TableInfo {
@@ -75,10 +68,13 @@ export interface GraphNode {
   depth: number;
   /** A box sized by its content, such as a table. Defaults to a card's size. */
   size?: { width: number; height: number } | undefined;
-  /** For a table (or a group of rows): what it stores. */
+  /** For a table (or a table of rows): what it stores. */
   table?: TableInfo | undefined;
-  /** For a row: the record. */
-  row?: RowInfo | undefined;
+  /** For a table of rows: the records, and the columns shown. */
+  rows?: RowInfo[] | undefined;
+  columns?: string[] | undefined;
+  /** Where edges attach, relative to the node, such as each row's sides. */
+  ports?: { id: string; side: "WEST" | "EAST"; x: number; y: number }[] | undefined;
 }
 
 export interface GraphEdge {
@@ -91,6 +87,11 @@ export interface GraphEdge {
   planned: boolean;
   /** A field pointing at another table's (a foreign key), rather than relationships. */
   reference?: { field: string; to: string } | undefined;
+  /** Between rows: the line in each table of rows. */
+  rows?: { from: number; to: number } | undefined;
+  /** Ports on the source and target the edge attaches to. */
+  sourcePort?: string | undefined;
+  targetPort?: string | undefined;
 }
 
 export interface Graph {
@@ -173,7 +174,7 @@ export function buildGraph(model: Model, state: ViewState): Graph {
     const registry = new DataRegistry(model);
     const references = fieldReferences(model, registry);
     const byEntry = new Map<string, string>();
-    const rowNodes = new Map<string, { node: string; row: RowInfo }[]>();
+    const rowNodes = new Map<string, { node: string; row: RowInfo; index: number }[]>();
     for (const id of state.tables) {
       const el = model.elements.get(id);
       if (!el || !nodes.has(`element:${id}`)) continue;
@@ -187,32 +188,33 @@ export function buildGraph(model: Model, state: ViewState): Graph {
         if (asRows) {
           const rows = state.rows?.data.get(entry) ?? [];
           if (!rows.length) continue;
-          const group = `rowgroup:${id}:${table}`;
-          nodes.set(group, {
-            id: group,
-            kind: "rowgroup",
+          // One small table per table: a line per record, with a port on each side of each line.
+          const node = `rows:${id}:${table}`;
+          const columns = rowColumns(rows, references, key);
+          const size = rowTableSize(columns.length, rows.length);
+          nodes.set(node, {
+            id: node,
+            kind: "rowtable",
             parentId: `element:${id}`,
-            isGroup: true,
+            isGroup: false,
             hiddenChildren: 0,
             depth: el.depth + 1,
+            size,
             table: { element: id, table, entry, key, fields: [] },
+            rows,
+            columns,
+            ports: rows.flatMap((_, i) => {
+              const y = rowY(i);
+              return [
+                { id: rowPort(node, i, "in"), side: "WEST" as const, x: 0, y },
+                { id: rowPort(node, i, "out"), side: "EAST" as const, x: size.width, y },
+              ];
+            }),
           });
-          const list = rowNodes.get(entry) ?? [];
-          rows.forEach((row, i) => {
-            const node = `row:${id}:${table}:${i}`;
-            nodes.set(node, {
-              id: node,
-              kind: "row",
-              parentId: group,
-              isGroup: false,
-              hiddenChildren: 0,
-              depth: el.depth + 2,
-              size: rowSize(row, references),
-              row,
-            });
-            list.push({ node, row });
-          });
-          rowNodes.set(entry, list);
+          rowNodes.set(entry, [
+            ...(rowNodes.get(entry) ?? []),
+            ...rows.map((row, index) => ({ node, row, index })),
+          ]);
           continue;
         }
         const all = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
@@ -266,16 +268,22 @@ export function buildGraph(model: Model, state: ViewState): Graph {
         const value = from.row.record[r.field];
         if (value === undefined || value === null || value === "") continue;
         const to = (rowNodes.get(r.to.entry) ?? []).find(
-          (t) => t.node !== from.node && String(t.row.record[r.to.field]) === String(value),
+          (t) =>
+            !(t.node === from.node && t.index === from.index) &&
+            String(t.row.record[r.to.field]) === String(value),
         );
-        if (!to) continue;
+        // Lines within one table (a category's parent) would loop back on it; the value shows it.
+        if (!to || to.node === from.node) continue;
         tableEdges.push({
-          id: `rowref:${from.node}.${r.field}->${to.node}`,
+          id: `rowref:${from.node}:${from.index}.${r.field}->${to.node}:${to.index}`,
           source: from.node,
           target: to.node,
           relationships: [],
           planned: false,
           reference: { field: r.field, to: r.to.field },
+          rows: { from: from.index, to: to.index },
+          sourcePort: rowPort(from.node, from.index, "out"),
+          targetPort: rowPort(to.node, to.index, "in"),
         });
       }
     }
@@ -385,19 +393,39 @@ function tableSize(rows: number): { width: number; height: number } {
 /** Stores with more tables than this show compact tables. */
 export const COMPACT_OVER = 6;
 const ROUTINE = new Set(["public", "internal"]);
-export const ROW_WIDTH = 210;
+export const ROWS_HEADER = 40;
+export const ROWS_COLUMNS = 22;
+export const ROWS_LINE = 22;
 
-/** The fields a row card shows: its key, what it points at, and what just changed. */
-export function rowFields(row: RowInfo, references: readonly FieldReference[]): string[] {
-  const linked = references.filter((r) => r.entry === row.entry).map((r) => r.field);
-  const shown = Object.keys(row.record).filter(
-    (f) => linked.includes(f) || row.changed.has(f) || f === "status",
-  );
-  return shown.slice(0, 6);
+/** The columns a table of rows shows: its key, what its rows point at, what changed, and status. */
+export function rowColumns(
+  rows: readonly RowInfo[],
+  references: readonly FieldReference[],
+  key: string,
+): string[] {
+  const present = new Set(rows.flatMap((r) => Object.keys(r.record)));
+  const linked = references.filter((r) => r.entry === rows[0]?.entry).map((r) => r.field);
+  const changed = rows.flatMap((r) => [...r.changed]);
+  return [...new Set([key, ...linked, ...changed, "status"])]
+    .filter((c) => present.has(c))
+    .slice(0, 6);
 }
 
-function rowSize(row: RowInfo, references: readonly FieldReference[]) {
-  return { width: ROW_WIDTH, height: 34 + rowFields(row, references).length * 18 + 6 };
+/** A table of rows' size: a badge column, then about 92px per column. */
+export function rowTableSize(columns: number, rows: number): { width: number; height: number } {
+  return {
+    width: Math.max(240, 64 + columns * 92),
+    height: ROWS_HEADER + ROWS_COLUMNS + rows * ROWS_LINE + 6,
+  };
+}
+
+/** The middle of line `index` in a table of rows. */
+function rowY(index: number): number {
+  return ROWS_HEADER + ROWS_COLUMNS + index * ROWS_LINE + ROWS_LINE / 2;
+}
+
+function rowPort(node: string, index: number, side: "in" | "out"): string {
+  return `${node}#${index}:${side}`;
 }
 
 /** The steps of a journey as edges between visible nodes. */

@@ -49,7 +49,25 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
               "elk.padding": `[top=${GROUP_HEADER},left=28,bottom=28,right=28]`,
             },
           }
-        : { id: n.id, width: n.size?.width ?? NODE_WIDTH, height: n.size?.height ?? NODE_HEIGHT },
+        : {
+            id: n.id,
+            width: n.size?.width ?? NODE_WIDTH,
+            height: n.size?.height ?? NODE_HEIGHT,
+            // Fixed ports, such as each row's sides, so edges meet the line they're about.
+            ...(n.ports?.length
+              ? {
+                  ports: n.ports.map((p) => ({
+                    id: p.id,
+                    x: p.x,
+                    y: p.y,
+                    width: 0,
+                    height: 0,
+                    layoutOptions: { "elk.port.side": p.side },
+                  })),
+                  layoutOptions: { "elk.portConstraints": "FIXED_POS" },
+                }
+              : {}),
+          },
     );
   }
 
@@ -73,7 +91,11 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     },
     children: [],
-    edges: graph.edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: graph.edges.map((e) => ({
+      id: e.id,
+      sources: [e.sourcePort ?? e.source],
+      targets: [e.targetPort ?? e.target],
+    })),
   };
 
   for (const n of graph.nodes) {

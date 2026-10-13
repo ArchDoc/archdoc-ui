@@ -106,7 +106,7 @@ describe("the ERP database on the canvas", () => {
     expect(graph.edges.filter((e) => e.reference).length).toBeGreaterThan(25);
   });
 
-  it("shows the journey's rows instead, grouped by table, with a line from each row to the row it names", () => {
+  it("shows the journey's rows instead, a small table each, with a line from each row to the row it names", () => {
     const rows = journeyRows(model, journey, last, sim);
     const graph = buildGraph(model, {
       expanded: defaultExpanded(model),
@@ -114,17 +114,35 @@ describe("the ERP database on the canvas", () => {
       rows: { stores: db, data: rows },
     });
     expect(graph.nodes.filter((n) => n.kind === "table")).toEqual([]);
-    const groups = graph.nodes.filter((n) => n.kind === "rowgroup");
+    // No boxes in boxes: one node per table, its rows inside it.
+    const tables = graph.nodes.filter((n) => n.kind === "rowtable");
+    expect(tables.every((t) => t.parentId === "element:erp-db" && !t.isGroup)).toBe(true);
     // Only tables with rows: the sample's two messages aren't stored.
     expect(rows.size).toBe(24);
-    expect(groups.length).toBe(22);
-    const label = (id: string) => {
-      const r = graph.nodes.find((n) => n.id === id)?.row;
+    expect(tables.length).toBe(22);
+    const orders = tables.find((t) => t.table?.entry === "erp.Order");
+    expect(orders?.rows?.map((r) => r.id)).toEqual(["so-0950", "so-1001"]);
+    expect(orders?.columns).toEqual([
+      "id",
+      "customer_id",
+      "ship_to",
+      "price_list_id",
+      "sales_rep_id",
+      "status",
+    ]);
+    // A port on each side of each line, for the lines between rows.
+    expect(orders?.ports).toHaveLength(4);
+
+    const label = (id: string, i: number) => {
+      const r = graph.nodes.find((n) => n.id === id)?.rows?.[i];
       return `${r?.entry.slice(4)}:${r?.id}`;
     };
     const links = graph.edges
-      .filter((e) => e.id.startsWith("rowref:"))
-      .map((e) => `${label(e.source)}.${e.reference?.field} -> ${label(e.target)}`);
+      .filter((e) => e.rows)
+      .map(
+        (e) =>
+          `${label(e.source, e.rows?.from ?? -1)}.${e.reference?.field} -> ${label(e.target, e.rows?.to ?? -1)}`,
+      );
     expect(links).toEqual(
       expect.arrayContaining([
         "Allocation:al-1.payment_id -> Payment:pay-1001",
@@ -132,10 +150,11 @@ describe("the ERP database on the canvas", () => {
         "ShipmentLine:sl-2.order_line_id -> OrderLine:ol-2",
         "OrderLine:ol-2.sku -> Variant:GAD-BLU",
         "Variant:GAD-BLU.product_id -> Product:prod-gadget",
-        "Category:cat-gadgets.parent_id -> Category:cat-home",
         "Order:so-0950.customer_id -> Customer:cust-2",
       ]),
     );
+    // A category's parent is in the same table: its value shows it, without a line.
+    expect(links.some((l) => l.startsWith("Category:"))).toBe(false);
     expect(links.length).toBeGreaterThan(40);
   });
 
@@ -149,6 +168,22 @@ describe("the ERP database on the canvas", () => {
       const { boxes, routes } = await layoutGraph(graph);
       expect(boxes.size).toBe(graph.nodes.length);
       for (const e of graph.edges) expect(routes.get(e.id), e.id).toBeDefined();
+      // A line between rows starts and ends at the height of its rows.
+      const top = (id: string): number => {
+        const n = graph.nodes.find((x) => x.id === id);
+        return (boxes.get(id)?.y ?? 0) + (n?.parentId ? top(n.parentId) : 0);
+      };
+      for (const e of graph.edges.filter((x) => x.rows)) {
+        const route = routes.get(e.id) ?? [];
+        const from = graph.nodes
+          .find((n) => n.id === e.source)
+          ?.ports?.find((p) => p.id === e.sourcePort);
+        const to = graph.nodes
+          .find((n) => n.id === e.target)
+          ?.ports?.find((p) => p.id === e.targetPort);
+        expect(route[0]?.y, e.id).toBeCloseTo(top(e.source) + (from?.y ?? 0), 0);
+        expect(route[route.length - 1]?.y, e.id).toBeCloseTo(top(e.target) + (to?.y ?? 0), 0);
+      }
     }
   });
 });
