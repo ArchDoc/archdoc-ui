@@ -1,6 +1,7 @@
 import type { DataFieldSpec } from "@archdoc/spec";
 import type { Finding } from "../check/check.js";
 import type { Model } from "../model.js";
+import { referenceFromSchema } from "./references.js";
 
 /** A field as a schema source declares it. */
 export interface ImportedField {
@@ -8,6 +9,8 @@ export interface ImportedField {
   type: string;
   required?: boolean | undefined;
   values?: string[] | undefined;
+  /** A foreign key: the type or table it points to, as the source names it, and the column. */
+  references?: { name: string; field?: string | undefined } | undefined;
 }
 
 /** What a schema importer read for one data entry's `source`. */
@@ -126,7 +129,7 @@ export function schemaDrift(model: Model, schemas: readonly ImportedSchema[]): F
   return out;
 }
 
-/** Fills in what a modeled field leaves out (type, values) from its schema. */
+/** Fills in what a modeled field leaves out (type, values, references) from its schema. */
 export function applySchemas(model: Model, schemas: readonly ImportedSchema[]): void {
   for (const s of schemas) {
     const entry = model.data.get(s.data);
@@ -136,6 +139,9 @@ export function applySchemas(model: Model, schemas: readonly ImportedSchema[]): 
       if (!theirs) continue;
       if (field.type === undefined) field.type = theirs.type;
       if (field.values === undefined && theirs.values) field.values = theirs.values;
+      if (field.references === undefined && theirs.references) {
+        field.references = referenceFromSchema(model, theirs.references);
+      }
     }
   }
 }

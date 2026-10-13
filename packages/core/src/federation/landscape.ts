@@ -248,6 +248,23 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
       ...(Object.keys(children).length ? { elements: children } : {}),
     };
   };
+  /** Fields, with the entries their references and types name as the composed model's data IDs. */
+  const fieldsIn = (ns: string, fields: NonNullable<DataEntrySpec["fields"]>) =>
+    Object.fromEntries(
+      Object.entries(fields).map(([name, f]) => {
+        const out = { ...f };
+        if (f.type) out.type = dataRef(ns, f.type);
+        if (f.references) {
+          const whole = dataRef(ns, f.references);
+          const dot = f.references.lastIndexOf(".");
+          out.references =
+            whole !== f.references || dot <= 0
+              ? whole
+              : `${dataRef(ns, f.references.slice(0, dot))}${f.references.slice(dot)}`;
+        }
+        return [name, out];
+      }),
+    );
   const topLevel = (m: Model) => [...m.elements.values()].filter((e) => !e.parentId);
 
   const data: Record<string, DataEntrySpec> = {};
@@ -256,6 +273,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
       const id = ns === L ? d.id : dataIdOf(ns, d.id, landscapeData);
       data[id] = {
         ...d.spec,
+        ...(d.spec.fields ? { fields: fieldsIn(ns, d.spec.fields) } : {}),
         ...(d.spec.owners ? { owners: d.spec.owners.map((o) => owner(ns, o)) } : {}),
         ...(ns !== L ? { tags: [...(d.spec.tags ?? []), `repo:${ns}`] } : {}),
       };

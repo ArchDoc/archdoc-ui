@@ -2,6 +2,7 @@ import type { JourneyStepSpec } from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
 import type { Model, Target } from "../model.js";
 import { checkLogic } from "./logic.js";
+import { checkReferences } from "./references.js";
 import {
   type DataResolution,
   findContract,
@@ -136,6 +137,7 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
     }
   }
   out.push(...checkLogic(model, scope));
+  out.push(...checkReferences(model, scope));
   return out;
 
   /** What a step (or one of its branches) creates and changes: entries, fields, values, and transitions. */

@@ -7,6 +7,7 @@ import {
   dataFlows,
   diffModels,
   federate,
+  fieldReferences,
   formatDiff,
   integrityOf,
   parseStates,
@@ -68,6 +69,33 @@ const messages = (m: { diagnostics: { code: string; message: string }[] }, code:
   m.diagnostics.filter((d) => d.code === code).map((d) => d.message);
 
 describe("data entries", () => {
+  it("point fields at other entries, written or by type, and warn about ones that don't resolve", () => {
+    const m = payments(`
+      data:
+        RefundLine:
+          kind: entity
+          fields:
+            refund: { type: Refund }
+            entry: { type: uuid, references: LedgerEntry.amount_cents }
+            ledger: { type: uuid, references: payments.LedgerEntry }
+            bad: { type: uuid, references: Nope.id }
+            worse: { type: uuid, references: Refund.nope }
+    `);
+    expect(messages(m, "data/unknown-reference")).toEqual([
+      'RefundLine.bad references "Nope.id", which isn\'t a data entry or Entry.field.',
+      "RefundLine.worse references Refund.nope, but Refund has no field nope.",
+    ]);
+    const refs = fieldReferences(m).map(
+      (r) => `${r.entry}.${r.field} -> ${r.to.entry}.${r.to.field} (${r.how})`,
+    );
+    expect(refs).toEqual([
+      "payments.RefundLine.refund -> payments.Refund.id (type)",
+      "payments.RefundLine.entry -> payments.LedgerEntry.amount_cents (references)",
+      // An entry alone points at the key its datastore stores it by.
+      "payments.RefundLine.ledger -> payments.LedgerEntry.id (references)",
+    ]);
+  });
+
   it("resolve locally, qualified with the model's namespace, or not at all", () => {
     const m = payments();
     expect(codes(m)).toEqual([]);
@@ -320,6 +348,29 @@ describe("data in other repos", () => {
       "gateway → payments.charges sends payments.Charge, which payments.charges doesn't accept through proto/charges.proto. It accepts: payments.RefundRequest.",
     ]);
     expect(messages(m, "data/invalid-transition")).toHaveLength(1);
+  });
+
+  it("are pointed at by references once synced", () => {
+    const { m, before } = rides(`
+      data:
+        Receipt:
+          kind: entity
+          fields:
+            charge: { type: uuid, references: payments.Charge }
+            refund: { type: uuid, references: payments.Refund.nope }
+    `);
+    expect(before).not.toContain("data/unknown-reference");
+    expect(messages(m, "data/unknown-reference")).toEqual([
+      "Receipt.refund references payments.Refund.nope, but payments.Refund has no field nope.",
+    ]);
+    expect(fieldReferences(m).filter((r) => r.entry === "rides.Receipt")).toEqual([
+      {
+        entry: "rides.Receipt",
+        field: "charge",
+        to: { entry: "payments.Charge", field: "id" },
+        how: "references",
+      },
+    ]);
   });
 
   it("bring their classifications into this repo's data rules", () => {

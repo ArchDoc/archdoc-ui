@@ -1282,23 +1282,6 @@ kbd {
   }
 }
 
-.card.family-data {
-  --accent: var(--k-data);
-}
-
-.card.family-field {
-  --accent: var(--k-data);
-  border-left-width: 3px;
-}
-
-.card.family-field.is-classified {
-  --accent: var(--sensitive);
-}
-
-.card.family-field.is-classified .card-kind {
-  color: var(--sensitive);
-}
-
 /* A box that stores the selected data entry. */
 .card.is-store {
   border-color: var(--k-data);
@@ -1338,20 +1321,6 @@ ul.plain {
   display: grid;
   gap: 4px;
   font-size: 0.86rem;
-}
-
-.react-flow__edge.lineage path {
-  stroke: var(--k-data);
-  stroke-width: 1.8;
-}
-
-.react-flow__edge.lineage.is-derived path {
-  stroke-dasharray: 6 3;
-}
-
-.react-flow__edge.lineage .react-flow__edge-text {
-  font-family: var(--f-mono);
-  font-size: 10px;
 }
 
 .canvas-empty {
@@ -1466,4 +1435,170 @@ ol.timeline > li.is-skipped {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A datastore's tables, inside it. */
+.card-tables {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+}
+
+.card-tables svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.card-tables.is-on {
+  color: var(--k-data);
+  border-color: var(--k-data);
+}
+
+.card-tables + .card-toggle {
+  margin-left: 4px;
+}
+
+.table-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--k-data);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.78rem;
+  transition:
+    opacity 200ms ease,
+    box-shadow 300ms ease,
+    border-color 300ms ease;
+}
+
+.table-card.emphasis-current {
+  border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
+}
+
+.table-card.emphasis-highlight {
+  border-color: var(--k-data);
+}
+
+.table-card.emphasis-dim {
+  opacity: 0.4;
+}
+
+.table-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  height: 52px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.table-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-table {
+  font-family: var(--f-mono);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.table-rows {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-row:hover {
+  background: var(--surface-2);
+}
+
+.table-rows li.is-lit .table-row {
+  background: color-mix(in srgb, var(--k-data) 18%, transparent);
+  font-weight: 600;
+}
+
+.table-mark {
+  width: 18px;
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.table-field {
+  font-family: var(--f-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-class {
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  color: var(--sensitive);
+}
+
+.table-type {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.table-empty {
+  padding: 2px 10px;
+  color: var(--muted);
+}
+
+/* A foreign key between two tables. */
+.react-flow__edge.fk path {
+  stroke: var(--k-data);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+
+/* Data on the move: a selected message or field flows along its arrows. */
+.react-flow__edge.rel.is-flow path {
+  stroke: var(--k-data);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 6;
+  animation: data-flow 0.9s linear infinite;
+}
+
+@keyframes data-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.rel.is-flow path {
+    animation: none;
+  }
 }

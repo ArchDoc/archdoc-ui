@@ -498,6 +498,10 @@
                     "required": {
                       "type": "boolean"
                     },
+                    "references": {
+                      "description": "The field this one points to, as Entry.field (or Entry, for its key), like a foreign key. Taken from a type that names another entry, and from foreign keys in the source.",
+                      "type": "string"
+                    },
                     "status": {
                       "type": "string",
                       "enum": ["active", "planned", "deprecated"],

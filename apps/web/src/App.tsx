@@ -14,8 +14,8 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
-import { LineageCanvas } from "./components/LineageCanvas.js";
 import { Sidebar } from "./components/Sidebar.js";
+import { dataPlaces } from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
   boundaryLabel,
@@ -80,6 +80,8 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   // The last simulation, with its sample, so it reruns when the model reloads.
   const [simRun, setSimRun] = useState<{ journey: string; sample: Record<string, unknown> }>();
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
+  // Datastores opened to show their tables.
+  const [tables, setTables] = useState<ReadonlySet<string>>(() => new Set());
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
   const [journeyId, setJourneyId] = useState<string>();
@@ -112,6 +114,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   // After a live reload, drop references to things that no longer exist.
   useEffect(() => {
     setExpanded((prev) => new Set([...prev].filter((id) => model.elements.has(id))));
+    setTables((prev) => new Set([...prev].filter((id) => model.elements.has(id))));
     setSelected((prev) => (prev && exists(model, prev, landscape) ? prev : undefined));
     setSimRun((prev) => (prev && model.journeys.has(prev.journey) ? prev : undefined));
     setJourneyId((prev) => (prev && model.journeys.has(prev) ? prev : undefined));
@@ -122,8 +125,8 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     [model, landscape, groupBy],
   );
   const view = useMemo(
-    () => ({ expanded, focus: focused && !journey ? selected : undefined, grouping }),
-    [expanded, focused, journey, selected, grouping],
+    () => ({ expanded, focus: focused && !journey ? selected : undefined, grouping, tables }),
+    [expanded, focused, journey, selected, grouping, tables],
   );
 
   const select = useCallback(
@@ -141,7 +144,24 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
           hidden.every((a) => prev.has(a)) ? prev : new Set([...prev, ...hidden]),
         );
       }
-      if (key.startsWith("data:") || key.startsWith("field:")) return;
+      if (key.startsWith("data:") || key.startsWith("field:")) {
+        // Open what the data goes through: the boxes it travels between, and its stores' tables.
+        const entries = key.startsWith("data:")
+          ? [key.slice(5)]
+          : (lineageEntries(model, key.slice(6)) ?? []);
+        const places = entries.map((e) => dataPlaces(model, e));
+        const stores = places.flatMap((p) => p.stores);
+        const open = [...stores, ...places.flatMap((p) => p.ends)].flatMap((id) =>
+          ancestorsOf(model, id),
+        );
+        setExpanded((prev) =>
+          open.every((a) => prev.has(a)) ? prev : new Set([...prev, ...open]),
+        );
+        setTables((prev) =>
+          stores.every((id) => prev.has(id)) ? prev : new Set([...prev, ...stores]),
+        );
+        return;
+      }
       if (key.startsWith("domain:")) {
         // A domain is a box only when grouping by domain.
         setGroupBy("domain");
@@ -152,6 +172,16 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     },
     [model],
   );
+
+  const toggleTables = useCallback((id: string) => {
+    setTables((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setCenterOn(`element:${id}`);
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -311,9 +341,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       />
 
       <main className="canvas" aria-label="Architecture diagram">
-        {selected?.startsWith("field:") ? (
-          <LineageCanvas model={model} field={selected.slice(6)} onSelect={select} />
-        ) : (
+        {
           <Canvas
             model={model}
             grouping={grouping}
@@ -326,9 +354,10 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
             onCentered={() => setCenterOn(undefined)}
             onSelect={select}
             onToggle={toggle}
+            onTables={toggleTables}
             compare={compare}
           />
-        )}
+        }
         {journey && currentStep ? (
           <section className="journey-bar" aria-label="Journey steps">
             <div className="journey-bar-title">
@@ -489,6 +518,21 @@ function usePanelWidth(): [number, (w: number) => void] {
     }
   }, []);
   return [width, set];
+}
+
+/** The entries a field's lineage goes through. */
+function lineageEntries(model: Model, ref: string): string[] | undefined {
+  const l = lineage(model, ref);
+  if (!l) return undefined;
+  return [
+    ...new Set([
+      l.field.entry,
+      ...[...l.upstream, ...l.downstream].flatMap((e) => [
+        e.to.entry,
+        ...e.from.map((f) => f.entry),
+      ]),
+    ]),
+  ];
 }
 
 function exists(model: Model, key: string, landscape?: LandscapeInfo): boolean {

@@ -49,7 +49,7 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
               "elk.padding": `[top=${GROUP_HEADER},left=28,bottom=28,right=28]`,
             },
           }
-        : { id: n.id, width: NODE_WIDTH, height: NODE_HEIGHT },
+        : { id: n.id, width: n.size?.width ?? NODE_WIDTH, height: n.size?.height ?? NODE_HEIGHT },
     );
   }
 

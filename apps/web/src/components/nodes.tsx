@@ -1,10 +1,11 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import type { MouseEvent } from "react";
+import type { TableInfo } from "../graph/graph.js";
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
 export interface CardData extends Record<string, unknown> {
-  family: "actor" | "element" | "external" | "group" | "data" | "field";
+  family: "actor" | "element" | "external" | "group";
   label: string;
   kind: string;
   detail?: string | undefined;
@@ -22,11 +23,12 @@ export interface CardData extends Record<string, unknown> {
   selected: boolean;
   /** The box the current journey step crosses into. */
   entered?: boolean | undefined;
-  /** A field with a classification, in a lineage graph. */
-  classified?: boolean | undefined;
-  /** In the data view: the box stores the selected data entry. */
+  /** The box stores the selected data entry. */
   stores?: boolean | undefined;
   onToggle?: (() => void) | undefined;
+  /** A datastore: show or hide the tables it stores. */
+  onTables?: (() => void) | undefined;
+  tablesOpen?: boolean | undefined;
 }
 
 export type CardNode = Node<CardData, "card">;
@@ -66,7 +68,6 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
     data.entered ? "is-entered" : "",
-    data.classified ? "is-classified" : "",
     data.stores ? "is-store" : "",
   ]
     .filter(Boolean)
@@ -94,6 +95,25 @@ export function Card({ data }: NodeProps<CardNode>) {
         ) : null}
         {data.status && data.status !== "active" ? (
           <span className="card-status">{data.status}</span>
+        ) : null}
+        {data.onTables ? (
+          <button
+            type="button"
+            className={`card-toggle card-tables nodrag${data.tablesOpen ? " is-on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onTables?.();
+            }}
+            title={data.tablesOpen ? "Hide its tables" : "Show its tables"}
+            aria-label={
+              data.tablesOpen ? `Hide ${data.label}'s tables` : `Show ${data.label}'s tables`
+            }
+            aria-pressed={data.tablesOpen}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v14H4zM4 10h16M4 14.5h16M10 10v9" />
+            </svg>
+          </button>
         ) : null}
         {data.onToggle ? (
           <button
@@ -123,4 +143,60 @@ export function Card({ data }: NodeProps<CardNode>) {
   );
 }
 
-export const nodeTypes = { card: Card };
+export interface TableData extends Record<string, unknown> {
+  table: TableInfo;
+  /** The entry as the explorer names it, without this repo's namespace. */
+  label: string;
+  emphasis: Emphasis;
+  /** Fields that point at another table. */
+  references: ReadonlySet<string>;
+  /** Fields to light up, such as a lineage's. */
+  lit?: ReadonlySet<string> | undefined;
+  onField?: ((field: string) => void) | undefined;
+}
+
+export type TableNode = Node<TableData, "table">;
+
+/** A datastore's table, inside it: the entry it stores, and a row per field. */
+export function Table({ data }: NodeProps<TableNode>) {
+  const { table } = data;
+  return (
+    <div className={`table-card emphasis-${data.emphasis}`}>
+      <Handle type="target" position={Position.Left} className="handle" />
+      <div className="table-head">
+        <span className="table-name">{data.label}</span>
+        <span className="table-table">{table.table}</span>
+      </div>
+      <ul className="table-rows">
+        {table.fields.map((f) => (
+          <li key={f.name} className={data.lit?.has(f.name) ? "is-lit" : undefined}>
+            <button
+              type="button"
+              className="table-row nodrag"
+              title={`${f.name}: where its value comes from and goes`}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onField?.(f.name);
+              }}
+            >
+              <span className="table-mark">
+                {f.name === table.key ? "PK" : data.references.has(f.name) ? "FK" : ""}
+              </span>
+              <span className="table-field">{f.name}</span>
+              {f.classification && !ROUTINE.has(f.classification) ? (
+                <span className="table-class">{f.classification}</span>
+              ) : null}
+              <span className="table-type">{f.type ?? ""}</span>
+            </button>
+          </li>
+        ))}
+        {table.fields.length === 0 ? <li className="table-empty">No fields modeled</li> : null}
+      </ul>
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+const ROUTINE = new Set(["public", "internal"]);
+
+export const nodeTypes = { card: Card, table: Table };

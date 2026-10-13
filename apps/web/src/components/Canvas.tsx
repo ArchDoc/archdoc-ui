@@ -1,13 +1,13 @@
 import type { JourneyNode, Model, ModelDiff, Simulation } from "@archdoc/core/browser";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { dataFocus } from "../graph/data.js";
+import { type DataFocus, dataFocus, lineageFocus } from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
 import { type Layout, layoutGraph, type Point } from "../graph/layout.js";
 import { edgeTypes, type RoutedEdge } from "./edges.js";
-import { type CardNode, type Emphasis, nodeTypes } from "./nodes.js";
+import { type CardNode, type Emphasis, nodeTypes, type TableNode } from "./nodes.js";
 
 export interface CanvasProps {
   model: Model;
@@ -24,6 +24,8 @@ export interface CanvasProps {
   onCentered: () => void;
   onSelect: (key: string | undefined) => void;
   onToggle: (elementId: string) => void;
+  /** Show or hide a datastore's tables. */
+  onTables: (elementId: string) => void;
   /** Show changes against a base model. */
   compare?: { base: Model; diff: ModelDiff } | undefined;
 }
@@ -69,17 +71,34 @@ export function Canvas(props: CanvasProps) {
     return out;
   }, [model, journey, grouping]);
 
-  // A selected data entry: where it's stored, and where it travels.
-  const focus = useMemo(
-    () => (selected?.startsWith("data:") ? dataFocus(model, view, selected.slice(5)) : undefined),
-    [model, view, selected],
-  );
+  // A selected data entry (or field's lineage): where it's stored, where it travels, and its tables.
+  const focus = useMemo<
+    (DataFocus & { entries: string[]; fields?: Set<string> | undefined }) | undefined
+  >(() => {
+    if (selected?.startsWith("data:")) {
+      const entry = selected.slice(5);
+      return { ...dataFocus(model, view, entry), entries: [entry] };
+    }
+    if (selected?.startsWith("field:")) return lineageFocus(model, view, selected.slice(6));
+    return undefined;
+  }, [model, view, selected]);
+  // Tables of the focused entries, the field's own (or the entry's) first.
+  const focusTables = useMemo(() => {
+    const out = new Map<string, "current" | "highlight">();
+    if (!focus) return out;
+    for (const n of graph.nodes) {
+      const i = n.table ? focus.entries.indexOf(n.table.entry) : -1;
+      if (i >= 0) out.set(n.id, i === 0 ? "current" : "highlight");
+    }
+    return out;
+  }, [focus, graph]);
 
   const emphasis = useMemo(() => {
     const map = new Map<string, Emphasis>();
     if (focus) {
       for (const k of focus.nodes) map.set(k, "highlight");
       for (const k of focus.stores) map.set(k, "current");
+      for (const [k, e] of focusTables) map.set(k, e);
       return map;
     }
     if (journey) {
@@ -107,14 +126,52 @@ export function Canvas(props: CanvasProps) {
       }
     }
     return map;
-  }, [journey, steps, step, selected, graph, focus]);
+  }, [journey, steps, step, selected, graph, focus, focusTables]);
   const dimming = journey !== undefined || selected !== undefined;
 
-  const nodes = useMemo<CardNode[]>(() => {
+  const nodes = useMemo<(CardNode | TableNode)[]>(() => {
     if (!layout) return [];
-    return layout.graph.nodes.flatMap((n) => {
+    const references = new Map<string, Set<string>>();
+    for (const e of layout.graph.edges) {
+      if (!e.reference) continue;
+      references.set(e.source, (references.get(e.source) ?? new Set()).add(e.reference.field));
+    }
+    return layout.graph.nodes.flatMap((n): (CardNode | TableNode)[] => {
       const box = layout.boxes.get(n.id);
       if (!box) return [];
+      if (n.table) {
+        const t = n.table;
+        const prefix = `${t.entry}.`;
+        return [
+          {
+            id: n.id,
+            type: "table" as const,
+            position: { x: box.x, y: box.y },
+            parentId: n.parentId,
+            width: box.width,
+            height: box.height,
+            selectable: false,
+            draggable: false,
+            zIndex: 2,
+            data: {
+              table: t,
+              label: t.entry.startsWith(`${model.namespace}.`)
+                ? t.entry.slice(model.namespace.length + 1)
+                : t.entry,
+              emphasis: emphasis.get(n.id) ?? (dimming ? "dim" : "normal"),
+              references: references.get(n.id) ?? new Set(),
+              lit: focus?.fields
+                ? new Set(
+                    [...focus.fields]
+                      .filter((f) => f.startsWith(prefix))
+                      .map((f) => f.slice(prefix.length)),
+                  )
+                : undefined,
+              onField: (field: string) => props.onSelect(`field:${t.entry}.${field}`),
+            },
+          },
+        ];
+      }
       const ghost = overlay?.ghosts.has(n.id) && compare;
       const info = describe(ghost ? compare.base : model, n.id, grouping);
       const element = n.kind === "element" ? model.elements.get(n.id.slice(8)) : undefined;
@@ -141,6 +198,11 @@ export function Canvas(props: CanvasProps) {
             stores: focus?.stores.has(n.id),
             onToggle:
               element && element.childIds.length > 0 ? () => props.onToggle(element.id) : undefined,
+            onTables:
+              element && Object.keys(element.spec.stores ?? {}).length > 0
+                ? () => props.onTables(element.id)
+                : undefined,
+            tablesOpen: element ? view.tables?.has(element.id) : undefined,
           },
         },
       ];
@@ -152,6 +214,9 @@ export function Canvas(props: CanvasProps) {
     dimming,
     selected,
     props.onToggle,
+    props.onTables,
+    props.onSelect,
+    view.tables,
     overlay,
     compare,
     grouping,
@@ -179,6 +244,22 @@ export function Canvas(props: CanvasProps) {
       sharing.set(pair, [...(sharing.get(pair) ?? []), s.step]);
     }
     const regular: RoutedEdge[] = layout.graph.edges.map((e) => {
+      if (e.reference) {
+        const lit = focusTables.has(e.source) || focusTables.has(e.target);
+        return {
+          id: e.id,
+          type: "routed" as const,
+          source: e.source,
+          target: e.target,
+          data: { points: layout.routes.get(e.id) },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+          className: ["fk", dimming && !lit ? "is-dim" : ""].filter(Boolean).join(" "),
+          label: e.id === hoverEdge ? `${e.reference.field} → ${e.reference.to}` : undefined,
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 4,
+          zIndex: 3,
+        };
+      }
       const lit = focus
         ? focus.edges.has(e.id)
         : !journey && selected !== undefined && (e.source === selected || e.target === selected);
@@ -202,6 +283,8 @@ export function Canvas(props: CanvasProps) {
             : "",
           overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
           lit ? "is-lit" : "",
+          // A selected message or field travels along its arrows.
+          lit && focus ? "is-flow" : "",
           dimming && !lit ? "is-dim" : "",
         ]
           .filter(Boolean)
@@ -254,6 +337,7 @@ export function Canvas(props: CanvasProps) {
     overlay,
     crossings,
     focus,
+    focusTables,
     props.simulation,
   ]);
 
@@ -299,6 +383,30 @@ export function Canvas(props: CanvasProps) {
     requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 450 }));
   }, [layout, graph, grouping?.by, centerOn, flow]);
 
+  // Move to a selected entry's (or field's) stores, tables, and arrows, once they're laid out.
+  const focusKey = focus ? selected : undefined;
+  const lastFocusKey = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!focusKey || !focus || !layout || layout.graph !== graph) return;
+    if (lastFocusKey.current === focusKey) return;
+    const targets = [...focusTables.keys(), ...focus.stores, ...focus.nodes].filter((id) =>
+      nodes.some((n) => n.id === id),
+    );
+    if (!targets.length) return;
+    lastFocusKey.current = focusKey;
+    requestAnimationFrame(() => {
+      void flow.fitView({
+        nodes: targets.map((id) => ({ id })),
+        duration: 700,
+        padding: 0.3,
+        maxZoom: 1.2,
+      });
+    });
+  }, [focusKey, focus, focusTables, layout, graph, nodes, flow]);
+  useEffect(() => {
+    if (!focusKey) lastFocusKey.current = undefined;
+  }, [focusKey]);
+
   // Keep the current journey step in view.
   useEffect(() => {
     const current = steps.find((s) => s.step === step);
@@ -320,13 +428,21 @@ export function Canvas(props: CanvasProps) {
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodeClick={(_, node) => {
+        if (node.type === "table") {
+          return props.onSelect(`data:${(node as TableNode).data.table.entry}`);
+        }
         if (!node.id.startsWith("group:")) return props.onSelect(node.id);
         // A team's box selects the team; a domain's box, the domain.
         const g = grouping?.groups.get(node.id);
         if (g?.id) props.onSelect(g.by === "team" ? `actor:${g.id}` : `domain:${g.id}`);
       }}
       onNodeDoubleClick={(_, node) => {
-        if (node.id.startsWith("element:")) props.onToggle(node.id.slice(8));
+        if (!node.id.startsWith("element:")) return;
+        const el = model.elements.get(node.id.slice(8));
+        // A datastore with nothing inside opens into its tables.
+        if (el && el.childIds.length === 0 && Object.keys(el.spec.stores ?? {}).length) {
+          props.onTables(el.id);
+        } else props.onToggle(node.id.slice(8));
       }}
       onPaneClick={() => props.onSelect(undefined)}
       onEdgeMouseEnter={(_, edge) => setHoverEdge(edge.id)}

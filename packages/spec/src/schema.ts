@@ -313,6 +313,12 @@ export const DataFieldSchema = z.strictObject({
     .optional()
     .describe("Allowed values, for an enum"),
   required: z.boolean().optional(),
+  references: z
+    .string()
+    .optional()
+    .describe(
+      "The field this one points to, as Entry.field (or Entry, for its key), like a foreign key. Taken from a type that names another entry, and from foreign keys in the source.",
+    ),
   status: StatusSchema.optional(),
 });
 

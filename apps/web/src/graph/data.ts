@@ -10,7 +10,7 @@ import {
   qualifyData,
   SIMULATED_NOW,
 } from "@archdoc/core/browser";
-import { type Graph, type GraphNode, liftKey, type ViewState } from "./graph.js";
+import { liftKey, type ViewState } from "./graph.js";
 
 /** Classifications that don't need a reviewer's attention. */
 const ROUTINE = new Set(["public", "internal"]);
@@ -42,6 +42,14 @@ export function dataFocus(model: Model, view: ViewState, entry: string): DataFoc
   for (const s of dataStores(model)) {
     if (same(s.data)) focus.stores.add(liftKey(model, view, { type: "element", id: s.element }));
   }
+  // An API or topic that accepts, returns, or carries it, even when nothing here sends it.
+  for (const e of model.elements.values()) {
+    for (const p of e.spec.provides ?? []) {
+      const names = [p.accepts, p.returns, p.carries].flat().filter((d): d is string => !!d);
+      if (names.some((d) => same(d)))
+        focus.nodes.add(liftKey(model, view, { type: "element", id: e.id }));
+    }
+  }
   for (const f of dataFlows(model)) {
     if (!same(f.data)) continue;
     const a = liftKey(model, view, f.from);
@@ -55,94 +63,57 @@ export function dataFocus(model: Model, view: ViewState, entry: string): DataFoc
   return focus;
 }
 
-/** Labels and details for the boxes of a lineage graph. */
-export interface LineageInfo {
-  graph: Graph;
-  /** By node key: entry:<ref> or field:<ref>.<field>. */
-  nodes: Map<
-    string,
-    {
-      label: string;
-      kind: "entry" | "field";
-      classification?: string | undefined;
-      detail?: string | undefined;
-      focus?: boolean;
-    }
-  >;
-  /** By edge ID: the expression and the mapping. */
-  edges: Map<string, { expression: string; mapping: string; copy: boolean }>;
+/** What a field's lineage lights up: every entry on the way, where they're stored and sent, and the fields themselves. */
+export interface LineageFocus extends DataFocus {
+  /** Qualified entries on the way, the field's own first. */
+  entries: string[];
+  /** entry.field for every field on the way. */
+  fields: Set<string>;
 }
 
-/**
- * A field's lineage as a graph: one box per entry, holding the fields on the
- * way, with an edge per mapping expression. `ref` is entry.field.
- */
-export function lineageGraph(model: Model, ref: string): LineageInfo | undefined {
+export function lineageFocus(model: Model, view: ViewState, ref: string): LineageFocus | undefined {
   const l = lineage(model, ref);
   if (!l) return undefined;
-  const nodes: LineageInfo["nodes"] = new Map();
-  const graphNodes = new Map<string, GraphNode>();
-  const edges: LineageInfo["edges"] = new Map();
-  const graphEdges: Graph["edges"] = [];
-  const short = (entry: string) =>
-    entry.startsWith(`${model.namespace}.`) ? entry.slice(model.namespace.length + 1) : entry;
-
-  const addField = (f: { entry: string; field: string }) => {
-    const entryKey = `entry:${f.entry}`;
-    if (!graphNodes.has(entryKey)) {
-      graphNodes.set(entryKey, {
-        id: entryKey,
-        kind: "group",
-        isGroup: true,
-        hiddenChildren: 0,
-        depth: 0,
-      });
-      const tables = l.stored.get(f.entry) ?? [];
-      nodes.set(entryKey, {
-        label: short(f.entry),
-        kind: "entry",
-        detail: tables.length
-          ? tables
-              .map(
-                (t) =>
-                  `${t.namespace === model.namespace ? "" : `${t.namespace}.`}${t.element} (${t.table})`,
-              )
-              .join(", ")
-          : undefined,
-      });
-    }
-    const key = `field:${f.entry}.${f.field}`;
-    if (!graphNodes.has(key)) {
-      graphNodes.set(key, {
-        id: key,
-        kind: "element",
-        parentId: entryKey,
-        isGroup: false,
-        hiddenChildren: 0,
-        depth: 1,
-      });
-      nodes.set(key, {
-        label: f.field,
-        kind: "field",
-        classification: l.classifications.get(`${f.entry}.${f.field}`),
-        focus: f.entry === l.field.entry && f.field === l.field.field,
-      });
-    }
-    return key;
-  };
-
-  addField(l.field);
+  const fields = new Set<string>([`${l.field.entry}.${l.field.field}`]);
   for (const e of [...l.upstream, ...l.downstream]) {
-    const to = addField(e.to);
-    for (const f of e.from) {
-      const from = addField(f);
-      const id = `${from}->${to}`;
-      if (edges.has(id)) continue;
-      edges.set(id, { expression: e.expression, mapping: e.mapping, copy: e.copy });
-      graphEdges.push({ id, source: from, target: to, relationships: [], planned: false });
-    }
+    fields.add(`${e.to.entry}.${e.to.field}`);
+    for (const f of e.from) fields.add(`${f.entry}.${f.field}`);
   }
-  return { graph: { nodes: [...graphNodes.values()], edges: graphEdges }, nodes, edges };
+  const entries = [...new Set([...fields].map((f) => f.slice(0, f.lastIndexOf("."))))];
+  const focus: LineageFocus = {
+    entries,
+    fields,
+    stores: new Set(),
+    nodes: new Set(),
+    edges: new Set(),
+  };
+  for (const entry of entries) {
+    const f = dataFocus(model, view, entry);
+    for (const k of f.stores) focus.stores.add(k);
+    for (const k of f.nodes) focus.nodes.add(k);
+    for (const k of f.edges) focus.edges.add(k);
+  }
+  return focus;
+}
+
+/** Element IDs where an entry is stored, and the elements it travels between, to open on the canvas. */
+export function dataPlaces(model: Model, entry: string): { stores: string[]; ends: string[] } {
+  const same = (data: string) => qualifyData(data, model.namespace) === entry;
+  const stores = dataStores(model)
+    .filter((s) => same(s.data))
+    .map((s) => s.element);
+  const providers = [...model.elements.values()]
+    .filter((e) =>
+      (e.spec.provides ?? []).some((p) =>
+        [p.accepts, p.returns, p.carries].flat().some((d) => !!d && same(d)),
+      ),
+    )
+    .map((e) => e.id);
+  const ends = dataFlows(model)
+    .filter((f) => same(f.data))
+    .flatMap((f) => [f.from, f.to])
+    .flatMap((t) => (t.type === "element" ? [t.id] : []));
+  return { stores: [...new Set(stores)], ends: [...new Set([...ends, ...providers])] };
 }
 
 /** True when a journey says anything about data: what steps send, decide, map, create, or change. */

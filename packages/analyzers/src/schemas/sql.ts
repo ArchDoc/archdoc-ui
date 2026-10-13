@@ -5,7 +5,8 @@ import { stripComments } from "./api.js";
  * SQL migrations: `sql: migrations#charges` replays every .sql file under
  * migrations (or one file), in file-name order, and reads the table as the
  * last migration leaves it: CREATE TABLE, ALTER TABLE (add, drop, rename,
- * and retype columns), RENAME TO, DROP TABLE, and CREATE TYPE ... AS ENUM.
+ * and retype columns; add foreign keys), RENAME TO, DROP TABLE, and CREATE
+ * TYPE ... AS ENUM. Foreign keys (REFERENCES) say where a column points.
  */
 export const sql: SchemaImporter = {
   kind: "sql",
@@ -74,6 +75,14 @@ class Database {
       }
       return;
     }
+    const fk = foreignKey(d);
+    if (fk) {
+      for (const [i, c] of fk.columns.entries()) {
+        const col = cols.get(ident(c));
+        if (col) col.references = { name: fk.table, field: fk.fields[i] };
+      }
+      return;
+    }
     if (/^(constraint|unique|foreign key|check|index|key)\b/i.test(d)) return;
     const m = /^(\S+) (.*)$/.exec(d);
     if (!m) return;
@@ -89,6 +98,8 @@ class Database {
       )[0] ?? lower;
     const field = this.type(type.trim());
     if (/\bnot null\b|\bprimary key\b/.test(lower)) field.required = true;
+    const ref = /\breferences\s+(\S+?)\s*(?:\(([^)]*)\))?(?:\s|$)/i.exec(rest);
+    if (ref) field.references = { name: ident(ref[1] as string), field: ref[2] && ident(ref[2]) };
     return field;
   }
 
@@ -116,7 +127,10 @@ class Database {
         [
           /^add (?:column )?(?:if not exists )?(.*)$/i,
           ([def]) => {
-            if (!/^(constraint|primary key|unique|foreign key|check)\b/i.test(def))
+            if (
+              foreignKey(def) ||
+              !/^(constraint|primary key|unique|foreign key|check)\b/i.test(def)
+            )
               this.define(cols, def);
           },
         ],
@@ -152,6 +166,23 @@ class Database {
       ]);
     }
   }
+}
+
+/** A table constraint naming a foreign key: [CONSTRAINT x] FOREIGN KEY (a, b) REFERENCES t (c, d). */
+function foreignKey(
+  def: string,
+): { columns: string[]; table: string; fields: string[] } | undefined {
+  const m =
+    /^(?:constraint \S+ )?foreign key\s*\(([^)]*)\)\s*references\s+(\S+?)\s*(?:\(([^)]*)\))?(?:\s|$)/i.exec(
+      def.trim(),
+    );
+  if (!m) return undefined;
+  const names = (s: string | undefined) =>
+    (s ?? "")
+      .split(",")
+      .map((c) => ident(c.trim()))
+      .filter(Boolean);
+  return { columns: names(m[1]), table: ident(m[2] as string), fields: names(m[3]) };
 }
 
 /** Runs the handler of the first pattern that matches, with its groups. */
