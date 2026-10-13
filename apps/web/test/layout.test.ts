@@ -3,7 +3,7 @@ import { buildModel, type Model } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
 import { buildGraph, defaultExpanded, type Graph } from "../src/graph/graph.js";
 import { groupLandscape } from "../src/graph/groups.js";
-import { type Box, layoutGraph, NODE_HEIGHT, NODE_WIDTH } from "../src/graph/layout.js";
+import { type Box, layoutGraph, NODE_HEIGHT, NODE_WIDTH, type Point } from "../src/graph/layout.js";
 import { landscapeInfo, landscapeModel, ridesModel } from "./fixtures.js";
 
 const example = (name: string): Model =>
@@ -55,9 +55,9 @@ describe.each(["repo", "team", "domain"] as const)("layoutGraph: a landscape by 
   });
 });
 
-/** Every node at a finite position, with no overlapping siblings. */
+/** Every node at a finite position, with no overlapping siblings, and every edge routed between their borders. */
 async function expectClean(graph: Graph) {
-  const boxes = await layoutGraph(graph);
+  const { boxes, routes } = await layoutGraph(graph);
   expect(boxes.size).toBe(graph.nodes.length);
   for (const box of boxes.values()) {
     for (const v of [box.x, box.y, box.width, box.height]) expect(Number.isFinite(v)).toBe(true);
@@ -69,13 +69,39 @@ async function expectClean(graph: Graph) {
       expect(overlaps(abs.get(a.id) as Box, abs.get(b.id) as Box), `${a.id} / ${b.id}`).toBe(false);
     }
   }
+  const ends = new Set<string>();
+  for (const e of graph.edges) {
+    const route = routes.get(e.id) as Point[];
+    expect(route, e.id).toBeDefined();
+    const [start, end] = [route[0] as Point, route[route.length - 1] as Point];
+    expect(onBorder(start, abs.get(e.source) as Box), `${e.id} starts on ${e.source}`).toBe(true);
+    expect(onBorder(end, abs.get(e.target) as Box), `${e.id} ends on ${e.target}`).toBe(true);
+    // No two edges leave or enter a box at the same point.
+    for (const [node, p] of [
+      [e.source, start],
+      [e.target, end],
+    ] as const) {
+      const key = `${node}@${Math.round(p.x)},${Math.round(p.y)}`;
+      expect(ends.has(key), `${e.id} shares a point on ${node}`).toBe(false);
+      ends.add(key);
+    }
+  }
+}
+
+/** A point on (or within a pixel of) a box's border. */
+function onBorder(p: Point, b: Box): boolean {
+  const inX = p.x >= b.x - 1 && p.x <= b.x + b.width + 1;
+  const inY = p.y >= b.y - 1 && p.y <= b.y + b.height + 1;
+  const nearX = Math.abs(p.x - b.x) <= 1 || Math.abs(p.x - b.x - b.width) <= 1;
+  const nearY = Math.abs(p.y - b.y) <= 1 || Math.abs(p.y - b.y - b.height) <= 1;
+  return (nearX && inY) || (nearY && inX);
 }
 
 describe("layoutGraph: groups", () => {
   it("keeps children inside their group, below its header", async () => {
     const model = ridesModel();
     const graph = buildGraph(model, { expanded: new Set(["platform"]) });
-    const boxes = await layoutGraph(graph);
+    const { boxes } = await layoutGraph(graph);
     const group = boxes.get("element:platform") as Box;
     expect(group.width).toBeGreaterThan(NODE_WIDTH);
     for (const id of ["element:platform.api", "element:platform.db", "element:platform.cache"]) {
@@ -88,7 +114,7 @@ describe("layoutGraph: groups", () => {
   });
 
   it("sizes leaves consistently", async () => {
-    const boxes = await layoutGraph(buildGraph(ridesModel(), { expanded: new Set() }));
+    const { boxes } = await layoutGraph(buildGraph(ridesModel(), { expanded: new Set() }));
     expect(boxes.get("element:orphan")).toMatchObject({ width: NODE_WIDTH, height: NODE_HEIGHT });
     expect(boxes.get("actor:lurker")).toMatchObject({ width: NODE_WIDTH, height: NODE_HEIGHT });
   });

@@ -33,7 +33,7 @@ export function LineageCanvas({ model, field, onSelect }: LineageCanvasProps) {
     setBoxes(undefined);
     if (info) {
       void layoutGraph(info.graph).then((b) => {
-        if (!cancelled) setBoxes(b);
+        if (!cancelled) setBoxes(b.boxes);
       });
     }
     return () => {

@@ -1,19 +1,12 @@
 import type { JourneyNode, Model, ModelDiff, Simulation } from "@archdoc/core/browser";
-import {
-  Background,
-  Controls,
-  type Edge,
-  MarkerType,
-  MiniMap,
-  ReactFlow,
-  useReactFlow,
-} from "@xyflow/react";
+import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { dataFocus } from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
-import { type Box, layoutGraph } from "../graph/layout.js";
+import { type Layout, layoutGraph, type Point } from "../graph/layout.js";
+import { edgeTypes, type RoutedEdge } from "./edges.js";
 import { type CardNode, type Emphasis, nodeTypes } from "./nodes.js";
 
 export interface CanvasProps {
@@ -46,15 +39,15 @@ export function Canvas(props: CanvasProps) {
     [model, view, compare],
   );
   const graph = useMemo(() => overlay?.graph ?? buildGraph(model, view), [overlay, model, view]);
-  const [layout, setLayout] = useState<{ graph: Graph; boxes: Map<string, Box> }>();
+  const [layout, setLayout] = useState<{ graph: Graph } & Layout>();
   const flow = useReactFlow();
   const [hoverEdge, setHoverEdge] = useState<string>();
   const firstFit = useRef(true);
 
   useEffect(() => {
     let cancelled = false;
-    void layoutGraph(graph).then((boxes) => {
-      if (!cancelled) setLayout({ graph, boxes });
+    void layoutGraph(graph).then((result) => {
+      if (!cancelled) setLayout({ graph, ...result });
     });
     return () => {
       cancelled = true;
@@ -167,9 +160,25 @@ export function Canvas(props: CanvasProps) {
     focus,
   ]);
 
-  const edges = useMemo<Edge[]>(() => {
+  const edges = useMemo<RoutedEdge[]>(() => {
     if (!layout) return [];
-    const regular: Edge[] = layout.graph.edges.map((e) => {
+    // A journey step follows the route of the relationship between the same boxes.
+    const routeBetween = new Map<string, Point[]>();
+    for (const e of layout.graph.edges) {
+      const points = layout.routes.get(e.id);
+      if (!points) continue;
+      routeBetween.set(`${e.source}->${e.target}`, points);
+      if (!routeBetween.has(`${e.target}->${e.source}`)) {
+        routeBetween.set(`${e.target}->${e.source}`, [...points].reverse());
+      }
+    }
+    // Steps that share a route spread their numbers along it, so none hides another.
+    const sharing = new Map<string, number[]>();
+    for (const s of steps) {
+      const pair = [s.source, s.target].sort().join("|");
+      sharing.set(pair, [...(sharing.get(pair) ?? []), s.step]);
+    }
+    const regular: RoutedEdge[] = layout.graph.edges.map((e) => {
       const lit = focus
         ? focus.edges.has(e.id)
         : !journey && selected !== undefined && (e.source === selected || e.target === selected);
@@ -179,8 +188,10 @@ export function Canvas(props: CanvasProps) {
         .join(" · ");
       return {
         id: e.id,
+        type: "routed" as const,
         source: e.source,
         target: e.target,
+        data: { points: layout.routes.get(e.id) },
         markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
         className: [
           "rel",
@@ -202,27 +213,35 @@ export function Canvas(props: CanvasProps) {
       };
     });
     // A step inside a collapsed group has nowhere to go; the group is still highlighted.
-    const journeyOverlay: Edge[] = steps
+    const journeyOverlay: RoutedEdge[] = steps
       .filter((s) => s.source !== s.target)
-      .map((s) => ({
-        id: `step:${s.id}`,
-        source: s.source,
-        target: s.target,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-        className: [
-          "journey",
-          s.step === step ? "is-current" : "",
-          crossings.has(s.step) ? "is-crossing" : "",
-          props.simulation && props.simulation.steps[s.step]?.ran === false ? "is-skipped" : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
-        label: String(s.step + 1),
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 10,
-        animated: s.step === step,
-        zIndex: s.step === step ? 10 : 6,
-      }));
+      .map((s) => {
+        const shared = sharing.get([s.source, s.target].sort().join("|")) ?? [s.step];
+        return {
+          id: `step:${s.id}`,
+          type: "routed" as const,
+          source: s.source,
+          target: s.target,
+          data: {
+            points: routeBetween.get(`${s.source}->${s.target}`),
+            labelAt: (shared.indexOf(s.step) + 1) / (shared.length + 1),
+          },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
+          className: [
+            "journey",
+            s.step === step ? "is-current" : "",
+            crossings.has(s.step) ? "is-crossing" : "",
+            props.simulation && props.simulation.steps[s.step]?.ran === false ? "is-skipped" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          label: String(s.step + 1),
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 10,
+          animated: s.step === step,
+          zIndex: s.step === step ? 10 : 6,
+        };
+      });
     return [...regular, ...journeyOverlay];
   }, [
     layout,
@@ -299,6 +318,7 @@ export function Canvas(props: CanvasProps) {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodeClick={(_, node) => {
         if (!node.id.startsWith("group:")) return props.onSelect(node.id);
         // A team's box selects the team; a domain's box, the domain.

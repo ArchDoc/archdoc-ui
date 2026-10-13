@@ -1,4 +1,4 @@
-import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
+import ELK, { type ElkExtendedEdge, type ElkNode } from "elkjs/lib/elk.bundled.js";
 import type { Graph } from "./graph.js";
 
 export interface Box {
@@ -9,6 +9,21 @@ export interface Box {
   height: number;
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Layout {
+  boxes: Map<string, Box>;
+  /**
+   * Each edge's route, in absolute coordinates: from a point on the source's
+   * border, through its bends, to a point on the target's. Edges that share a
+   * box leave and enter it at different points.
+   */
+  routes: Map<string, Point[]>;
+}
+
 export const NODE_WIDTH = 220;
 export const NODE_HEIGHT = 76;
 export const GROUP_HEADER = 62;
@@ -16,11 +31,12 @@ export const GROUP_HEADER = 62;
 const elk = new ELK();
 
 /**
- * Lays the graph out left to right with ELK's layered algorithm. Groups are
- * compound nodes, so relationships between children of different groups are
- * routed across the hierarchy.
+ * Lays the graph out left to right with ELK's layered algorithm, with
+ * orthogonal routes for the edges. Groups are compound nodes, so
+ * relationships between children of different groups are routed across the
+ * hierarchy.
  */
-export async function layoutGraph(graph: Graph): Promise<Map<string, Box>> {
+export async function layoutGraph(graph: Graph): Promise<Layout> {
   const elkNodes = new Map<string, ElkNode>();
   for (const n of graph.nodes) {
     elkNodes.set(
@@ -30,7 +46,7 @@ export async function layoutGraph(graph: Graph): Promise<Map<string, Box>> {
             id: n.id,
             children: [],
             layoutOptions: {
-              "elk.padding": `[top=${GROUP_HEADER},left=20,bottom=20,right=20]`,
+              "elk.padding": `[top=${GROUP_HEADER},left=28,bottom=28,right=28]`,
             },
           }
         : { id: n.id, width: NODE_WIDTH, height: NODE_HEIGHT },
@@ -43,9 +59,17 @@ export async function layoutGraph(graph: Graph): Promise<Map<string, Box>> {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
       "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "70",
-      "elk.spacing.nodeNode": "28",
-      "elk.spacing.componentComponent": "50",
+      "elk.edgeRouting": "ORTHOGONAL",
+      // Routes in absolute coordinates, wherever ELK keeps the edge.
+      "elk.json.edgeCoords": "ROOT",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "110",
+      "elk.layered.spacing.edgeNodeBetweenLayers": "28",
+      "elk.layered.spacing.edgeEdgeBetweenLayers": "14",
+      "elk.spacing.nodeNode": "36",
+      "elk.spacing.edgeNode": "22",
+      "elk.spacing.edgeEdge": "14",
+      "elk.spacing.componentComponent": "60",
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     },
     children: [],
@@ -68,17 +92,22 @@ export async function layoutGraph(graph: Graph): Promise<Map<string, Box>> {
 
   const result = await elk.layout(root);
   const boxes = new Map<string, Box>();
-  const visit = (nodes: ElkNode[] | undefined) => {
-    for (const n of nodes ?? []) {
+  const routes = new Map<string, Point[]>();
+  const visit = (node: ElkNode) => {
+    for (const e of (node.edges ?? []) as ElkExtendedEdge[]) {
+      const s = e.sections?.[0];
+      if (s) routes.set(e.id, [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]);
+    }
+    for (const n of node.children ?? []) {
       boxes.set(n.id, {
         x: n.x ?? 0,
         y: n.y ?? 0,
         width: n.width ?? NODE_WIDTH,
         height: n.height ?? NODE_HEIGHT,
       });
-      visit(n.children);
+      visit(n);
     }
   };
-  visit(result.children);
-  return boxes;
+  visit(result);
+  return { boxes, routes };
 }

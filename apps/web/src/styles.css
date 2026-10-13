@@ -215,17 +215,68 @@ kbd {
 }
 
 .side-section {
-  margin-top: 16px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.side-section:first-of-type {
+  border-top: 0;
+}
+
+.side-section .side-list {
+  margin-bottom: 6px;
 }
 
 .side-section h2 {
-  margin: 0 0 4px 6px;
+  margin: 0;
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
   font-family: var(--f-mono);
   font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.side-head:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.side-head:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.side-chevron {
+  display: inline-block;
+  width: 10px;
+  transition: transform 150ms ease;
+}
+
+.side-section.is-open .side-chevron {
+  transform: rotate(90deg);
+}
+
+.side-title {
+  flex: 1;
+  text-align: left;
+}
+
+.side-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .side-list {
