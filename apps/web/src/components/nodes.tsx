@@ -1,6 +1,12 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import type { MouseEvent } from "react";
-import { OTHERS_LISTED, type RowInfo, type TableInfo } from "../graph/graph.js";
+import {
+  OTHERS_LISTED,
+  ROWS_BADGE,
+  type RowInfo,
+  showValue,
+  type TableInfo,
+} from "../graph/graph.js";
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
@@ -253,6 +259,8 @@ export interface RowTableData extends Record<string, unknown> {
   label: string;
   rows: RowInfo[];
   columns: string[];
+  /** Each column's width, from the layout. */
+  columnWidths: number[];
   /** Columns that point at another row. */
   references: ReadonlySet<string>;
   /** Each line's emphasis: the current step's rows, the rows they point at, the rest. */
@@ -276,6 +284,12 @@ export function RowTable({ data }: NodeProps<RowTableNode>) {
         </span>
       </div>
       <table className="rows-grid">
+        <colgroup>
+          <col style={{ width: ROWS_BADGE }} />
+          {columns.map((c, i) => (
+            <col key={c} style={{ width: data.columnWidths[i] }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th aria-label="Row" />
@@ -319,18 +333,19 @@ export function RowTable({ data }: NodeProps<RowTableNode>) {
                 </td>
                 {columns.map((c) => (
                   <td key={c} className={row.changed.has(c) ? "is-changed" : undefined}>
-                    {show(row.record[c])}
+                    {showValue(row.record[c])}
                   </td>
                 ))}
               </tr>
             );
           })}
           {data.hiddenRows ? (
-            <tr className="rows-hidden">
-              <td />
-              <td colSpan={columns.length}>
-                +{data.hiddenRows} other row{data.hiddenRows === 1 ? "" : "s"} the journey doesn't
-                use
+            <tr
+              className="rows-hidden"
+              title={`${data.hiddenRows} other row${data.hiddenRows === 1 ? "" : "s"} the journey doesn't use`}
+            >
+              <td colSpan={columns.length + 1}>
+                +{data.hiddenRows} row{data.hiddenRows === 1 ? "" : "s"} not used
               </td>
             </tr>
           ) : null}
@@ -340,10 +355,6 @@ export function RowTable({ data }: NodeProps<RowTableNode>) {
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );
-}
-
-function show(v: unknown): string {
-  return v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
 }
 
 export interface OthersData extends Record<string, unknown> {

@@ -256,6 +256,7 @@ export function Canvas(props: CanvasProps) {
               label: shortEntry(t.entry),
               rows: n.rows,
               columns: n.columns ?? [],
+              columnWidths: n.columnWidths ?? [],
               references: new Set(fieldRefs.filter((x) => x.entry === t.entry).map((x) => x.field)),
               lines: lines.get(n.id) ?? [],
               hiddenRows: n.hiddenRows,

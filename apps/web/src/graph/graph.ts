@@ -89,6 +89,8 @@ export interface GraphNode {
   /** For a table of rows: the records, and the columns shown. */
   rows?: RowInfo[] | undefined;
   columns?: string[] | undefined;
+  /** For a table of rows: each column's width in pixels, to fit its header and values. */
+  columnWidths?: number[] | undefined;
   /** For a table of rows: rows the journey doesn't use, left out. */
   hiddenRows?: number | undefined;
   /** For the box of folded tables: the tables in it. */
@@ -227,8 +229,14 @@ export function buildGraph(model: Model, state: ViewState): Graph {
           // One small table per table: a line per record, with a port on each side of each line.
           const node = `rows:${id}:${table}`;
           const columns = rowColumns(rows, references, key);
+          const linking = new Set(references.filter((r) => r.entry === entry).map((r) => r.field));
+          const columnWidths = rowColumnWidths(columns, rows, linking);
           const hiddenRows = all.length - rows.length;
-          const size = rowTableSize(columns.length, rows.length, hiddenRows > 0);
+          const size = rowTableSize(columnWidths, rows.length, hiddenRows > 0, {
+            label: entry.slice(entry.lastIndexOf(".") + 1),
+            table,
+            rows: rows.length,
+          });
           nodes.set(node, {
             id: node,
             kind: "rowtable",
@@ -240,6 +248,7 @@ export function buildGraph(model: Model, state: ViewState): Graph {
             table: { element: id, table, entry, key, fields: [] },
             rows,
             columns,
+            columnWidths,
             hiddenRows,
             ports: rows.flatMap((_, i) => {
               const y = rowY(i);
@@ -466,14 +475,45 @@ export function rowColumns(
     .slice(0, 6);
 }
 
-/** A table of rows' size: a badge column, then about 92px per column, and a line for hidden rows. */
+/** The badge column at the start of each line of a table of rows. */
+export const ROWS_BADGE = 62;
+// Approximate character widths: monospace values and headers, the sans-serif title.
+const VALUE_CHAR = 7;
+const HEADER_CHAR = 6.4;
+const TITLE_CHAR = 9;
+
+/** Each column's width: enough for its header (with the arrow, if it points at a row) and its longest value. */
+export function rowColumnWidths(
+  columns: readonly string[],
+  rows: readonly RowInfo[],
+  linking: ReadonlySet<string>,
+): number[] {
+  return columns.map((c) => {
+    const header = c.length * HEADER_CHAR + (linking.has(c) ? 12 : 0);
+    const value = Math.max(0, ...rows.map((r) => showValue(r.record[c]).length)) * VALUE_CHAR;
+    return Math.round(Math.min(170, Math.max(44, header, value) + 14));
+  });
+}
+
+/** How a table of rows shows a value. */
+export function showValue(v: unknown): string {
+  return v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
+}
+
+/** A table of rows' size: its title, a badge column and its columns, and a line for hidden rows. */
 export function rowTableSize(
-  columns: number,
+  widths: readonly number[],
   rows: number,
   hidden = false,
+  title?: { label: string; table: string; rows: number },
 ): { width: number; height: number } {
+  const head = title
+    ? 28 +
+      title.label.length * TITLE_CHAR +
+      `${title.table} · ${title.rows} rows`.length * VALUE_CHAR
+    : 0;
   return {
-    width: Math.max(240, 64 + columns * 92),
+    width: Math.ceil(Math.max(180, head, ROWS_BADGE + widths.reduce((a, b) => a + b, 0) + 2)),
     height: ROWS_HEADER + ROWS_COLUMNS + (rows + (hidden ? 1 : 0)) * ROWS_LINE + 6,
   };
 }
@@ -482,6 +522,8 @@ const OWN_LAYOUT = {
   "elk.hierarchyHandling": "SEPARATE_CHILDREN",
   "elk.algorithm": "layered",
   "elk.edgeRouting": "ORTHOGONAL",
+  // Places tables to keep lines short and straight, rather than looping around the edge.
+  "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
 };
 
 /** The key of a row in an Involvement. */

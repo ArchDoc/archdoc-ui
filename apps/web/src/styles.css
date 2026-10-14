@@ -1845,6 +1845,15 @@ table.fields.compact caption {
   background: var(--surface-2);
 }
 
+.rows-head .table-name {
+  min-width: 0;
+}
+
+.rows-head .table-table {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .rows-grid {
   width: 100%;
   border-collapse: collapse;
@@ -1869,11 +1878,6 @@ table.fields.compact caption {
   color: var(--muted);
   font-weight: 500;
   font-size: 0.66rem;
-}
-
-.rows-grid th:first-child,
-.rows-grid td.rows-badge {
-  width: 52px;
 }
 
 .rows-grid tbody tr + tr td {
@@ -1972,6 +1976,7 @@ table.fields.compact caption {
 }
 
 .rows-grid tr.rows-hidden td {
+  padding-left: 14px;
   color: var(--muted);
   font-style: italic;
   font-size: 0.66rem;

@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { buildModel, simulate } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
 import { journeyInvolvement, journeyRows } from "../src/graph/data.js";
-import { buildGraph, COMPACT_OVER, defaultExpanded, reorderRows } from "../src/graph/graph.js";
+import {
+  buildGraph,
+  COMPACT_OVER,
+  defaultExpanded,
+  ROWS_BADGE,
+  reorderRows,
+  rowColumnWidths,
+  rowTableSize,
+} from "../src/graph/graph.js";
 import { layoutGraph } from "../src/graph/layout.js";
 import { countCrossings } from "../src/graph/route.js";
 
@@ -17,6 +25,19 @@ const journey = model.journeys.get("order-to-cash");
 if (!journey) throw new Error("no journey");
 const sim = simulate(model, "order-to-cash", sample);
 const last = journey.steps.length - 1;
+/** How much longer a route is than the shortest orthogonal path between its ends. */
+const detour = (r: { x: number; y: number }[]) => {
+  let length = 0;
+  for (let i = 1; i < r.length; i++) {
+    const [a, b] = [r[i - 1], r[i]] as [{ x: number; y: number }, { x: number; y: number }];
+    length += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+  }
+  const [first, last] = [r[0], r[r.length - 1]] as [
+    { x: number; y: number },
+    { x: number; y: number },
+  ];
+  return length - Math.abs(last.x - first.x) - Math.abs(last.y - first.y);
+};
 const ids = (rows: Map<string, { id?: string | undefined }[]>, entry: string) =>
   rows.get(`erp.${entry}`)?.map((r) => r.id);
 
@@ -325,7 +346,44 @@ describe("a big database during a journey", () => {
       countCrossings(l.routes.values()),
     );
     expect(before).toBeGreaterThan(100);
-    expect(after).toBeLessThan(folded as number);
-    expect(after).toBeLessThanOrEqual(20);
+    expect(after).toBeLessThanOrEqual(folded as number);
+    expect(after).toBeLessThanOrEqual(12);
+    // No line between rows loops far out of its way, even with every table shown.
+    const all = await layoutGraph(
+      buildGraph(model, { ...base, rows: { stores: db, data: rows }, showAll: db }),
+    );
+    for (const l of [untangled, all]) {
+      const detours = [...l.routes]
+        .filter(([id]) => id.startsWith("rowref:"))
+        .map(([, r]) => detour(r));
+      expect(Math.max(...detours)).toBeLessThan(300);
+    }
+  });
+});
+
+describe("a table of rows' size", () => {
+  const row = (record: Record<string, unknown>) =>
+    ({ entry: "erp.Shipment", record, changed: new Set<string>(), origin: "existing" }) as never;
+  it("fits each column's header and longest value, and the title", () => {
+    const widths = rowColumnWidths(
+      ["id", "warehouse_id", "notes"],
+      [row({ id: "sh-1", warehouse_id: "wh-north", notes: "x".repeat(80) })],
+      new Set(["warehouse_id"]),
+    );
+    const [id, warehouse, notes] = widths as [number, number, number];
+    // A short column stays narrow; one that points at a row fits its header and arrow.
+    expect(id).toBeLessThan(warehouse);
+    expect(warehouse).toBeGreaterThanOrEqual("warehouse_id".length * 6.4 + 12);
+    // A long value is cut off at a limit, rather than widening the table without end.
+    expect(notes).toBe(170);
+    const size = rowTableSize(widths, 1);
+    expect(size.width).toBeGreaterThanOrEqual(ROWS_BADGE + id + warehouse + notes);
+    // A narrow table is still wide enough for its title.
+    const titled = rowTableSize([44], 2, false, {
+      label: "Warehouse",
+      table: "warehouses",
+      rows: 2,
+    });
+    expect(titled.width).toBeGreaterThan(rowTableSize([44], 2).width);
   });
 });
