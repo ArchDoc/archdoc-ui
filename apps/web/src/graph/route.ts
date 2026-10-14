@@ -45,3 +45,41 @@ const toward = (from: Point, to: Point, by: number): Point => {
     ? from
     : { x: from.x + ((to.x - from.x) * by) / d, y: from.y + ((to.y - from.y) * by) / d };
 };
+
+/**
+ * How many times routed lines cross each other: pairs of segments from
+ * different lines that intersect, not counting shared ends. Fewer is tidier.
+ */
+export function countCrossings(routes: Iterable<Point[]>): number {
+  const segments: { line: number; a: Point; b: Point }[] = [];
+  let line = 0;
+  for (const points of routes) {
+    for (let i = 1; i < points.length; i++) {
+      segments.push({ line, a: points[i - 1] as Point, b: points[i] as Point });
+    }
+    line++;
+  }
+  let crossings = 0;
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = i + 1; j < segments.length; j++) {
+      const s = segments[i] as (typeof segments)[number];
+      const t = segments[j] as (typeof segments)[number];
+      if (s.line !== t.line && intersects(s.a, s.b, t.a, t.b)) crossings++;
+    }
+  }
+  return crossings;
+}
+
+/** Whether two segments cross in their interiors. */
+function intersects(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
+  const d = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const d1 = d(p3, p4, p1);
+  const d2 = d(p3, p4, p2);
+  const d3 = d(p1, p2, p3);
+  const d4 = d(p1, p2, p4);
+  const eps = 0.5;
+  return (
+    ((d1 > eps && d2 < -eps) || (d1 < -eps && d2 > eps)) &&
+    ((d3 > eps && d4 < -eps) || (d3 < -eps && d4 > eps))
+  );
+}

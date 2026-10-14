@@ -3,6 +3,7 @@ import {
   DataRegistry,
   dataFlows,
   dataStores,
+  fieldReferences,
   type JourneyNode,
   lineage,
   type Model,
@@ -13,7 +14,7 @@ import {
   type StepMessage,
   stepMessage,
 } from "@archdoc/core/browser";
-import { liftKey, type RowInfo, type ViewState } from "./graph.js";
+import { liftKey, type RowInfo, rowKey, type ViewState } from "./graph.js";
 
 /** Classifications that don't need a reviewer's attention. */
 const ROUTINE = new Set(["public", "internal"]);
@@ -473,4 +474,78 @@ export function journeyRows(
     }
   }
   return new Map([...rows].filter(([, l]) => l.length));
+}
+
+/** What a journey uses in its datastores, so the rest can be folded away. */
+export interface Involvement {
+  /** Qualified entries it writes, sends, or reads. */
+  entries: Set<string>;
+  /** Rows it wrote and the rows they point at, as entry#id; set when there are rows. */
+  rows?: Set<string> | undefined;
+}
+
+/**
+ * The entries a journey uses: what its steps write and send, and what its
+ * decisions and mappings read. With rows, the ones it wrote by now and the
+ * rows its decisions and mappings read, and the rows those point at.
+ */
+export function journeyInvolvement(
+  model: Model,
+  journey: JourneyNode,
+  rows?: ReadonlyMap<string, RowInfo[]>,
+): Involvement {
+  const registry = new DataRegistry(model);
+  const ns = model.namespace;
+  const entries = new Set<string>();
+  const read = new Set<string>();
+  for (const s of journey.steps) {
+    const d = stepData(model, journey, s.index);
+    for (const w of d.writes) entries.add(w.entry);
+    for (const e of d.message?.entries ?? []) entries.add(e.entry);
+    const inputs = [
+      ...Object.entries(
+        (s.spec.decides && registry.logic(s.spec.decides)?.node.spec.input) || {},
+      ).map(([, ref]) => qualifyData(ref, registry.logic(s.spec.decides ?? "")?.namespace ?? ns)),
+      ...Object.entries((s.spec.via && registry.mapping(s.spec.via)?.node.spec.from) || {}).map(
+        ([, ref]) => qualifyData(ref, registry.mapping(s.spec.via ?? "")?.namespace ?? ns),
+      ),
+    ];
+    for (const e of inputs) {
+      entries.add(e);
+      read.add(e);
+    }
+  }
+  if (!rows) return { entries };
+
+  const involved = new Set<string>();
+  // The rows the journey writes and reads; what they point at is added, one hop out.
+  const queue: { entry: string; row: RowInfo }[] = [];
+  const add = (entry: string, row: RowInfo, index: number, used = true) => {
+    const key = rowKey(entry, row.id, index);
+    if (involved.has(key)) return;
+    involved.add(key);
+    if (used) queue.push({ entry, row });
+  };
+  for (const [entry, list] of rows) {
+    list.forEach((row, i) => {
+      if (row.origin === "created" || row.step !== undefined) add(entry, row, i);
+    });
+    // The row the journey's decisions and mappings read: the first of each.
+    const first = list[0];
+    if (first && read.has(entry)) add(entry, first, 0);
+  }
+  const references = fieldReferences(model, registry);
+  while (queue.length) {
+    const { entry, row } = queue.shift() as { entry: string; row: RowInfo };
+    for (const r of references) {
+      if (r.entry !== entry) continue;
+      const value = row.record[r.field];
+      if (value === undefined || value === null || value === "") continue;
+      const targets = rows.get(r.to.entry) ?? [];
+      const i = targets.findIndex((t) => String(t.record[r.to.field]) === String(value));
+      const target = targets[i];
+      if (target) add(r.to.entry, target, i, false);
+    }
+  }
+  return { entries, rows: involved };
 }

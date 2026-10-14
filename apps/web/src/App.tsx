@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
-import { dataPlaces, journeyRows, journeyStores } from "./graph/data.js";
+import { dataPlaces, journeyInvolvement, journeyRows, journeyStores } from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
   boundaryLabel,
@@ -83,6 +83,9 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   // Datastores opened to show their tables, and those showing a journey's rows instead.
   const [tables, setTables] = useState<ReadonlySet<string>>(() => new Set());
   const [rowStores, setRowStores] = useState<ReadonlySet<string>>(() => new Set());
+  // During a journey, datastores showing every table, and tables brought back one at a time.
+  const [showAll, setShowAll] = useState<ReadonlySet<string>>(() => new Set());
+  const [extra, setExtra] = useState<ReadonlySet<string>>(() => new Set());
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
   const [journeyId, setJourneyId] = useState<string>();
@@ -130,6 +133,11 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     () => (journey && rowStores.size ? journeyRows(model, journey, step, simulation) : undefined),
     [model, journey, step, simulation, rowStores],
   );
+  // What the journey uses; the rest of its datastores folds away.
+  const involved = useMemo(
+    () => (journey ? journeyInvolvement(model, journey, rows) : undefined),
+    [model, journey, rows],
+  );
   const view = useMemo(
     () => ({
       expanded,
@@ -137,8 +145,23 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       grouping,
       tables,
       rows: rows && { stores: rowStores, data: rows },
+      involved,
+      showAll,
+      extra,
     }),
-    [expanded, focused, journey, selected, grouping, tables, rows, rowStores],
+    [
+      expanded,
+      focused,
+      journey,
+      selected,
+      grouping,
+      tables,
+      rows,
+      rowStores,
+      involved,
+      showAll,
+      extra,
+    ],
   );
 
   const select = useCallback(
@@ -241,6 +264,8 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
           ]),
       );
       setTables((prev) => new Set([...prev, ...stores]));
+      setShowAll(new Set());
+      setExtra(new Set());
       // A sample named after the journey (samples/<journey>*.json) runs right away.
       const sample = matchingSample(samples, id);
       if (sample) setSimRun({ journey: id, sample });
@@ -396,6 +421,8 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
             onToggle={toggle}
             onTables={toggleTables}
             onStoreView={storeView}
+            onShowTable={(entry) => setExtra((prev) => new Set([...prev, entry]))}
+            onShowAll={(id) => setShowAll((prev) => new Set([...prev, id]))}
             compare={compare}
           />
         }
@@ -447,6 +474,23 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
                         </button>
                       ))}
                     </span>
+                    <label className="journey-store-all">
+                      <input
+                        type="checkbox"
+                        checked={showAll.has(id)}
+                        onChange={(e) => {
+                          const on = e.currentTarget.checked;
+                          setShowAll((prev) => {
+                            const next = new Set(prev);
+                            if (on) next.add(id);
+                            else next.delete(id);
+                            return next;
+                          });
+                          if (!on) setExtra(new Set());
+                        }}
+                      />{" "}
+                      All tables
+                    </label>
                   </fieldset>
                 ))}
                 {!simulation && rowStores.size ? (

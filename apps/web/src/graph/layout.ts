@@ -1,5 +1,6 @@
 import ELK, { type ElkExtendedEdge, type ElkNode } from "elkjs/lib/elk.bundled.js";
-import type { Graph } from "./graph.js";
+import { type Graph, reorderRows } from "./graph.js";
+import { countCrossings } from "./route.js";
 
 export interface Box {
   /** Relative to the parent group, like React Flow sub-flows. */
@@ -36,7 +37,11 @@ const elk = new ELK();
  * relationships between children of different groups are routed across the
  * hierarchy.
  */
-export async function layoutGraph(graph: Graph): Promise<Layout> {
+async function layoutOnce(
+  graph: Graph,
+  /** Extra ELK options for the root, to compare layouts. */
+  options: Record<string, string> = {},
+): Promise<Layout> {
   const elkNodes = new Map<string, ElkNode>();
   for (const n of graph.nodes) {
     elkNodes.set(
@@ -47,6 +52,7 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
             children: [],
             layoutOptions: {
               "elk.padding": `[top=${GROUP_HEADER},left=28,bottom=28,right=28]`,
+              ...n.layout,
             },
           }
         : {
@@ -89,6 +95,7 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
       "elk.spacing.componentComponent": "60",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+      ...options,
     },
     children: [],
     edges: graph.edges.map((e) => ({
@@ -132,4 +139,75 @@ export async function layoutGraph(graph: Graph): Promise<Layout> {
   };
   visit(result);
   return { boxes, routes };
+}
+
+export interface UntangledLayout extends Layout {
+  /** The graph as laid out: tables of rows may have their lines in a new order. */
+  graph: Graph;
+}
+
+/**
+ * Lays the graph out, then untangles the lines between rows: each table of
+ * rows sorts its lines by where the rows they link to sit (the barycenter
+ * heuristic), and the graph is laid out again, keeping whichever has fewer
+ * crossings. Graphs without tables of rows are laid out once.
+ */
+export async function layoutGraph(
+  graph: Graph,
+  options: Record<string, string> = {},
+  passes = 4,
+): Promise<UntangledLayout> {
+  let best = { graph, ...(await layoutOnce(graph, options)) };
+  if (!graph.edges.some((e) => e.rows)) return best;
+  let crossings = countCrossings(best.routes.values());
+  // Each pass reorders from the last one, which may be worse before it gets better.
+  let current = best;
+  for (let pass = 0; pass < passes && crossings > 0; pass++) {
+    const next = reorderRows(current.graph, barycenters(current.graph, current.boxes));
+    current = { graph: next, ...(await layoutOnce(next, options)) };
+    const c = countCrossings(current.routes.values());
+    if (c < crossings) {
+      best = current;
+      crossings = c;
+    }
+  }
+  return best;
+}
+
+/** For each table of rows, its lines ordered by the average height of the rows they link to. */
+function barycenters(graph: Graph, boxes: Map<string, Box>): Map<string, number[]> {
+  const parent = new Map(graph.nodes.map((n) => [n.id, n.parentId]));
+  const top = (id: string): number => {
+    const p = parent.get(id);
+    return (boxes.get(id)?.y ?? 0) + (p ? top(p) : 0);
+  };
+  const port = new Map(
+    graph.nodes.flatMap((n) => (n.ports ?? []).map((p) => [p.id, top(n.id) + p.y] as const)),
+  );
+  const linked = new Map<string, number[][]>();
+  for (const n of graph.nodes) {
+    if (n.rows)
+      linked.set(
+        n.id,
+        n.rows.map(() => []),
+      );
+  }
+  for (const e of graph.edges) {
+    if (!e.rows || !e.sourcePort || !e.targetPort) continue;
+    linked.get(e.source)?.[e.rows.from]?.push(port.get(e.targetPort) ?? 0);
+    linked.get(e.target)?.[e.rows.to]?.push(port.get(e.sourcePort) ?? 0);
+  }
+  const order = new Map<string, number[]>();
+  for (const [id, lines] of linked) {
+    const base = top(id);
+    const weight = lines.map((ys, i) =>
+      ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : base + i * 1e-3,
+    );
+    // Lines that link nowhere keep their place relative to each other.
+    order.set(
+      id,
+      lines.map((_, i) => i).sort((a, b) => (weight[a] as number) - (weight[b] as number) || a - b),
+    );
+  }
+  return order;
 }

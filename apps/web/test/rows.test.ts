@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { buildModel, simulate } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
-import { journeyRows } from "../src/graph/data.js";
-import { buildGraph, COMPACT_OVER, defaultExpanded } from "../src/graph/graph.js";
+import { journeyInvolvement, journeyRows } from "../src/graph/data.js";
+import { buildGraph, COMPACT_OVER, defaultExpanded, reorderRows } from "../src/graph/graph.js";
 import { layoutGraph } from "../src/graph/layout.js";
+import { countCrossings } from "../src/graph/route.js";
 
 // The ERP example: one database with 24 tables, and an order-to-cash journey
 // whose sample seeds several rows per table.
@@ -164,8 +165,8 @@ describe("the ERP database on the canvas", () => {
       { expanded: defaultExpanded(model), tables: db },
       { expanded: defaultExpanded(model), tables: db, rows: { stores: db, data: rows } },
     ]) {
-      const graph = buildGraph(model, view);
-      const { boxes, routes } = await layoutGraph(graph);
+      // The graph as laid out: untangling may have put a table's rows in a new order.
+      const { boxes, routes, graph } = await layoutGraph(buildGraph(model, view));
       expect(boxes.size).toBe(graph.nodes.length);
       for (const e of graph.edges) expect(routes.get(e.id), e.id).toBeDefined();
       // A line between rows starts and ends at the height of its rows.
@@ -185,5 +186,146 @@ describe("the ERP database on the canvas", () => {
         expect(route[route.length - 1]?.y, e.id).toBeCloseTo(top(e.target) + (to?.y ?? 0), 0);
       }
     }
+  });
+});
+
+describe("a big database during a journey", () => {
+  const db = new Set(["erp-db"]);
+  const base = { expanded: defaultExpanded(model), tables: db };
+  const rows = journeyRows(model, journey, last, sim);
+
+  it("folds the tables the journey doesn't use into one box", () => {
+    const involved = journeyInvolvement(model, journey);
+    expect([...involved.entries].sort()).toEqual([
+      "erp.Allocation",
+      "erp.BankTransaction",
+      "erp.Customer",
+      "erp.Invoice",
+      "erp.InvoiceLine",
+      "erp.Order",
+      "erp.OrderLine",
+      "erp.OrderRequest",
+      "erp.Payment",
+      "erp.PickList",
+      "erp.Shipment",
+      "erp.ShipmentLine",
+      "erp.Stock",
+    ]);
+    const graph = buildGraph(model, { ...base, involved });
+    // Ten of the 24 are stored tables it writes or reads; the order request and
+    // bank transaction are messages.
+    expect(graph.nodes.filter((n) => n.kind === "table")).toHaveLength(10);
+    const others = graph.nodes.find((n) => n.kind === "others");
+    expect(others?.folded?.map((f) => f.table)).toEqual([
+      "currencies",
+      "tax_rates",
+      "territories",
+      "sales_reps",
+      "addresses",
+      "contacts",
+      "categories",
+      "products",
+      "variants",
+      "price_lists",
+      "price_items",
+      "warehouses",
+      "returns",
+      "credit_notes",
+    ]);
+    // Brought back one at a time, or all at once.
+    const one = buildGraph(model, { ...base, involved, extra: new Set(["erp.Variant"]) });
+    expect(one.nodes.filter((n) => n.kind === "table")).toHaveLength(11);
+    const all = buildGraph(model, { ...base, involved, showAll: db });
+    expect(all.nodes.filter((n) => n.kind === "table")).toHaveLength(24);
+    expect(all.nodes.some((n) => n.kind === "others")).toBe(false);
+  });
+
+  it("shows the rows it wrote and read, and the rows those point at, hiding the rest", () => {
+    const involved = journeyInvolvement(model, journey, rows);
+    const graph = buildGraph(model, {
+      ...base,
+      rows: { stores: db, data: rows },
+      involved,
+    });
+    const table = (entry: string) => graph.nodes.find((n) => n.table?.entry === `erp.${entry}`);
+    // The new order, and the past one credit control reads.
+    expect(table("Order")?.rows?.map((r) => r.id)).toEqual(["so-0950", "so-1001"]);
+    // The orders' customers, not the third.
+    expect(table("Customer")?.rows?.map((r) => r.id)).toEqual(["cust-1", "cust-2"]);
+    expect(table("Customer")?.hiddenRows).toBe(1);
+    expect(table("Stock")?.rows?.map((r) => r.id)).toEqual(["st-1"]);
+    expect(table("Stock")?.hiddenRows).toBe(2);
+    // The lines' variants, one hop out; their products are two, so folded.
+    expect(table("Variant")?.rows?.map((r) => r.id)).toEqual(["WID-RED", "GAD-BLU"]);
+    expect(table("Product")).toBeUndefined();
+    expect(graph.nodes.find((n) => n.kind === "others")?.folded?.map((f) => f.table)).toEqual([
+      "contacts",
+      "categories",
+      "products",
+      "price_items",
+    ]);
+    // A table brought back shows all its rows.
+    const shown = buildGraph(model, {
+      ...base,
+      rows: { stores: db, data: rows },
+      involved,
+      extra: new Set(["erp.Customer"]),
+    });
+    const customers = shown.nodes.find((n) => n.table?.entry === "erp.Customer");
+    expect(customers?.rows).toHaveLength(3);
+    expect(customers?.hiddenRows ?? 0).toBe(0);
+  });
+
+  it("reorders a table's rows with the lines that link them", () => {
+    const graph = buildGraph(model, {
+      ...base,
+      rows: { stores: db, data: rows },
+      involved: journeyInvolvement(model, journey, rows),
+    });
+    const lines = graph.nodes.find((n) => n.table?.entry === "erp.OrderLine");
+    if (!lines?.rows) throw new Error("no order lines");
+    const reordered = reorderRows(graph, new Map([[lines.id, [1, 0]]]));
+    const after = reordered.nodes.find((n) => n.id === lines.id);
+    expect(after?.rows?.map((r) => r.id)).toEqual(["ol-2", "ol-1"]);
+    // Each edge still joins the same two rows, from its new place.
+    const rowOf = (g: typeof graph, node: string, i: number) =>
+      g.nodes.find((n) => n.id === node)?.rows?.[i]?.id;
+    const ends = (g: typeof graph) =>
+      g.edges
+        .filter((e) => e.rows && (e.source === lines.id || e.target === lines.id))
+        .map((e) => [
+          rowOf(g, e.source, e.rows?.from ?? -1),
+          rowOf(g, e.target, e.rows?.to ?? -1),
+          e.sourcePort?.endsWith(`#${e.rows?.from}:out`),
+          e.targetPort?.endsWith(`#${e.rows?.to}:in`),
+        ]);
+    expect(ends(reordered)).toEqual(ends(graph));
+    expect(ends(graph).length).toBeGreaterThan(0);
+  });
+
+  it("untangles: no crossings in the folded schema, and far fewer between rows", async () => {
+    const erd = await layoutGraph(
+      buildGraph(model, { ...base, involved: journeyInvolvement(model, journey) }),
+    );
+    expect(countCrossings(erd.routes.values())).toBe(0);
+
+    const tangled = await layoutGraph(
+      buildGraph(model, { ...base, rows: { stores: db, data: rows } }),
+      {},
+      0,
+    );
+    const graph = buildGraph(model, {
+      ...base,
+      rows: { stores: db, data: rows },
+      involved: journeyInvolvement(model, journey, rows),
+    });
+    const once = await layoutGraph(graph, {}, 0);
+    const untangled = await layoutGraph(graph);
+    const [before, folded, after] = [tangled, once, untangled].map((l) =>
+      countCrossings(l.routes.values()),
+    );
+    expect(before).toBeGreaterThan(100);
+    expect(after).toBeLessThan(folded as number);
+    expect(after).toBeLessThanOrEqual(20);
   });
 });

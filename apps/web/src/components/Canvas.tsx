@@ -11,12 +11,13 @@ import { type DataFocus, dataFocus, lineageFocus, stepData } from "../graph/data
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
-import { type Layout, layoutGraph, type Point } from "../graph/layout.js";
+import { layoutGraph, type Point, type UntangledLayout } from "../graph/layout.js";
 import { edgeTypes, type RoutedEdge } from "./edges.js";
 import {
   type CardNode,
   type Emphasis,
   nodeTypes,
+  type OthersNode,
   type RowTableNode,
   type TableNode,
 } from "./nodes.js";
@@ -40,6 +41,9 @@ export interface CanvasProps {
   onTables: (elementId: string) => void;
   /** During a journey: show an open datastore's schema or its rows. */
   onStoreView: (elementId: string, view: "erd" | "rows") => void;
+  /** Bring back one folded table, or every table in a datastore. */
+  onShowTable: (entry: string) => void;
+  onShowAll: (elementId: string) => void;
   /** Show changes against a base model. */
   compare?: { base: Model; diff: ModelDiff } | undefined;
 }
@@ -55,7 +59,8 @@ export function Canvas(props: CanvasProps) {
     [model, view, compare],
   );
   const graph = useMemo(() => overlay?.graph ?? buildGraph(model, view), [overlay, model, view]);
-  const [layout, setLayout] = useState<{ graph: Graph } & Layout>();
+  // `source` is the graph asked for; `graph` is it as laid out, rows possibly reordered.
+  const [layout, setLayout] = useState<{ source: Graph } & UntangledLayout>();
   const flow = useReactFlow();
   const [hoverEdge, setHoverEdge] = useState<string>();
   const firstFit = useRef(true);
@@ -63,7 +68,7 @@ export function Canvas(props: CanvasProps) {
   useEffect(() => {
     let cancelled = false;
     void layoutGraph(graph).then((result) => {
-      if (!cancelled) setLayout({ graph, ...result });
+      if (!cancelled) setLayout({ source: graph, ...result });
     });
     return () => {
       cancelled = true;
@@ -124,16 +129,18 @@ export function Canvas(props: CanvasProps) {
   }, [focus, graph, selected]);
 
   // In tables of rows, each line: the current step's rows, the rows they point at, the rest.
+  // By the laid-out graph, whose rows may be in a new order.
+  const laid = layout && layout.source === graph ? layout.graph : graph;
   const lines = useMemo(() => {
     const out = new Map<string, Emphasis[]>();
-    for (const n of graph.nodes) {
+    for (const n of laid.nodes) {
       if (n.kind !== "rowtable" || !n.rows) continue;
       out.set(
         n.id,
         n.rows.map((r) => (r.isNew || r.changed.size ? "current" : "dim")),
       );
     }
-    for (const e of graph.edges) {
+    for (const e of laid.edges) {
       if (!e.rows) continue;
       const from = out.get(e.source);
       const to = out.get(e.target);
@@ -143,7 +150,7 @@ export function Canvas(props: CanvasProps) {
         from[e.rows.from] = "highlight";
     }
     return out;
-  }, [graph]);
+  }, [laid]);
 
   const emphasis = useMemo(() => {
     const map = new Map<string, Emphasis>();
@@ -197,7 +204,7 @@ export function Canvas(props: CanvasProps) {
   }, [journey, steps, step, selected, graph, focus, focusTables, current, lines]);
   const dimming = journey !== undefined || selected !== undefined;
 
-  const nodes = useMemo<(CardNode | TableNode | RowTableNode)[]>(() => {
+  const nodes = useMemo<(CardNode | TableNode | RowTableNode | OthersNode)[]>(() => {
     if (!layout) return [];
     const shortEntry = (entry: string) =>
       entry.startsWith(`${model.namespace}.`) ? entry.slice(model.namespace.length + 1) : entry;
@@ -206,9 +213,31 @@ export function Canvas(props: CanvasProps) {
       if (!e.reference) continue;
       references.set(e.source, (references.get(e.source) ?? new Set()).add(e.reference.field));
     }
-    return layout.graph.nodes.flatMap((n): (CardNode | TableNode | RowTableNode)[] => {
+    return layout.graph.nodes.flatMap((n): (CardNode | TableNode | RowTableNode | OthersNode)[] => {
       const box = layout.boxes.get(n.id);
       if (!box) return [];
+      if (n.kind === "others" && n.folded) {
+        const store = n.parentId?.slice("element:".length) ?? "";
+        return [
+          {
+            id: n.id,
+            type: "others" as const,
+            position: { x: box.x, y: box.y },
+            parentId: n.parentId,
+            width: box.width,
+            height: box.height,
+            selectable: false,
+            draggable: false,
+            zIndex: 2,
+            data: {
+              tables: n.folded.map((f) => ({ ...f, label: shortEntry(f.entry) })),
+              emphasis: "normal" as const,
+              onShow: props.onShowTable,
+              onShowAll: () => props.onShowAll(store),
+            },
+          },
+        ];
+      }
       if (n.kind === "rowtable" && n.table && n.rows) {
         const t = n.table;
         return [
@@ -229,6 +258,7 @@ export function Canvas(props: CanvasProps) {
               columns: n.columns ?? [],
               references: new Set(fieldRefs.filter((x) => x.entry === t.entry).map((x) => x.field)),
               lines: lines.get(n.id) ?? [],
+              hiddenRows: n.hiddenRows,
               emphasis: emphasis.get(n.id) ?? "normal",
             },
           },
@@ -338,6 +368,8 @@ export function Canvas(props: CanvasProps) {
     props.onStoreView,
     journey,
     lines,
+    props.onShowTable,
+    props.onShowAll,
   ]);
 
   const edges = useMemo<RoutedEdge[]>(() => {
@@ -483,7 +515,7 @@ export function Canvas(props: CanvasProps) {
 
   useEffect(() => {
     // Wait for the layout of the current graph, or we'd fit the old size of the node.
-    if (!layout || layout.graph !== graph) return;
+    if (!layout || layout.source !== graph) return;
     const target = nodes.find((n) => n.id === centerOn);
     if (!target) return;
     requestAnimationFrame(() => {
@@ -500,7 +532,7 @@ export function Canvas(props: CanvasProps) {
   // Turning focus on or off changes what's on the canvas: show all of it.
   const lastFocus = useRef(view.focus);
   useEffect(() => {
-    if (!layout || layout.graph !== graph || lastFocus.current === view.focus) return;
+    if (!layout || layout.source !== graph || lastFocus.current === view.focus) return;
     lastFocus.current = view.focus;
     requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 450, maxZoom: 1.15 }));
   }, [layout, graph, view.focus, flow]);
@@ -508,7 +540,7 @@ export function Canvas(props: CanvasProps) {
   // Regrouping moves everything: show all of it.
   const lastBy = useRef(grouping?.by);
   useEffect(() => {
-    if (!layout || layout.graph !== graph || lastBy.current === grouping?.by) return;
+    if (!layout || layout.source !== graph || lastBy.current === grouping?.by) return;
     lastBy.current = grouping?.by;
     if (centerOn) return;
     requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 450 }));
@@ -518,7 +550,7 @@ export function Canvas(props: CanvasProps) {
   const focusKey = focus ? selected : undefined;
   const lastFocusKey = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!focusKey || !focus || !layout || layout.graph !== graph) return;
+    if (!focusKey || !focus || !layout || layout.source !== graph) return;
     if (lastFocusKey.current === focusKey) return;
     const targets = [...focusTables.keys(), ...focus.stores, ...focus.nodes].filter((id) =>
       nodes.some((n) => n.id === id),
@@ -541,7 +573,7 @@ export function Canvas(props: CanvasProps) {
   // Keep the current journey step in view: its arrow, or the rows and tables it writes.
   const written = useMemo(
     () =>
-      layout && layout.graph === graph
+      layout && layout.source === graph
         ? graph.nodes
             .filter(
               (n) =>

@@ -6,6 +6,7 @@ import {
   nodeKey,
   qualifyData,
 } from "@archdoc/core/browser";
+import type { Involvement } from "./data.js";
 import type { Grouping } from "./groups.js";
 
 /** What the canvas shows: which elements are open, and an optional focus. */
@@ -18,6 +19,14 @@ export interface ViewState {
   grouping?: Grouping | undefined;
   /** Datastore element IDs opened to show their tables. */
   tables?: ReadonlySet<string> | undefined;
+  /**
+   * During a journey, what it uses: other tables fold into one box per
+   * datastore, and other rows are hidden, except in `showAll` datastores and
+   * for `extra` entries brought back one at a time.
+   */
+  involved?: Involvement | undefined;
+  showAll?: ReadonlySet<string> | undefined;
+  extra?: ReadonlySet<string> | undefined;
   /** Opened datastores that show their rows instead of their tables, and the rows, by qualified entry. */
   rows?: { stores: ReadonlySet<string>; data: ReadonlyMap<string, RowInfo[]> } | undefined;
 }
@@ -41,7 +50,14 @@ export interface RowInfo {
   declared?: boolean | undefined;
 }
 
-export type GraphNodeKind = "actor" | "element" | "external" | "group" | "table" | "rowtable";
+export type GraphNodeKind =
+  | "actor"
+  | "element"
+  | "external"
+  | "group"
+  | "table"
+  | "rowtable"
+  | "others";
 
 /** A datastore's table, drawn inside it: the entry it stores and its fields. */
 export interface TableInfo {
@@ -73,6 +89,12 @@ export interface GraphNode {
   /** For a table of rows: the records, and the columns shown. */
   rows?: RowInfo[] | undefined;
   columns?: string[] | undefined;
+  /** For a table of rows: rows the journey doesn't use, left out. */
+  hiddenRows?: number | undefined;
+  /** For the box of folded tables: the tables in it. */
+  folded?: { entry: string; table: string }[] | undefined;
+  /** ELK options for a group's own layout, such as a datastore's tables. */
+  layout?: Record<string, string> | undefined;
   /** Where edges attach, relative to the node, such as each row's sides. */
   ports?: { id: string; side: "WEST" | "EAST"; x: number; y: number }[] | undefined;
 }
@@ -162,6 +184,8 @@ export function buildGraph(model: Model, state: ViewState): Graph {
       parentId:
         grouping?.parentOf.get(el.id) ?? (el.parentId ? `element:${el.parentId}` : undefined),
       isGroup: open || !!tables,
+      // A datastore showing rows lays its tables out on their own: fewer crossings between rows.
+      layout: tables && state.rows?.stores.has(el.id) ? OWN_LAYOUT : undefined,
       hiddenChildren: open ? 0 : el.childIds.length,
       depth: el.depth,
     });
@@ -180,18 +204,31 @@ export function buildGraph(model: Model, state: ViewState): Graph {
       if (!el || !nodes.has(`element:${id}`)) continue;
       const stores = Object.entries(el.spec.stores ?? {});
       const asRows = state.rows?.stores.has(id);
+      // During a journey, what it doesn't use folds away.
+      const involved = state.showAll?.has(id) ? undefined : state.involved;
+      const folded: { entry: string; table: string }[] = [];
       // A big schema shows keys, foreign keys, and sensitive fields; the rest are counted.
       const compact = stores.length > COMPACT_OVER;
       for (const [table, s] of stores) {
         const entry = qualifyData(s.entity, model.namespace);
         const key = s.key ?? "id";
+        const brought = state.extra?.has(entry) ?? false;
         if (asRows) {
-          const rows = state.rows?.data.get(entry) ?? [];
-          if (!rows.length) continue;
+          const all = state.rows?.data.get(entry) ?? [];
+          if (!all.length) continue;
+          const rows =
+            involved?.rows && !brought
+              ? all.filter((r, i) => involved.rows?.has(rowKey(entry, r.id, i)))
+              : all;
+          if (!rows.length) {
+            folded.push({ entry, table });
+            continue;
+          }
           // One small table per table: a line per record, with a port on each side of each line.
           const node = `rows:${id}:${table}`;
           const columns = rowColumns(rows, references, key);
-          const size = rowTableSize(columns.length, rows.length);
+          const hiddenRows = all.length - rows.length;
+          const size = rowTableSize(columns.length, rows.length, hiddenRows > 0);
           nodes.set(node, {
             id: node,
             kind: "rowtable",
@@ -203,6 +240,7 @@ export function buildGraph(model: Model, state: ViewState): Graph {
             table: { element: id, table, entry, key, fields: [] },
             rows,
             columns,
+            hiddenRows,
             ports: rows.flatMap((_, i) => {
               const y = rowY(i);
               return [
@@ -215,6 +253,10 @@ export function buildGraph(model: Model, state: ViewState): Graph {
             ...(rowNodes.get(entry) ?? []),
             ...rows.map((row, index) => ({ node, row, index })),
           ]);
+          continue;
+        }
+        if (involved && !brought && !involved.entries.has(entry)) {
+          folded.push({ entry, table });
           continue;
         }
         const all = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
@@ -247,6 +289,19 @@ export function buildGraph(model: Model, state: ViewState): Graph {
             fields,
             hidden: all.length - fields.length,
           },
+        });
+      }
+      if (folded.length) {
+        const node = `others:${id}`;
+        nodes.set(node, {
+          id: node,
+          kind: "others",
+          parentId: `element:${id}`,
+          isGroup: false,
+          hiddenChildren: 0,
+          depth: el.depth + 1,
+          size: othersSize(folded.length),
+          folded,
         });
       }
     }
@@ -411,17 +466,73 @@ export function rowColumns(
     .slice(0, 6);
 }
 
-/** A table of rows' size: a badge column, then about 92px per column. */
-export function rowTableSize(columns: number, rows: number): { width: number; height: number } {
+/** A table of rows' size: a badge column, then about 92px per column, and a line for hidden rows. */
+export function rowTableSize(
+  columns: number,
+  rows: number,
+  hidden = false,
+): { width: number; height: number } {
   return {
     width: Math.max(240, 64 + columns * 92),
-    height: ROWS_HEADER + ROWS_COLUMNS + rows * ROWS_LINE + 6,
+    height: ROWS_HEADER + ROWS_COLUMNS + (rows + (hidden ? 1 : 0)) * ROWS_LINE + 6,
   };
+}
+
+const OWN_LAYOUT = {
+  "elk.hierarchyHandling": "SEPARATE_CHILDREN",
+  "elk.algorithm": "layered",
+  "elk.edgeRouting": "ORTHOGONAL",
+};
+
+/** The key of a row in an Involvement. */
+export const rowKey = (entry: string, id: string | undefined, index: number) =>
+  `${entry}#${id ?? `@${index}`}`;
+
+/** The most folded tables the box lists by name. */
+export const OTHERS_LISTED = 12;
+
+function othersSize(count: number): { width: number; height: number } {
+  const lines = Math.min(count, OTHERS_LISTED) + (count > OTHERS_LISTED ? 1 : 0);
+  return { width: 220, height: 64 + lines * 20 };
 }
 
 /** The middle of line `index` in a table of rows. */
 function rowY(index: number): number {
   return ROWS_HEADER + ROWS_COLUMNS + index * ROWS_LINE + ROWS_LINE / 2;
+}
+
+/**
+ * The graph with each table of rows' lines in a new order (`order` lists
+ * old indexes, new order first), and its ports and lines between rows to match.
+ */
+export function reorderRows(graph: Graph, order: ReadonlyMap<string, number[]>): Graph {
+  const moved = new Map<string, Map<number, number>>();
+  const nodes = graph.nodes.map((n) => {
+    const o = order.get(n.id);
+    if (!o || !n.rows || !n.size) return n;
+    moved.set(n.id, new Map(o.map((old, i) => [old, i])));
+    const width = n.size.width;
+    return {
+      ...n,
+      rows: o.map((i) => n.rows?.[i] as RowInfo),
+      ports: o.flatMap((_, i) => [
+        { id: rowPort(n.id, i, "in"), side: "WEST" as const, x: 0, y: rowY(i) },
+        { id: rowPort(n.id, i, "out"), side: "EAST" as const, x: width, y: rowY(i) },
+      ]),
+    };
+  });
+  const edges = graph.edges.map((e) => {
+    if (!e.rows) return e;
+    const from = moved.get(e.source)?.get(e.rows.from) ?? e.rows.from;
+    const to = moved.get(e.target)?.get(e.rows.to) ?? e.rows.to;
+    return {
+      ...e,
+      rows: { from, to },
+      sourcePort: rowPort(e.source, from, "out"),
+      targetPort: rowPort(e.target, to, "in"),
+    };
+  });
+  return { nodes, edges };
 }
 
 function rowPort(node: string, index: number, side: "in" | "out"): string {

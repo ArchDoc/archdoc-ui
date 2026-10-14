@@ -1,6 +1,6 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import type { MouseEvent } from "react";
-import type { RowInfo, TableInfo } from "../graph/graph.js";
+import { OTHERS_LISTED, type RowInfo, type TableInfo } from "../graph/graph.js";
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
@@ -258,6 +258,8 @@ export interface RowTableData extends Record<string, unknown> {
   /** Each line's emphasis: the current step's rows, the rows they point at, the rest. */
   lines: Emphasis[];
   emphasis: Emphasis;
+  /** Rows the journey doesn't use, left out. */
+  hiddenRows?: number | undefined;
 }
 
 export type RowTableNode = Node<RowTableData, "rowtable">;
@@ -323,6 +325,15 @@ export function RowTable({ data }: NodeProps<RowTableNode>) {
               </tr>
             );
           })}
+          {data.hiddenRows ? (
+            <tr className="rows-hidden">
+              <td />
+              <td colSpan={columns.length}>
+                +{data.hiddenRows} other row{data.hiddenRows === 1 ? "" : "s"} the journey doesn't
+                use
+              </td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
       <Handle type="target" position={Position.Left} className="handle" />
@@ -335,4 +346,62 @@ function show(v: unknown): string {
   return v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
 }
 
-export const nodeTypes = { card: Card, table: Table, rowtable: RowTable };
+export interface OthersData extends Record<string, unknown> {
+  /** The tables folded away, by short entry name and table. */
+  tables: { entry: string; label: string; table: string }[];
+  emphasis: Emphasis;
+  /** Bring one table back. */
+  onShow: (entry: string) => void;
+  /** Show every table in the datastore. */
+  onShowAll: () => void;
+}
+
+export type OthersNode = Node<OthersData, "others">;
+
+/** A datastore's tables the journey doesn't use, folded into one box. */
+export function Others({ data }: NodeProps<OthersNode>) {
+  const listed = data.tables.slice(0, OTHERS_LISTED);
+  const more = data.tables.length - listed.length;
+  return (
+    <div className={`others-card emphasis-${data.emphasis}`}>
+      <Handle type="target" position={Position.Left} className="handle" />
+      <div className="others-head">
+        <span>
+          {data.tables.length} other table{data.tables.length === 1 ? "" : "s"}
+        </span>
+        <button
+          type="button"
+          className="link nodrag"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onShowAll();
+          }}
+        >
+          Show all
+        </button>
+      </div>
+      <p className="others-note">Not used by this journey</p>
+      <ul className="others-list">
+        {listed.map((t) => (
+          <li key={t.entry}>
+            <button
+              type="button"
+              className="nodrag"
+              title={`Show ${t.table}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onShow(t.entry);
+              }}
+            >
+              {t.label}
+            </button>
+          </li>
+        ))}
+        {more > 0 ? <li className="others-more">+{more} more</li> : null}
+      </ul>
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+export const nodeTypes = { card: Card, table: Table, rowtable: RowTable, others: Others };

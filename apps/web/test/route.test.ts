@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pointAlong, roundedPath } from "../src/graph/route.js";
+import { countCrossings, pointAlong, roundedPath } from "../src/graph/route.js";
 
 const route = [
   { x: 0, y: 0 },
@@ -36,5 +36,26 @@ describe("pointAlong", () => {
   it("clamps fractions outside 0 to 1", () => {
     expect(pointAlong(route, 2)).toEqual({ x: 100, y: 50 });
     expect(pointAlong(route, -1)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("countCrossings", () => {
+  const p = (x: number, y: number) => ({ x, y });
+  it("counts where different lines cross, not where they meet or bend", () => {
+    const across = [p(0, 0), p(100, 100)];
+    const back = [p(0, 100), p(100, 0)];
+    expect(countCrossings([across, back])).toBe(1);
+    // Sharing an end point, like two edges into one port, isn't a crossing.
+    expect(
+      countCrossings([
+        [p(0, 0), p(50, 0)],
+        [p(50, 0), p(50, 50)],
+      ]),
+    ).toBe(0);
+    // A line's own bends don't count.
+    expect(countCrossings([[p(0, 0), p(50, 0), p(50, 50), p(25, -10)]])).toBe(0);
+    // An orthogonal route crossing two others.
+    const stair = [p(0, 50), p(50, 50), p(50, 150), p(100, 150)];
+    expect(countCrossings([stair, [p(25, 0), p(25, 200)], [p(0, 100), p(100, 100)]])).toBe(3);
   });
 });

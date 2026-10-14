@@ -1916,3 +1916,72 @@ table.fields.compact caption {
 .row-badge.badge-step {
   color: var(--muted);
 }
+
+/* A datastore's tables the journey doesn't use, folded into one box. */
+.others-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  overflow: hidden;
+}
+
+.others-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.others-note {
+  margin: 2px 0 6px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.others-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.others-list button {
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.others-list button:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.others-more {
+  height: 20px;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+}
+
+.rows-grid tr.rows-hidden td {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.66rem;
+}
+
+.journey-store-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
