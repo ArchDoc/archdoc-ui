@@ -1,0 +1,257 @@
+# Logistics: a parcel network. Handheld scanners emit scan events at every
+# hub, partner carriers post status webhooks, and customers track parcels.
+# Exercises events on a queue, an external partner calling in, a decision on
+# delivery exceptions, and a shipment lifecycle with many states.
+archdoc: "2.0"
+namespace: parcels
+name: Parcel network
+description: Moves parcels from sender to door, and says where they are.
+
+actors:
+  courier:
+    kind: role
+    description: Scans parcels at hubs and on the doorstep.
+    uses:
+      scanner-app: { description: Scans parcels, sends: Scan }
+  recipient:
+    kind: person
+    uses:
+      tracking-site: { description: Tracks a parcel, sends: TrackingQuery }
+  dispatcher:
+    kind: role
+    uses:
+      ops-console: { description: Reroutes exceptions, sends: Reroute }
+  network-team: { kind: team }
+
+elements:
+  scanner-app:
+    kind: container
+    technology: Android, offline-first
+    owners: [network-team]
+    tags: [app]
+    uses:
+      scan-ingest: { description: Uploads scans in batches, sends: Scan }
+  scan-ingest:
+    kind: container
+    technology: Go
+    owners: [network-team]
+    provides:
+      - { api: openapi/scans.yaml, accepts: Scan }
+    uses:
+      scan-events: { description: Publishes each scan, sends: ScanEvent }
+  scan-events:
+    kind: queue
+    technology: Kafka
+    owners: [network-team]
+    provides:
+      - { topic: scans, carries: ScanEvent }
+  tracker:
+    kind: container
+    technology: Kotlin, Kafka Streams
+    owners: [network-team]
+    description: Folds scans and carrier updates into each shipment's status.
+    uses:
+      scan-events: { description: Consumes scans, via: scans }
+      shipments-db: { description: Updates shipments, sends: [Shipment, TrackingEvent] }
+      notifier: { description: Tells the recipient, sends: DeliveryNotice }
+  partner-carrier:
+    kind: external
+    description: A last-mile partner in regions the network doesn't cover.
+    uses:
+      carrier-webhooks: { description: Posts status updates, sends: CarrierUpdate }
+  carrier-webhooks:
+    kind: container
+    technology: Node.js
+    owners: [network-team]
+    provides:
+      - { api: openapi/carrier-webhooks.yaml, accepts: CarrierUpdate }
+    uses:
+      scan-events: { description: Publishes them as scans, sends: ScanEvent }
+  shipments-db:
+    kind: datastore
+    technology: Cassandra
+    owners: [network-team]
+    stores:
+      shipments: { entity: Shipment, key: tracking_number }
+      tracking_events: { entity: TrackingEvent, key: id, retention: 2y }
+  tracking-site:
+    kind: container
+    technology: SvelteKit
+    owners: [network-team]
+    tags: [app]
+    uses:
+      tracking-api: { description: Looks up a parcel, sends: TrackingQuery }
+  tracking-api:
+    kind: container
+    technology: Go
+    owners: [network-team]
+    provides:
+      - { api: openapi/tracking.yaml, accepts: TrackingQuery, returns: TrackingView }
+    uses:
+      shipments-db: { description: Reads the shipment, sends: Shipment }
+  notifier:
+    kind: container
+    technology: Python
+    owners: [network-team]
+    uses:
+      sms-gateway: { description: Texts the recipient, sends: Sms }
+  sms-gateway:
+    kind: external
+  ops-console:
+    kind: container
+    technology: React
+    owners: [network-team]
+    tags: [app]
+    uses:
+      tracker: { description: Reroutes a parcel, sends: Reroute }
+
+data:
+  Shipment:
+    kind: entity
+    fields:
+      tracking_number: { type: string }
+      recipient_phone: { type: string, classification: pii }
+      address: { type: string, classification: pii }
+      hub: { type: string }
+      attempts: { type: int }
+      status:
+        type: enum
+        values: [label_created, in_transit, out_for_delivery, delivered, exception, returned]
+    states:
+      - label_created -> in_transit
+      - in_transit -> out_for_delivery | exception
+      - out_for_delivery -> delivered | exception
+      - exception -> out_for_delivery | returned
+  TrackingEvent:
+    kind: entity
+    fields:
+      id: { type: uuid }
+      tracking_number: { type: string, references: Shipment }
+      hub: { type: string }
+      code: { type: string }
+      at: { type: timestamp }
+  Scan:
+    kind: message
+    fields:
+      tracking_number: { type: string, references: Shipment }
+      hub: { type: string }
+      code: { type: enum, values: [arrived, departed, out_for_delivery, delivered, no_access, refused] }
+      at: { type: timestamp }
+  ScanEvent:
+    kind: event
+    fields:
+      tracking_number: { type: string, references: Shipment }
+      hub: { type: string }
+      code: { type: string }
+      at: { type: timestamp }
+  CarrierUpdate:
+    kind: message
+    fields:
+      tracking_number: { type: string, references: Shipment }
+      partner_status: { type: string }
+      at: { type: timestamp }
+  TrackingQuery:
+    kind: message
+    fields:
+      tracking_number: { type: string, references: Shipment }
+  TrackingView:
+    kind: message
+    description: What anyone with the number may see. No address or phone.
+    fields:
+      tracking_number: { type: string }
+      status: { type: string }
+      last_hub: { type: string }
+  DeliveryNotice:
+    kind: message
+    fields:
+      tracking_number: { type: string, references: Shipment }
+      phone: { type: string, classification: pii }
+      text: { type: string }
+  Sms:
+    kind: message
+    fields:
+      phone: { type: string, classification: pii }
+      text: { type: string }
+  Reroute:
+    kind: message
+    fields:
+      tracking_number: { type: string, references: Shipment }
+      hub: { type: string }
+
+logic:
+  delivery-exception:
+    description: A failed doorstep scan is retried twice, then the parcel goes back.
+    runs-in: tracker
+    input: { scan: ScanEvent, shipment: Shipment }
+    rules:
+      - when: "scan.code == 'delivered'"
+        then: delivered
+      - when: "scan.code == 'refused' || shipment.attempts >= 2"
+        then: return-to-sender
+      - when: "scan.code == 'no_access'"
+        then: retry-tomorrow
+      - else: in-transit
+
+mappings:
+  scan-to-event:
+    from: { scan: Scan }
+    to: ScanEvent
+    fields:
+      tracking_number: scan.tracking_number
+      hub: scan.hub
+      code: scan.code
+      at: scan.at
+  event-to-history:
+    from: { scan: ScanEvent }
+    to: shipments-db.tracking_events
+    fields:
+      id: "scan.tracking_number + '-' + scan.code"
+      tracking_number: scan.tracking_number
+      hub: scan.hub
+      code: scan.code
+      at: scan.at
+
+journeys:
+  doorstep-scan:
+    actor: courier
+    goal: Record a delivery attempt, and tell the recipient
+    importance: critical
+    steps:
+      - { from: courier, to: scanner-app, action: Scans the parcel at the door }
+      - { from: scanner-app, to: scan-ingest, action: Uploads the scan }
+      - { from: scan-ingest, to: scan-events, action: Publishes it, via: scan-to-event }
+      - { from: tracker, to: scan-events, action: Consumes it }
+      - from: tracker
+        to: shipments-db
+        action: Updates the shipment
+        via: event-to-history
+        decides: delivery-exception
+        branches:
+          delivered: { changes: { Shipment.status: out_for_delivery -> delivered } }
+          retry-tomorrow: { changes: { Shipment.status: out_for_delivery -> exception } }
+          return-to-sender: { changes: { Shipment.status: exception -> returned } }
+      - { from: tracker, to: notifier, action: Asks to tell the recipient, when: delivered }
+      - { from: notifier, to: sms-gateway, action: Texts them, when: delivered }
+  track-a-parcel:
+    actor: recipient
+    goal: Know when the parcel arrives
+    importance: high
+    steps:
+      - { from: recipient, to: tracking-site, action: Enters the tracking number }
+      - { from: tracking-site, to: tracking-api, action: Looks it up }
+      - { from: tracking-api, to: shipments-db, action: Reads its status }
+  partner-update:
+    actor: dispatcher
+    goal: See partner deliveries alongside the network's own
+    steps:
+      - { from: partner-carrier, to: carrier-webhooks, action: Posts a status update }
+      - { from: carrier-webhooks, to: scan-events, action: Publishes it as a scan }
+      - { from: dispatcher, to: ops-console, action: Reroutes it if it's stuck }
+      - { from: ops-console, to: tracker, action: Sends the new hub }
+
+rules:
+  - id: apps-go-through-services
+    deny: { from: { tag: app }, to: { kind: datastore } }
+  - id: tracking-is-public
+    description: Anyone with a tracking number can see the status, so it never shows contact details.
+    data: { classification: pii, not-sent-to: tracking-site }

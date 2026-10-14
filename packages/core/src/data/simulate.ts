@@ -1,8 +1,9 @@
 import type { BranchSpec, JourneyStepSpec } from "@archdoc/spec";
 import type { Model, Target } from "../model.js";
-import { evaluate } from "./cel.js";
+import { CelDouble, evaluate } from "./cel.js";
 import { DataRegistry, type StoredIn } from "./registry.js";
 import { parseChange, qualifyData, splitField } from "./resolve.js";
+import { normalizeType } from "./schemas.js";
 
 export type DataRecord = Record<string, unknown>;
 
@@ -57,6 +58,8 @@ export interface Simulation {
   records: Record<string, DataRecord>;
   /** The journey this one continues as, if a branch says so. */
   next?: string | undefined;
+  /** The rows the sample starts with, by qualified entry; the first of each is the one the journey reads. */
+  seed: Record<string, DataRecord[]>;
 }
 
 /**
@@ -67,7 +70,9 @@ export interface Simulation {
  * lands in. What a branch creates is merged
  * into the record the step's mapping produced. The sample holds the records
  * that exist when the journey starts, keyed by data entry, such as
- * { "payments.RefundRequest": {...}, "payments.Charge": {...} }.
+ * { "payments.RefundRequest": {...}, "payments.Charge": {...} }. An entry can
+ * have a list of rows instead: the first is the one logic and mappings read,
+ * and the rest are other rows already there, which `seed` passes on.
  * Deterministic: now() is a fixed time.
  */
 export function simulate(
@@ -80,10 +85,17 @@ export function simulate(
   const registry = new DataRegistry(model);
   const ns = model.namespace;
   const records = new Map<string, DataRecord>();
+  const seed: Record<string, DataRecord[]> = {};
   for (const [key, value] of Object.entries(sample)) {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      records.set(qualifyData(key, ns), { ...(value as DataRecord) });
-    }
+    // An entry's rows: one record, or a list whose first is the one the journey reads.
+    const rows = (Array.isArray(value) ? value : [value]).filter(
+      (r): r is DataRecord => !!r && typeof r === "object" && !Array.isArray(r),
+    );
+    const first = rows[0];
+    if (!first) continue;
+    const entry = qualifyData(key, ns);
+    records.set(entry, { ...first });
+    seed[entry] = rows.map((r) => ({ ...r }));
   }
   const outcomes: string[] = [];
   const steps: SimulatedStep[] = [];
@@ -128,8 +140,16 @@ export function simulate(
           if (r.ok) record[field] = r.value;
           else out.problems.push(`${field} = ${expr}: ${r.error}`);
         }
-        // Writing to a record that exists updates it.
-        const existing = records.get(target.entry);
+        // Writing to the record that exists updates it, unless the mapping gives it another key.
+        const key = keyOf(target.entry);
+        const current = records.get(target.entry);
+        const existing =
+          current &&
+          (record[key] === undefined ||
+            current[key] === undefined ||
+            String(current[key]) === String(record[key]))
+            ? current
+            : undefined;
         const merged = { ...(existing ?? {}), ...record };
         records.set(target.entry, merged);
         out.events.push({
@@ -205,6 +225,7 @@ export function simulate(
     steps,
     outcomes,
     records: Object.fromEntries(records),
+    seed,
     ...(next ? { next } : {}),
   };
 
@@ -218,10 +239,33 @@ export function simulate(
     for (const [alias, ref] of Object.entries(inputs)) {
       const entry = qualifyData(ref, at);
       const record = records.get(entry);
-      if (record) context[alias] = record;
+      if (record) context[alias] = typed(entry, record);
       else problems.push(`no ${short(entry)} to read as ${alias}; add it to the sample`);
     }
     return context;
+  }
+
+  /** The field an entry's records are keyed by: its datastore's key, or id. */
+  function keyOf(entry: string): string {
+    const at = registry.storedIn(entry)[0];
+    if (!at) return "id";
+    return (
+      registry.models.get(at.namespace)?.elements.get(at.element)?.spec.stores?.[at.table]?.key ??
+      "id"
+    );
+  }
+
+  /** A record with its `number` fields kept as doubles, so 300 * 24.5 works in CEL. */
+  function typed(entry: string, record: DataRecord): Record<string, unknown> {
+    const fields = registry.entry(entry)?.node.spec.fields ?? {};
+    return Object.fromEntries(
+      Object.entries(record).map(([k, v]) => [
+        k,
+        typeof v === "number" && fields[k]?.type && normalizeType(fields[k].type) === "number"
+          ? new CelDouble(v)
+          : v,
+      ]),
+    );
   }
 
   /** What a step or branch creates and changes. */
@@ -238,8 +282,10 @@ export function simulate(
           : Object.entries(creates);
     for (const [name, values] of created) {
       const entry = qualifyData(name, ns);
-      // A record a mapping just produced gets these values too.
-      const existing = out.events.find((e) => e.kind === "created" && e.entry === entry);
+      // A record this step's mapping just wrote gets these values too.
+      const existing = out.events.find(
+        (e) => e.entry === entry && (e.kind === "created" || e.via !== undefined),
+      );
       const record = { ...(existing ? records.get(entry) : {}), ...values };
       records.set(entry, record);
       if (existing) {

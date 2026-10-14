@@ -6,8 +6,19 @@ export function model(files: Record<string, string>): Model {
   return buildModel(sources, { root: sources[0]?.path });
 }
 
+/** The warning for journey steps that don't say what they send. */
+export const STEP_MESSAGE = "journey/step-without-message";
+
+/** Diagnostics, without the step-message warning, for tests whose fixtures don't model data. */
+export function diagnostics(m: Model) {
+  return m.diagnostics.filter((d) => d.code !== STEP_MESSAGE);
+}
+
+/** Diagnostic codes, without the step-message warning (see `diagnostics`). */
 export function codes(m: Model, severity?: string): string[] {
-  return m.diagnostics.filter((d) => !severity || d.severity === severity).map((d) => d.code);
+  return diagnostics(m)
+    .filter((d) => !severity || d.severity === severity)
+    .map((d) => d.code);
 }
 
 export function dedent(text: string): string {

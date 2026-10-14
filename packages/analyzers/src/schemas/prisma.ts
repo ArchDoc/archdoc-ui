@@ -16,7 +16,8 @@ const SCALARS: Record<string, string> = {
 /**
  * Prisma schemas: `prisma: prisma/schema.prisma#Charge` reads model Charge
  * (or the model mapped to the table charges). Relation fields aren't columns,
- * so they're left out; enums bring their values.
+ * so they're left out, but the foreign keys they name point where the
+ * relation does; enums bring their values.
  */
 export const prisma: SchemaImporter = {
   kind: "prisma",
@@ -55,9 +56,27 @@ export const prisma: SchemaImporter = {
       field.required = !optional && !list;
       fields[name] = field;
     }
+    // A relation's foreign keys: charge Charge @relation(fields: [charge_id], references: [id]).
+    for (const m of target.body.matchAll(
+      /^[ \t]*\w+[ \t]+(\w+)\??[ \t]+.*@relation\(([^)]*)\)/gm,
+    )) {
+      const keys = list(/fields:\s*\[([^\]]*)\]/.exec(m[2] as string)?.[1]);
+      const refs = list(/references:\s*\[([^\]]*)\]/.exec(m[2] as string)?.[1]);
+      keys.forEach((key, i) => {
+        const field = fields[key];
+        if (field) field.references = { name: m[1] as string, field: refs[i] };
+      });
+    }
     return { fields, files: [ref.path] };
   },
 };
+
+function list(text: string | undefined): string[] {
+  return (text ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 function enumValues(body: string): string[] {
   return body

@@ -1,0 +1,416 @@
+# ERP: order to cash for a wholesale distributor. One database holds the
+# whole business (24 tables, with foreign keys between most of them), and
+# one journey takes an order from the portal through credit check, stock,
+# shipping, invoicing, and payment. A big schema to read in the explorer, and
+# a journey whose rows reference each other: run it with
+# samples/order-to-cash.json and switch the database to Rows.
+archdoc: "2.0"
+namespace: erp
+name: Wholesale ERP
+description: Order to cash, in one database.
+
+actors:
+  buyer:
+    kind: person
+    description: A retailer's purchaser ordering stock.
+    uses:
+      sales-portal: { description: Orders stock, sends: OrderRequest }
+  warehouse-clerk:
+    kind: role
+    uses:
+      warehouse-app: { description: "Picks, packs, and ships", sends: PickList }
+  credit-controller:
+    kind: role
+    description: Releases orders held for credit.
+  erp-team: { kind: team }
+
+elements:
+  sales-portal:
+    kind: container
+    technology: Angular
+    owners: [erp-team]
+    tags: [app]
+    uses:
+      order-service: { description: Places orders, sends: OrderRequest }
+  order-service:
+    kind: container
+    technology: Java, Spring
+    owners: [erp-team]
+    provides:
+      - { api: openapi/orders.yaml, accepts: OrderRequest, returns: Order }
+    uses:
+      erp-db: { description: Writes orders and their lines, sends: [Order, OrderLine] }
+      inventory-service: { description: Reserves stock, sends: OrderLine }
+      billing-service: { description: Asks for an invoice, sends: Order }
+  inventory-service:
+    kind: container
+    technology: Java, Spring
+    owners: [erp-team]
+    uses:
+      erp-db: { description: Reserves and releases stock, sends: Stock }
+  warehouse-app:
+    kind: container
+    technology: Android
+    owners: [erp-team]
+    tags: [app]
+    uses:
+      fulfilment-service: { description: Confirms what's shipped, sends: PickList }
+  fulfilment-service:
+    kind: container
+    technology: Kotlin
+    owners: [erp-team]
+    uses:
+      erp-db: { description: Records shipments, sends: [Shipment, ShipmentLine] }
+  billing-service:
+    kind: container
+    technology: Java, Spring
+    owners: [erp-team]
+    uses:
+      erp-db: { description: "Writes invoices, payments, and allocations", sends: [Invoice, InvoiceLine, Payment, Allocation] }
+  bank-feed:
+    kind: external
+    description: The bank's statement feed.
+    uses:
+      billing-service: { description: Reports incoming payments, sends: BankTransaction }
+  erp-db:
+    kind: datastore
+    technology: Postgres
+    owners: [erp-team]
+    stores:
+      currencies: { entity: Currency, key: code }
+      tax_rates: { entity: TaxRate, key: id }
+      territories: { entity: Territory, key: id }
+      sales_reps: { entity: SalesRep, key: id }
+      customers: { entity: Customer, key: id }
+      addresses: { entity: Address, key: id }
+      contacts: { entity: Contact, key: id }
+      categories: { entity: Category, key: id }
+      products: { entity: Product, key: id }
+      variants: { entity: Variant, key: sku }
+      price_lists: { entity: PriceList, key: id }
+      price_items: { entity: PriceItem, key: id }
+      warehouses: { entity: Warehouse, key: id }
+      stock: { entity: Stock, key: id }
+      orders: { entity: Order, key: id }
+      order_lines: { entity: OrderLine, key: id }
+      shipments: { entity: Shipment, key: id }
+      shipment_lines: { entity: ShipmentLine, key: id }
+      invoices: { entity: Invoice, key: id }
+      invoice_lines: { entity: InvoiceLine, key: id }
+      payments: { entity: Payment, key: id }
+      allocations: { entity: Allocation, key: id }
+      returns: { entity: Return, key: id }
+      credit_notes: { entity: CreditNote, key: id }
+
+data:
+  Currency:
+    kind: entity
+    fields:
+      code: { type: string }
+      name: { type: string }
+  TaxRate:
+    kind: entity
+    fields:
+      id: { type: string }
+      percent: { type: number }
+  Territory:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string }
+  SalesRep:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string, classification: pii }
+      territory_id: { type: string, references: Territory }
+  Customer:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string }
+      territory_id: { type: string, references: Territory }
+      sales_rep_id: { type: string, references: SalesRep }
+      currency: { type: string, references: Currency }
+      credit_limit_cents: { type: int }
+      balance_cents: { type: int }
+      on_hold: { type: bool }
+  Address:
+    kind: entity
+    fields:
+      id: { type: string }
+      customer_id: { type: string, references: Customer }
+      line1: { type: string }
+      country: { type: string }
+  Contact:
+    kind: entity
+    fields:
+      id: { type: string }
+      customer_id: { type: string, references: Customer }
+      email: { type: string, classification: pii }
+  Category:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string }
+      parent_id: { type: string, references: Category }
+  Product:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string }
+      category_id: { type: string, references: Category }
+  Variant:
+    kind: entity
+    fields:
+      sku: { type: string }
+      product_id: { type: string, references: Product }
+      colour: { type: string }
+  PriceList:
+    kind: entity
+    fields:
+      id: { type: string }
+      currency: { type: string, references: Currency }
+  PriceItem:
+    kind: entity
+    fields:
+      id: { type: string }
+      price_list_id: { type: string, references: PriceList }
+      sku: { type: string, references: Variant }
+      unit_price_cents: { type: int }
+  Warehouse:
+    kind: entity
+    fields:
+      id: { type: string }
+      name: { type: string }
+  Stock:
+    kind: entity
+    fields:
+      id: { type: string }
+      warehouse_id: { type: string, references: Warehouse }
+      sku: { type: string, references: Variant }
+      on_hand: { type: int }
+      status: { type: enum, values: [available, reserved, empty] }
+  Order:
+    kind: entity
+    fields:
+      id: { type: string }
+      customer_id: { type: string, references: Customer }
+      ship_to: { type: string, references: Address }
+      price_list_id: { type: string, references: PriceList }
+      sales_rep_id: { type: string, references: SalesRep }
+      total_cents: { type: int }
+      status: { type: enum, values: [draft, confirmed, on_hold, shipped, invoiced, paid] }
+    states:
+      - draft -> confirmed | on_hold
+      - on_hold -> confirmed
+      - confirmed -> shipped
+      - shipped -> invoiced
+      - invoiced -> paid
+  OrderLine:
+    kind: entity
+    fields:
+      id: { type: string }
+      order_id: { type: string, references: Order }
+      sku: { type: string, references: Variant }
+      quantity: { type: int }
+      unit_price_cents: { type: int }
+      tax_rate_id: { type: string, references: TaxRate }
+  Shipment:
+    kind: entity
+    fields:
+      id: { type: string }
+      order_id: { type: string, references: Order }
+      warehouse_id: { type: string, references: Warehouse }
+      ship_to: { type: string, references: Address }
+  ShipmentLine:
+    kind: entity
+    fields:
+      id: { type: string }
+      shipment_id: { type: string, references: Shipment }
+      order_line_id: { type: string, references: OrderLine }
+      quantity: { type: int }
+  Invoice:
+    kind: entity
+    fields:
+      id: { type: string }
+      order_id: { type: string, references: Order }
+      customer_id: { type: string, references: Customer }
+      total_cents: { type: int }
+      status: { type: enum, values: [open, paid, credited] }
+    states:
+      - open -> paid | credited
+  InvoiceLine:
+    kind: entity
+    fields:
+      id: { type: string }
+      invoice_id: { type: string, references: Invoice }
+      order_line_id: { type: string, references: OrderLine }
+      amount_cents: { type: int }
+  Payment:
+    kind: entity
+    fields:
+      id: { type: string }
+      customer_id: { type: string, references: Customer }
+      currency: { type: string, references: Currency }
+      amount_cents: { type: int }
+  Allocation:
+    kind: entity
+    description: How much of a payment settles which invoice.
+    fields:
+      id: { type: string }
+      payment_id: { type: string, references: Payment }
+      invoice_id: { type: string, references: Invoice }
+      amount_cents: { type: int }
+  Return:
+    kind: entity
+    fields:
+      id: { type: string }
+      order_id: { type: string, references: Order }
+      reason: { type: string }
+  CreditNote:
+    kind: entity
+    fields:
+      id: { type: string }
+      invoice_id: { type: string, references: Invoice }
+      return_id: { type: string, references: Return }
+      amount_cents: { type: int }
+  OrderRequest:
+    kind: message
+    fields:
+      ref: { type: string }
+      customer_id: { type: string, references: Customer }
+      ship_to: { type: string, references: Address }
+      total_cents: { type: int }
+  PickList:
+    kind: message
+    fields:
+      order_id: { type: string, references: Order }
+      warehouse_id: { type: string, references: Warehouse }
+  BankTransaction:
+    kind: message
+    fields:
+      reference: { type: string }
+      customer_id: { type: string, references: Customer }
+      amount_cents: { type: int }
+      currency: { type: string, references: Currency }
+
+logic:
+  credit-check:
+    description: Customers on hold, or over their credit limit, wait for credit control.
+    runs-in: order-service
+    input: { customer: Customer, request: OrderRequest }
+    rules:
+      - when: customer.on_hold
+        then: credit-hold
+      - when: "customer.balance_cents + request.total_cents > customer.credit_limit_cents"
+        then: credit-hold
+      - else: confirm
+
+mappings:
+  request-to-order:
+    from: { request: OrderRequest, customer: Customer }
+    to: erp-db.orders
+    fields:
+      id: "'so-' + request.ref"
+      customer_id: request.customer_id
+      ship_to: request.ship_to
+      price_list_id: "'pl-' + customer.currency"
+      sales_rep_id: customer.sales_rep_id
+      total_cents: request.total_cents
+      status: "'draft'"
+  order-to-invoice:
+    from: { order: Order }
+    to: erp-db.invoices
+    fields:
+      id: "'inv-' + order.id"
+      order_id: order.id
+      customer_id: order.customer_id
+      total_cents: order.total_cents
+      status: "'open'"
+  transaction-to-payment:
+    from: { txn: BankTransaction }
+    to: erp-db.payments
+    fields:
+      id: "'pay-' + txn.reference"
+      customer_id: txn.customer_id
+      currency: txn.currency
+      amount_cents: txn.amount_cents
+
+journeys:
+  order-to-cash:
+    actor: buyer
+    goal: Order stock, receive it, and pay for it
+    importance: critical
+    steps:
+      - { from: buyer, to: sales-portal, action: Builds the order }
+      - from: sales-portal
+        to: order-service
+        action: Places it, and credit control checks the account
+        via: request-to-order
+        decides: credit-check
+        branches:
+          confirm:
+            creates:
+              Order: { status: confirmed }
+              OrderLine: { id: ol-1, order_id: so-1001, sku: WID-RED, quantity: 30, unit_price_cents: 1200, tax_rate_id: vat-20 }
+          credit-hold: { creates: { Order: { status: on_hold } } }
+      - from: order-service
+        to: erp-db
+        action: Adds the second line
+        when: confirm
+        creates: { OrderLine: { id: ol-2, order_id: so-1001, sku: GAD-BLU, quantity: 10, unit_price_cents: 4500, tax_rate_id: vat-20 } }
+      - from: order-service
+        to: inventory-service
+        action: Reserves the stock
+        when: confirm
+      - from: inventory-service
+        to: erp-db
+        action: Marks it reserved
+        when: confirm
+        changes: { Stock.status: available -> reserved }
+      - { from: warehouse-clerk, to: warehouse-app, action: Picks and packs, when: confirm }
+      - { from: warehouse-app, to: fulfilment-service, action: Confirms the pick, when: confirm }
+      - from: fulfilment-service
+        to: erp-db
+        action: Ships the first line
+        when: confirm
+        creates:
+          Shipment: { id: sh-1, order_id: so-1001, warehouse_id: wh-north, ship_to: addr-1 }
+          ShipmentLine: { id: sl-1, shipment_id: sh-1, order_line_id: ol-1, quantity: 30 }
+        changes: { Order.status: confirmed -> shipped }
+      - from: fulfilment-service
+        to: erp-db
+        action: Ships the second line
+        when: confirm
+        creates: { ShipmentLine: { id: sl-2, shipment_id: sh-1, order_line_id: ol-2, quantity: 10 } }
+      - from: order-service
+        to: billing-service
+        action: Invoices the order
+        when: confirm
+        via: order-to-invoice
+        creates: { InvoiceLine: { id: il-1, invoice_id: inv-so-1001, order_line_id: ol-1, amount_cents: 36000 } }
+      - from: billing-service
+        to: erp-db
+        action: Adds the second invoice line
+        when: confirm
+        creates: { InvoiceLine: { id: il-2, invoice_id: inv-so-1001, order_line_id: ol-2, amount_cents: 45000 } }
+        changes: { Order.status: shipped -> invoiced }
+      - from: bank-feed
+        to: billing-service
+        action: Reports the payment
+        when: confirm
+        via: transaction-to-payment
+      - from: billing-service
+        to: erp-db
+        action: Allocates it to the invoice
+        when: confirm
+        creates: { Allocation: { id: al-1, payment_id: pay-1001, invoice_id: inv-so-1001, amount_cents: 81000 } }
+        changes: { Invoice.status: open -> paid, Order.status: invoiced -> paid }
+
+rules:
+  - id: apps-go-through-services
+    deny: { from: { tag: app }, to: { kind: datastore } }
+  - id: no-personal-data-to-the-bank
+    description: The bank feed gets references and amounts, never contacts.
+    data: { classification: pii, not-sent-to: bank-feed }

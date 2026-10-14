@@ -1,6 +1,8 @@
 import {
+  applySchemas,
   buildModel,
   federate,
+  type ImportedSchema,
   type LandscapeDomain,
   type LandscapeRepo,
   type Model,
@@ -35,6 +37,8 @@ export interface ModelPayload {
   };
   /** Sample records for simulating journeys. */
   samples?: { path: string; text: string }[];
+  /** What data entries' schema sources say, to fill in what the model leaves out. */
+  schemas?: ImportedSchema[];
 }
 
 export interface LandscapeInfo {
@@ -90,6 +94,7 @@ export function useModel(): ModelState {
       }
       const payload = (await res.json()) as ModelPayload;
       const model = buildModel(payload.sources, { root: payload.root });
+      applySchemas(model, payload.schemas ?? []);
       const fed = payload.federation;
       if (
         fed &&

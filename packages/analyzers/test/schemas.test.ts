@@ -1,4 +1,4 @@
-import { buildModel, check } from "@archdoc/core";
+import { applySchemas, buildModel, check } from "@archdoc/core";
 import { describe, expect, it } from "vitest";
 import {
   type AnalyzerContext,
@@ -56,6 +56,14 @@ describe("prisma", () => {
     });
   });
 
+  it("reads the foreign keys a relation names", async () => {
+    const t = await prisma.read(files, { path: "prisma/schema.prisma", name: "Refund" });
+    expect(t.fields).toEqual({
+      id: { type: "string", required: true },
+      chargeId: { type: "string", required: true, references: { name: "Charge", field: "id" } },
+    });
+  });
+
   it("finds a model by the table it maps to, and explains what's missing", async () => {
     const t = await prisma.read(files, { path: "prisma/schema.prisma", name: "charges" });
     expect(Object.keys(t.fields)).toContain("cardLast4");
@@ -110,6 +118,36 @@ describe("sql migrations", () => {
     await expect(sql.read(files, { path: "db/migrations", name: "old_table" })).rejects.toThrow(
       "no migration under db/migrations leaves a table old_table",
     );
+  });
+});
+
+describe("sql foreign keys", () => {
+  const files = ctx({
+    "migrations/001.sql": `
+      CREATE TABLE charges (id uuid PRIMARY KEY);
+      CREATE TABLE refunds (
+        id uuid PRIMARY KEY,
+        charge_id uuid NOT NULL REFERENCES charges(id),
+        trip_id uuid REFERENCES trips,
+        account text,
+        CONSTRAINT refunds_account FOREIGN KEY (account) REFERENCES public.accounts (code)
+      );
+    `,
+    "migrations/002.sql": `
+      ALTER TABLE refunds ADD COLUMN ledger_id uuid,
+        ADD CONSTRAINT refunds_ledger FOREIGN KEY (ledger_id) REFERENCES ledger_entries(id);
+    `,
+  });
+
+  it("reads inline references, table constraints, and ones added later", async () => {
+    const t = await sql.read(files, { path: "migrations", name: "refunds" });
+    expect(t.fields).toEqual({
+      id: { type: "uuid", required: true },
+      charge_id: { type: "uuid", required: true, references: { name: "charges", field: "id" } },
+      trip_id: { type: "uuid", references: { name: "trips", field: undefined } },
+      account: { type: "string", references: { name: "accounts", field: "code" } },
+      ledger_id: { type: "uuid", references: { name: "ledger_entries", field: "id" } },
+    });
   });
 });
 
@@ -268,5 +306,50 @@ data:
       "warning drift/schema-mismatch: Charge.status: the model allows refunded, which the source doesn't in db/migrations#charges.",
     ]);
     expect(findings[0]?.files).toEqual(["db/migrations/001.sql", "archdoc.yaml"]);
+  });
+});
+
+describe("references from schemas", () => {
+  it("point a field at the entry its source or a datastore table names", async () => {
+    const model = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: `
+archdoc: "2.0"
+namespace: payments
+elements:
+  ledger:
+    kind: datastore
+    stores: { charges: { entity: Charge, key: id }, refunds: { entity: Refund, key: id } }
+data:
+  Charge: { kind: entity, source: { prisma: prisma/schema.prisma#Charge }, fields: { id: {} } }
+  Refund:
+    kind: entity
+    source: { prisma: prisma/schema.prisma#Refund }
+    fields: { id: {}, chargeId: {} }
+  Line:
+    kind: entity
+    source: { sql: migrations#lines }
+    fields: { id: {}, refund_id: {}, note: { references: Refund.id } }
+`,
+      },
+    ]);
+    const files = ctx({
+      "prisma/schema.prisma": `
+        model Charge { id String @id }
+        model Refund {
+          id String @id
+          chargeId String
+          charge Charge @relation(fields: [chargeId], references: [id])
+        }`,
+      "migrations/001.sql":
+        "CREATE TABLE lines (id uuid, refund_id uuid REFERENCES refunds(id), note text REFERENCES charges(id));",
+    });
+    applySchemas(model, await importSchemas(files, model));
+    const fields = (id: string) => model.data.get(id)?.spec.fields;
+    expect(fields("Refund")?.chargeId?.references).toBe("Charge.id");
+    // By the datastore's table name; a reference the model writes stays.
+    expect(fields("Line")?.refund_id?.references).toBe("Refund.id");
+    expect(fields("Line")?.note?.references).toBe("Refund.id");
   });
 });

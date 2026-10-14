@@ -42,7 +42,7 @@ journeys:
     goal: Get money back for a bad trip
     importance: critical
     steps:
-      - { from: rider, to: app, action: Taps "Report a problem" on the trip }
+      - { from: rider, to: app, action: Taps "Report a problem" on the trip, sends: payments.RefundRequest }
       - { from: app, to: api-gateway, action: Sends the refund request, sends: payments.RefundRequest }
       - { from: api-gateway, to: trips.trips-api, action: Checks the trip and its fare }
       - from: api-gateway

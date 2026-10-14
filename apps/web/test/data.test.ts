@@ -2,18 +2,21 @@ import { buildModel, type Model, simulate } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
 import {
   dataFocus,
+  dataPlaces,
   hasData,
-  lineageGraph,
+  journeyStores,
+  lineageFocus,
   sampleSkeleton,
   sensitivity,
+  stepData,
 } from "../src/graph/data.js";
-import { defaultExpanded } from "../src/graph/graph.js";
+import { buildGraph, defaultExpanded } from "../src/graph/graph.js";
 
 const text = `
 archdoc: "2.0"
 namespace: payments
 actors:
-  clerk: { kind: role, uses: { app: Refunds } }
+  clerk: { kind: role, uses: { app: { description: Refunds, sends: RefundRequest } } }
 elements:
   app: { kind: container, uses: { charges: { description: Asks, sends: RefundRequest } } }
   core:
@@ -78,21 +81,154 @@ describe("explorer data helpers", () => {
     const open = dataFocus(m, { expanded: defaultExpanded(m) }, "payments.Refund");
     expect([...open.stores]).toEqual(["element:core.ledger"]);
     const closed = dataFocus(m, { expanded: new Set() }, "payments.RefundRequest");
-    expect([...closed.nodes].sort()).toEqual(["element:app", "element:core"]);
+    expect([...closed.nodes].sort()).toEqual(["actor:clerk", "element:app", "element:core"]);
     expect(closed.edges.has("element:app->element:core")).toBe(true);
   });
 
-  it("draw a field's lineage as entries holding fields, joined by expressions", () => {
-    const l = lineageGraph(m, "RefundRequest.amount_cents");
-    expect(l?.graph.nodes.map((n) => `${n.id}${n.parentId ? ` in ${n.parentId}` : ""}`)).toEqual([
-      "entry:payments.RefundRequest",
-      "field:payments.RefundRequest.amount_cents in entry:payments.RefundRequest",
-      "entry:payments.Refund",
-      "field:payments.Refund.amount_cents in entry:payments.Refund",
+  it("light up a field's lineage on the canvas: the entries on the way, and their fields", () => {
+    const l = lineageFocus(m, { expanded: defaultExpanded(m) }, "RefundRequest.amount_cents");
+    expect(l?.entries).toEqual(["payments.RefundRequest", "payments.Refund"]);
+    expect([...(l?.fields ?? [])]).toEqual([
+      "payments.RefundRequest.amount_cents",
+      "payments.Refund.amount_cents",
     ]);
-    expect(l?.nodes.get("entry:payments.Refund")?.detail).toBe("core.ledger (refunds)");
-    expect([...(l?.edges.values() ?? [])]).toEqual([
-      { expression: "request.amount_cents", mapping: "payments.to-refund", copy: true },
+    expect([...(l?.stores ?? [])]).toEqual(["element:core.ledger"]);
+    expect(l?.edges.has("element:app->element:core.charges")).toBe(true);
+  });
+
+  it("find where to open the canvas for an entry: its stores, and the boxes it travels between", () => {
+    expect(dataPlaces(m, "payments.Refund")).toEqual({ stores: ["core.ledger"], ends: [] });
+    expect(dataPlaces(m, "payments.RefundRequest")).toEqual({
+      stores: [],
+      ends: ["app", "core.charges"],
+    });
+    // A message an API accepts lights up the API, even when nothing in this repo sends it.
+    const api = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: `
+archdoc: "2.0"
+namespace: payments
+elements:
+  charges: { kind: container, provides: [{ api: charges.proto, accepts: Ask }] }
+data:
+  Ask: { kind: message, fields: { amount: { type: int } } }
+`,
+      },
+    ]);
+    expect(dataPlaces(api, "payments.Ask")).toEqual({ stores: [], ends: ["charges"] });
+    expect([...dataFocus(api, { expanded: new Set() }, "payments.Ask").nodes]).toEqual([
+      "element:charges",
+    ]);
+  });
+
+  it("open a datastore into its tables, with a line for each foreign key between them", () => {
+    const erd = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: `
+archdoc: "2.0"
+namespace: payments
+elements:
+  db:
+    kind: datastore
+    stores: { charges: { entity: Charge, key: id }, refunds: { entity: Refund, key: id } }
+data:
+  Charge: { kind: entity, fields: { id: { type: uuid }, card_last4: { type: string, classification: pci } } }
+  Refund: { kind: entity, fields: { id: { type: uuid }, charge_id: { type: uuid, references: Charge }, charge: { type: Charge } } }
+`,
+      },
+    ]);
+    const closed = buildGraph(erd, { expanded: new Set() });
+    expect(closed.nodes.map((n) => n.id)).toEqual(["element:db"]);
+    const open = buildGraph(erd, { expanded: new Set(), tables: new Set(["db"]) });
+    expect(open.nodes.map((n) => `${n.id}${n.parentId ? ` in ${n.parentId}` : ""}`)).toEqual([
+      "element:db",
+      "table:db:charges in element:db",
+      "table:db:refunds in element:db",
+    ]);
+    expect(open.nodes[0]?.isGroup).toBe(true);
+    expect(open.nodes[1]?.table).toEqual({
+      element: "db",
+      table: "charges",
+      entry: "payments.Charge",
+      key: "id",
+      fields: [
+        { name: "id", type: "uuid", classification: undefined },
+        { name: "card_last4", type: "string", classification: "pci" },
+      ],
+      // A small schema shows every field.
+      hidden: 0,
+    });
+    expect(open.edges.map((e) => `${e.source}.${e.reference?.field} -> ${e.target}`)).toEqual([
+      "table:db:refunds.charge_id -> table:db:charges",
+      "table:db:refunds.charge -> table:db:charges",
+    ]);
+  });
+
+  it("say what each step carries, and what it writes, declared or simulated", () => {
+    const journey = m.journeys.get("refund");
+    if (!journey) throw new Error("no journey");
+    const declared = stepData(m, journey, 1);
+    expect(declared.message?.how).toBe("step");
+    expect(declared.message?.entries.map((e) => [e.label, e.fields.map((f) => f.name)])).toEqual([
+      ["RefundRequest", ["amount_cents", "email", "note"]],
+    ]);
+    // A branch's writes are declared with the outcome they need.
+    expect(declared.writes).toEqual([
+      {
+        entry: "payments.Charge",
+        created: false,
+        values: new Map([["status", "captured → refunded"]]),
+        when: "auto",
+      },
+    ]);
+    // Writing through a mapping creates what it maps to, with the mapping's expressions.
+    expect(stepData(m, journey, 2).writes).toEqual([
+      {
+        entry: "payments.Refund",
+        created: true,
+        values: new Map([["amount_cents", "= request.amount_cents"]]),
+      },
+    ]);
+
+    const sample = {
+      RefundRequest: { amount_cents: 300, email: "a@b.c", note: "" },
+      Charge: { amount_cents: 1000, status: "captured" },
+    };
+    const sim = simulate(m, "refund", sample);
+    const run = stepData(m, journey, 1, sim);
+    expect(run.message?.entries[0]?.fields[0]).toMatchObject({
+      name: "amount_cents",
+      value: "300",
+    });
+    expect(run.writes).toEqual([
+      {
+        entry: "payments.Charge",
+        created: false,
+        values: new Map([["status", "captured → refunded"]]),
+      },
+    ]);
+    expect(journeyStores(m, journey)).toEqual(["core.ledger"]);
+
+    // A step that maps into a record and changes it too updates the record.
+    const both = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: text.replace(
+          "{ from: core.charges, to: core.ledger, via: to-refund, when: auto }",
+          "{ from: core.charges, to: core.ledger, via: to-refund, when: auto, changes: { Refund.amount_cents: 0 -> 1 } }",
+        ),
+      },
+    ]);
+    const j = both.journeys.get("refund");
+    if (!j) throw new Error("no journey");
+    expect(stepData(both, j, 2).writes).toEqual([
+      {
+        entry: "payments.Refund",
+        created: false,
+        values: new Map([["amount_cents", "0 → 1"]]),
+      },
     ]);
   });
 

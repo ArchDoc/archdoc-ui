@@ -215,17 +215,68 @@ kbd {
 }
 
 .side-section {
-  margin-top: 16px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.side-section:first-of-type {
+  border-top: 0;
+}
+
+.side-section .side-list {
+  margin-bottom: 6px;
 }
 
 .side-section h2 {
-  margin: 0 0 4px 6px;
+  margin: 0;
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
   font-family: var(--f-mono);
   font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.side-head:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.side-head:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.side-chevron {
+  display: inline-block;
+  width: 10px;
+  transition: transform 150ms ease;
+}
+
+.side-section.is-open .side-chevron {
+  transform: rotate(90deg);
+}
+
+.side-title {
+  flex: 1;
+  text-align: left;
+}
+
+.side-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .side-list {
@@ -832,7 +883,7 @@ kbd {
   gap: 4px;
 }
 
-.steps button {
+.steps > li > button {
   display: grid;
   gap: 1px;
   width: 100%;
@@ -844,11 +895,11 @@ kbd {
   cursor: pointer;
 }
 
-.steps button:hover {
+.steps > li > button:hover {
   border-color: var(--line);
 }
 
-.steps li.is-current button {
+.steps > li.is-current > button {
   border-color: var(--brand);
   background: var(--brand-soft);
 }
@@ -1231,23 +1282,6 @@ kbd {
   }
 }
 
-.card.family-data {
-  --accent: var(--k-data);
-}
-
-.card.family-field {
-  --accent: var(--k-data);
-  border-left-width: 3px;
-}
-
-.card.family-field.is-classified {
-  --accent: var(--sensitive);
-}
-
-.card.family-field.is-classified .card-kind {
-  color: var(--sensitive);
-}
-
 /* A box that stores the selected data entry. */
 .card.is-store {
   border-color: var(--k-data);
@@ -1287,20 +1321,6 @@ ul.plain {
   display: grid;
   gap: 4px;
   font-size: 0.86rem;
-}
-
-.react-flow__edge.lineage path {
-  stroke: var(--k-data);
-  stroke-width: 1.8;
-}
-
-.react-flow__edge.lineage.is-derived path {
-  stroke-dasharray: 6 3;
-}
-
-.react-flow__edge.lineage .react-flow__edge-text {
-  font-family: var(--f-mono);
-  font-size: 10px;
 }
 
 .canvas-empty {
@@ -1415,4 +1435,558 @@ ol.timeline > li.is-skipped {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A datastore's tables, inside it. */
+.card-tables {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+}
+
+.card-tables svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.card-tables.is-on {
+  color: var(--k-data);
+  border-color: var(--k-data);
+}
+
+.card-tables + .card-toggle {
+  margin-left: 4px;
+}
+
+.table-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--k-data);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.78rem;
+  transition:
+    opacity 200ms ease,
+    box-shadow 300ms ease,
+    border-color 300ms ease;
+}
+
+.table-card.emphasis-current {
+  border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
+}
+
+.table-card.emphasis-highlight {
+  border-color: var(--k-data);
+}
+
+.table-card.emphasis-dim {
+  opacity: 0.4;
+}
+
+.table-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  height: 52px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.table-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-table {
+  font-family: var(--f-mono);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.table-rows {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-row:hover {
+  background: var(--surface-2);
+}
+
+.table-rows li.is-lit .table-row {
+  background: color-mix(in srgb, var(--k-data) 18%, transparent);
+  font-weight: 600;
+}
+
+.table-mark {
+  width: 18px;
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.table-field {
+  font-family: var(--f-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-class {
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  color: var(--sensitive);
+}
+
+.table-type {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.table-empty {
+  padding: 2px 10px;
+  color: var(--muted);
+}
+
+/* A foreign key between two tables. */
+.react-flow__edge.fk path {
+  stroke: var(--k-data);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+
+/* Data on the move: a selected message or field flows along its arrows. */
+.react-flow__edge.rel.is-flow path {
+  stroke: var(--k-data);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 6;
+  animation: data-flow 0.9s linear infinite;
+}
+
+@keyframes data-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.rel.is-flow path {
+    animation: none;
+  }
+}
+
+/* The message travelling the current journey step's arrow. */
+.packet rect {
+  fill: var(--k-data);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.packet text {
+  fill: #ffffff;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.packet.is-missing rect {
+  fill: var(--warn);
+}
+
+/* A table the current journey step writes to. */
+.table-card.is-written {
+  animation: table-written 900ms ease-out;
+}
+
+.table-write {
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--k-data);
+}
+
+.table-rows li.is-written .table-row {
+  background: color-mix(in srgb, var(--k-data) 22%, transparent);
+  font-weight: 600;
+  animation: row-written 1.2s ease-out;
+}
+
+.table-rows li.is-written .table-type {
+  color: var(--ink);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes table-written {
+  from {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--k-data) 45%, transparent);
+  }
+}
+
+@keyframes row-written {
+  from {
+    background: color-mix(in srgb, var(--k-data) 60%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-card.is-written,
+  .table-rows li.is-written .table-row {
+    animation: none;
+  }
+}
+
+/* The message a journey step carries, in the details panel. */
+.step-message {
+  margin: 4px 0 0 2px;
+  font-size: 0.82rem;
+}
+
+.step-message-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.step-message-toggle:hover {
+  background: var(--surface-2);
+}
+
+.step-message.is-open .side-chevron {
+  transform: rotate(90deg);
+}
+
+.step-message-name {
+  font-family: var(--f-mono);
+  color: var(--k-data);
+  font-weight: 600;
+}
+
+.step-message.is-missing {
+  color: var(--warn);
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+}
+
+.step-message-body {
+  margin: 4px 0 6px 18px;
+}
+
+table.fields.compact {
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+
+table.fields.compact caption {
+  text-align: left;
+  padding-bottom: 2px;
+}
+
+.step-writes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+/* An open datastore during a journey: its schema, or its rows. */
+.store-view {
+  display: inline-flex;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.store-view button {
+  padding: 2px 8px;
+  border: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.store-view button.is-on {
+  background: var(--k-data);
+  color: #ffffff;
+}
+
+.store-view + .card-tables {
+  margin-left: 4px;
+}
+
+.table-more {
+  padding: 2px 10px 0 34px;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.68rem;
+}
+
+.row-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 99px;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.row-badge.badge-new,
+.row-badge.badge-changed {
+  color: #ffffff;
+  background: var(--k-data);
+  border-color: var(--k-data);
+}
+
+.row-mark {
+  width: 10px;
+  color: var(--k-data);
+}
+
+.react-flow__edge[id^="rowref:"] path {
+  stroke-dasharray: none;
+}
+
+/* The datastores a journey writes to, in the journey bar. */
+.journey-bar-stores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 6px 0 2px;
+  font-size: 0.8rem;
+}
+
+.journey-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.journey-store .store-view {
+  margin: 0;
+}
+
+/* A datastore table's rows during a journey: a line per record. */
+.rows-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--k-data);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  transition:
+    opacity 200ms ease,
+    box-shadow 300ms ease;
+}
+
+.rows-card.emphasis-current {
+  border-color: var(--k-data);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-data) 30%, transparent);
+}
+
+.rows-card.emphasis-dim {
+  opacity: 0.5;
+}
+
+.rows-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  height: 40px;
+  padding: 8px 10px 0;
+  background: var(--surface-2);
+}
+
+.rows-head .table-name {
+  min-width: 0;
+}
+
+.rows-head .table-table {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.rows-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--f-mono);
+}
+
+.rows-grid th,
+.rows-grid td {
+  height: 22px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.rows-grid th {
+  height: 22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.66rem;
+}
+
+.rows-grid tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.rows-grid tr.origin-existing td {
+  color: var(--muted);
+}
+
+.rows-grid tr.line-current td {
+  background: color-mix(in srgb, var(--k-data) 14%, transparent);
+  color: var(--ink);
+}
+
+.rows-grid tr.line-current td.is-changed {
+  background: color-mix(in srgb, var(--k-data) 30%, transparent);
+  font-weight: 600;
+}
+
+.rows-grid tr.line-highlight td {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--k-data) 6%, transparent);
+}
+
+.rows-grid tr.line-dim td {
+  opacity: 0.55;
+}
+
+.rows-grid tr.is-new td {
+  animation: row-written 1.2s ease-out;
+}
+
+.rows-badge .row-badge {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+}
+
+.row-badge.badge-step {
+  color: var(--muted);
+}
+
+/* A datastore's tables the journey doesn't use, folded into one box. */
+.others-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  overflow: hidden;
+}
+
+.others-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.others-note {
+  margin: 2px 0 6px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.others-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.others-list button {
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.others-list button:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.others-more {
+  height: 20px;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+}
+
+.rows-grid tr.rows-hidden td {
+  padding-left: 14px;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.66rem;
+}
+
+.journey-store-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
 }

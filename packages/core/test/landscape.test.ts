@@ -6,11 +6,12 @@ import {
   composeLandscape,
   createBundle,
   federate,
+  fieldReferences,
   integrityOf,
   type Model,
   serializeBundle,
 } from "../src/index.js";
-import { dedent } from "./helpers.js";
+import { dedent, diagnostics } from "./helpers.js";
 
 const bundleOf = (text: string, version: string, includes?: IncludedBundle[]): Bundle => {
   const b = createBundle([{ path: "archdoc.yaml", text: dedent(text) }], "archdoc.yaml", {
@@ -198,7 +199,10 @@ describe("composeLandscape", () => {
       from: "rides.api",
       to: "payments.charges",
     });
-    const errors = m.diagnostics.filter((d) => d.severity !== "info").map((d) => d.code);
+    // The fixture's journeys don't model data.
+    const errors = diagnostics(m)
+      .filter((d) => d.severity !== "info")
+      .map((d) => d.code);
     expect(errors).toEqual(["landscape/outside-reference"]);
     expect(m.diagnostics.find((d) => d.code === "landscape/outside-reference")?.message).toBe(
       "rides.api → zendesk.tickets points outside the landscape. Import that namespace in the landscape to include it.",
@@ -280,5 +284,57 @@ describe("org definitions in a team's repo", () => {
       ],
     ]);
     expect(findings.filter((f) => f.code === "rule/unknown-selector")).toEqual([]);
+  });
+});
+
+describe("composeLandscape: data", () => {
+  it("rewrites what field references name, even when entry IDs collide", () => {
+    const pay = bundleOf(
+      `
+        archdoc: "2.0"
+        namespace: payments
+        elements:
+          ledger: { kind: datastore, stores: { charges: { entity: Charge, key: id } } }
+        data:
+          Charge: { kind: entity, fields: { id: { type: uuid } } }
+          Refund:
+            kind: entity
+            fields: { id: { type: uuid }, charge_id: { type: uuid, references: Charge.id }, charge: { type: Charge } }
+      `,
+      "5.0.0",
+    );
+    const rid = bundleOf(
+      `
+        archdoc: "2.0"
+        namespace: rides
+        imports:
+          payments: { github: acme/payments, version: ^5 }
+        elements:
+          app: { kind: container }
+        data:
+          Charge: { kind: message, fields: { amount: { type: int } } }
+          Receipt: { kind: entity, fields: { refund: { type: uuid, references: payments.Refund } } }
+      `,
+      "1.0.0",
+    );
+    const composed = composeLandscape(
+      federated(
+        `
+          archdoc: "2.0"
+          namespace: acme
+          imports:
+            payments: { github: acme/payments, version: ^5 }
+            rides: { github: acme/rides, version: ^1 }
+        `,
+        { payments: serializeBundle(pay), rides: serializeBundle(rid) },
+      ),
+    ).model;
+    expect(
+      fieldReferences(composed).map((r) => `${r.entry}.${r.field} -> ${r.to.entry}.${r.to.field}`),
+    ).toEqual([
+      "acme.Refund.charge_id -> acme.payments-Charge.id",
+      "acme.Refund.charge -> acme.payments-Charge.id",
+      "acme.Receipt.refund -> acme.Refund.id",
+    ]);
   });
 });

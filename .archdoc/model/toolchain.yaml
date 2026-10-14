@@ -4,7 +4,9 @@ elements:
     kind: external
     description: Hosts the repository, pull requests, and Actions.
     uses:
-      github-action: Runs on every pull request
+      github-action:
+        description: Runs on every pull request
+        sends: PullRequestEvent
 
   toolchain:
     kind: system
@@ -34,8 +36,12 @@ elements:
         description: Deterministic engine. Loads, validates, queries, diffs, maps to code, checks rules and data, and checks references into other repos.
         code: [{ path: packages/core/** }]
         uses:
-          spec: Validates model files against the schema
-          model-files: Reads the model
+          spec:
+            description: Validates model files against the schema
+            sends: ModelFile
+          model-files:
+            description: Reads the model
+            sends: ModelFile
           source-tree: Lists repository files to map them to elements (git ls-files)
         elements:
           loader:
@@ -149,8 +155,12 @@ elements:
         uses:
           core: Builds and validates bundles, and reads the current lock
           spec: Reads and writes the lockfile and bundle formats
-          model-files: Writes archdoc.lock and the bundles in .archdoc/vendor/
-          other-repos: Lists release tags and reads the model at a tag
+          model-files:
+            description: Writes archdoc.lock and the bundles in .archdoc/vendor/
+            sends: [Lock, Bundle]
+          other-repos:
+            description: Lists release tags and reads the model at a tag
+            sends: GitFetch
 
       cli:
         kind: container
@@ -158,15 +168,20 @@ elements:
         description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
-          core: Commands delegate to core
+          core:
+            description: Commands delegate to core
+            sends: ModelSources
           spec: Migrates v1 files and prints the JSON Schema
-          web: Serves the explorer, the raw model files (and with --base, the files at a ref), and change events for `archdoc view`
+          web:
+            description: Serves the explorer, the raw model files (and with --base, the files at a ref), and change events for `archdoc view`
+            sends: ExplorerPayload
           mcp: Starts the MCP server for `archdoc mcp`
           analyzers:
             description: Runs analyzers for `archdoc check`
             provenance: { source: suggested, by: agent:claude-code }
           federation:
             description: Runs `archdoc sync` and `archdoc publish`
+            sends: SyncRequest
             provenance: { source: suggested, by: agent:claude-code }
         elements:
           commands:
@@ -189,7 +204,9 @@ elements:
         description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
-          core: Tool calls delegate to core
+          core:
+            description: Tool calls delegate to core
+            sends: ModelSources
           model-files: Writes suggested additions and proposal notes for archdoc_propose
           analyzers:
             description: Runs analyzers for archdoc_check
@@ -200,10 +217,12 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. A data view (entries, classifications, where they're stored and sent), a field lineage graph, and a journey simulator that runs a sample request in the browser. Tours next.
+        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. Data shares the canvas. Messages flow along the arrows they travel, datastores open into their tables with foreign keys, a field's lineage lights up across tables and arrows, and every journey step shows the message it carries; a journey simulator runs a sample request in the browser and shows what each step writes. Tours next.
         code: [{ path: apps/web/** }]
         uses:
-          core: Builds and queries the model in the browser (@archdoc/core/browser)
+          core:
+            description: Builds and queries the model in the browser (@archdoc/core/browser)
+            sends: ModelSources
         elements:
           model-loader:
             kind: component
@@ -233,6 +252,7 @@ elements:
         uses:
           cli:
             description: Runs archdoc report and archdoc check against the pull request's base
+            sends: Command
             provenance: { source: suggested, by: agent:claude-code }
 
       agent-skills:
@@ -257,6 +277,10 @@ elements:
         technology: YAML in git (.archdoc/)
         description: The human-owned architecture model, versioned with the code.
         code: [{ path: .archdoc/** }]
+        stores:
+          ".archdoc": { entity: ModelFile, key: path }
+          archdoc.lock: { entity: Lock }
+          vendor: { entity: Bundle, key: namespace }
 
       other-repos:
         kind: external

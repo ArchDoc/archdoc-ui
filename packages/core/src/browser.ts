@@ -39,7 +39,14 @@ export {
   sensitiveDataChanges,
 } from "./data/changes.js";
 export { checkData } from "./data/check.js";
-export { type DataFlow, type DataStore, dataFlows, dataStores } from "./data/flows.js";
+export {
+  type DataFlow,
+  type DataStore,
+  dataFlows,
+  dataStores,
+  type StepMessage,
+  stepMessage,
+} from "./data/flows.js";
 export {
   type FieldId,
   type Lineage,
@@ -48,6 +55,13 @@ export {
   lineageEdges,
 } from "./data/lineage.js";
 export { checkLogic, outcomesOf } from "./data/logic.js";
+export {
+  checkReferences,
+  type FieldReference,
+  fieldReferences,
+  referenceFromSchema,
+  resolveReference,
+} from "./data/references.js";
 export { DataRegistry, type Owned, type StoredIn } from "./data/registry.js";
 export {
   classifiedFields,

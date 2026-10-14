@@ -7,12 +7,14 @@ import {
   dataFlows,
   diffModels,
   federate,
+  fieldReferences,
   formatDiff,
   integrityOf,
   parseStates,
   prReport,
   resolveData,
   serializeBundle,
+  stepMessage,
 } from "../src/index.js";
 import { dedent } from "./helpers.js";
 
@@ -68,6 +70,33 @@ const messages = (m: { diagnostics: { code: string; message: string }[] }, code:
   m.diagnostics.filter((d) => d.code === code).map((d) => d.message);
 
 describe("data entries", () => {
+  it("point fields at other entries, written or by type, and warn about ones that don't resolve", () => {
+    const m = payments(`
+      data:
+        RefundLine:
+          kind: entity
+          fields:
+            refund: { type: Refund }
+            entry: { type: uuid, references: LedgerEntry.amount_cents }
+            ledger: { type: uuid, references: payments.LedgerEntry }
+            bad: { type: uuid, references: Nope.id }
+            worse: { type: uuid, references: Refund.nope }
+    `);
+    expect(messages(m, "data/unknown-reference")).toEqual([
+      'RefundLine.bad references "Nope.id", which isn\'t a data entry or Entry.field.',
+      "RefundLine.worse references Refund.nope, but Refund has no field nope.",
+    ]);
+    const refs = fieldReferences(m).map(
+      (r) => `${r.entry}.${r.field} -> ${r.to.entry}.${r.to.field} (${r.how})`,
+    );
+    expect(refs).toEqual([
+      "payments.RefundLine.refund -> payments.Refund.id (type)",
+      "payments.RefundLine.entry -> payments.LedgerEntry.amount_cents (references)",
+      // An entry alone points at the key its datastore stores it by.
+      "payments.RefundLine.ledger -> payments.LedgerEntry.id (references)",
+    ]);
+  });
+
   it("resolve locally, qualified with the model's namespace, or not at all", () => {
     const m = payments();
     expect(codes(m)).toEqual([]);
@@ -202,6 +231,71 @@ describe("data entries", () => {
   });
 });
 
+describe("journey step messages", () => {
+  const m = payments(`
+    actors:
+      clerk: { kind: role, uses: { charges: { description: Refunds, via: proto/charges.proto } } }
+      auditor: { kind: person, uses: { ledger: Audits } }
+    elements:
+      shop:
+        kind: system
+        elements:
+          front: { kind: container, uses: { charges: { description: Pays, sends: Charge } } }
+      listener: { kind: container, uses: { charges: { description: Hears refunds, via: refund.issued } } }
+    mappings:
+      to-ledger:
+        from: { refund: Refund }
+        to: ledger.ledger_entries
+        fields: { amount_cents: refund.amount_cents }
+    journeys:
+      refund:
+        actor: clerk
+        goal: Refund
+        steps:
+          - { from: clerk, to: charges, sends: RefundRequest }
+          - { from: clerk, to: charges }
+          - { from: charges, to: clerk }
+          - { from: charges, to: ledger }
+          - { from: shop.front, to: charges }
+          - { from: shop, to: charges }
+          - { from: auditor, to: ledger, via: to-ledger }
+          - { from: auditor, to: ledger, changes: { Charge.status: captured -> refunded } }
+          - { from: auditor, to: ledger }
+          - { from: listener, to: charges }
+  `);
+  const steps = m.journeys.get("refund")?.steps ?? [];
+
+  it("come from the step, the relationship it travels, its contract, or what it writes", () => {
+    expect(steps.map((s) => stepMessage(m, s))).toEqual([
+      { data: ["RefundRequest"], how: "step" },
+      // A call through a contract carries what it accepts; the way back, what it returns.
+      { data: ["RefundRequest"], how: "accepts" },
+      { data: ["Refund"], how: "returns" },
+      { data: ["LedgerEntry"], how: "sends" },
+      { data: ["Charge"], how: "sends" },
+      // A coarse step, backed by a relationship between what's inside the boxes.
+      { data: ["Charge"], how: "sends" },
+      { data: ["payments.LedgerEntry"], how: "writes" },
+      { data: ["Charge"], how: "writes" },
+      undefined,
+      // A subscriber's step carries what the topic does.
+      { data: ["RefundIssued"], how: "carries" },
+    ]);
+  });
+
+  it("warn about a step nothing says the message of, with its location", () => {
+    expect(m.diagnostics.filter((d) => d.code === "journey/step-without-message")).toEqual([
+      {
+        severity: "warning",
+        code: "journey/step-without-message",
+        message:
+          'Journey "refund", step 9 (auditor → ledger) doesn\'t say what it sends. Add sends: to the step, or to the relationship it travels along.',
+        location: { file: "extra.yaml", line: 28, column: 9 },
+      },
+    ]);
+  });
+});
+
 describe("data rules", () => {
   it("flag classified data stored outside where it may be, and sent where it may not go", () => {
     const m = payments(`
@@ -320,6 +414,29 @@ describe("data in other repos", () => {
       "gateway → payments.charges sends payments.Charge, which payments.charges doesn't accept through proto/charges.proto. It accepts: payments.RefundRequest.",
     ]);
     expect(messages(m, "data/invalid-transition")).toHaveLength(1);
+  });
+
+  it("are pointed at by references once synced", () => {
+    const { m, before } = rides(`
+      data:
+        Receipt:
+          kind: entity
+          fields:
+            charge: { type: uuid, references: payments.Charge }
+            refund: { type: uuid, references: payments.Refund.nope }
+    `);
+    expect(before).not.toContain("data/unknown-reference");
+    expect(messages(m, "data/unknown-reference")).toEqual([
+      "Receipt.refund references payments.Refund.nope, but payments.Refund has no field nope.",
+    ]);
+    expect(fieldReferences(m).filter((r) => r.entry === "rides.Receipt")).toEqual([
+      {
+        entry: "rides.Receipt",
+        field: "charge",
+        to: { entry: "payments.Charge", field: "id" },
+        how: "references",
+      },
+    ]);
   });
 
   it("bring their classifications into this repo's data rules", () => {

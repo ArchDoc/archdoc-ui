@@ -57,6 +57,12 @@ data:
       source_ref: {}
       posted_at: {}
 
+  ReportRequest:
+    kind: message
+    description: Which month's report finance opens.
+    fields:
+      month: { type: date }
+
   FraudCheck:
     kind: message
     description: What the fraud scorer sees. No card or rider details.

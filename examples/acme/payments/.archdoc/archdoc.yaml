@@ -12,7 +12,7 @@ actors:
     kind: role
     description: Reviews refunds and closes the books each month.
     uses:
-      ledger-reports: Reviews refunds and month-end totals
+      ledger-reports: { description: Reviews refunds and month-end totals, sends: ReportRequest }
 
 elements:
   charges:
@@ -54,7 +54,7 @@ elements:
     owners: [payments-team]
     code: apps/reports/**
     uses:
-      ledger: Reads posted entries
+      ledger: { description: Reads posted entries, sends: LedgerEntry }
 
 journeys:
   month-end:

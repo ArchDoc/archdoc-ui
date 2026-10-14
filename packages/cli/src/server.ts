@@ -4,7 +4,9 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { contextFor, importSchemas } from "@archdoc/analyzers";
 import {
+  buildModel,
   federationDir,
   listRepoFiles,
   readFederationInput,
@@ -97,6 +99,13 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
           },
           samples: await readSamples(read.baseDir, files),
+          // What data entries' schema sources say (types, values, foreign keys), as check reads them.
+          schemas: (
+            await importSchemas(
+              contextFor(read.baseDir, files),
+              buildModel(read.sources, { root: read.root }),
+            )
+          ).filter((s) => !s.error),
           repo: { ...repo, root: read.baseDir },
           base: base && {
             ref: base.ref,

@@ -1,10 +1,17 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import type { MouseEvent } from "react";
+import {
+  OTHERS_LISTED,
+  ROWS_BADGE,
+  type RowInfo,
+  showValue,
+  type TableInfo,
+} from "../graph/graph.js";
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
 export interface CardData extends Record<string, unknown> {
-  family: "actor" | "element" | "external" | "group" | "data" | "field";
+  family: "actor" | "element" | "external" | "group";
   label: string;
   kind: string;
   detail?: string | undefined;
@@ -22,11 +29,15 @@ export interface CardData extends Record<string, unknown> {
   selected: boolean;
   /** The box the current journey step crosses into. */
   entered?: boolean | undefined;
-  /** A field with a classification, in a lineage graph. */
-  classified?: boolean | undefined;
-  /** In the data view: the box stores the selected data entry. */
+  /** The box stores the selected data entry. */
   stores?: boolean | undefined;
   onToggle?: (() => void) | undefined;
+  /** A datastore: show or hide the tables it stores. */
+  onTables?: (() => void) | undefined;
+  tablesOpen?: boolean | undefined;
+  /** An open datastore during a journey: show its schema, or the rows the journey has. */
+  storeView?: "erd" | "rows" | undefined;
+  onStoreView?: ((view: "erd" | "rows") => void) | undefined;
 }
 
 export type CardNode = Node<CardData, "card">;
@@ -66,7 +77,6 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
     data.entered ? "is-entered" : "",
-    data.classified ? "is-classified" : "",
     data.stores ? "is-store" : "",
   ]
     .filter(Boolean)
@@ -94,6 +104,43 @@ export function Card({ data }: NodeProps<CardNode>) {
         ) : null}
         {data.status && data.status !== "active" ? (
           <span className="card-status">{data.status}</span>
+        ) : null}
+        {data.onStoreView ? (
+          <fieldset className="store-view nodrag" aria-label="Show the schema or the rows">
+            {(["erd", "rows"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={data.storeView === v ? "is-on" : undefined}
+                aria-pressed={data.storeView === v}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onStoreView?.(v);
+                }}
+              >
+                {v === "erd" ? "ERD" : "Rows"}
+              </button>
+            ))}
+          </fieldset>
+        ) : null}
+        {data.onTables ? (
+          <button
+            type="button"
+            className={`card-toggle card-tables nodrag${data.tablesOpen ? " is-on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onTables?.();
+            }}
+            title={data.tablesOpen ? "Hide its tables" : "Show its tables"}
+            aria-label={
+              data.tablesOpen ? `Hide ${data.label}'s tables` : `Show ${data.label}'s tables`
+            }
+            aria-pressed={data.tablesOpen}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v14H4zM4 10h16M4 14.5h16M10 10v9" />
+            </svg>
+          </button>
         ) : null}
         {data.onToggle ? (
           <button
@@ -123,4 +170,249 @@ export function Card({ data }: NodeProps<CardNode>) {
   );
 }
 
-export const nodeTypes = { card: Card };
+export interface TableData extends Record<string, unknown> {
+  table: TableInfo;
+  /** The entry as the explorer names it, without this repo's namespace. */
+  label: string;
+  emphasis: Emphasis;
+  /** Fields that point at another table. */
+  references: ReadonlySet<string>;
+  /** Fields to light up, such as a lineage's. */
+  lit?: ReadonlySet<string> | undefined;
+  /** What the current journey step writes: a new row, or changed fields, with their values. */
+  write?: { created: boolean; values: ReadonlyMap<string, string>; step: number } | undefined;
+  onField?: ((field: string) => void) | undefined;
+}
+
+export type TableNode = Node<TableData, "table">;
+
+/** A datastore's table, inside it: the entry it stores, and a row per field. */
+export function Table({ data }: NodeProps<TableNode>) {
+  const { table } = data;
+  return (
+    <div
+      className={`table-card emphasis-${data.emphasis}${data.write ? " is-written" : ""}`}
+      key={data.write ? `step-${data.write.step}` : undefined}
+    >
+      <Handle type="target" position={Position.Left} className="handle" />
+      <div className="table-head">
+        <span className="table-name">{data.label}</span>
+        {data.write ? (
+          <span className="table-write">{data.write.created ? "+ new row" : "~ updated"}</span>
+        ) : (
+          <span className="table-table">{table.table}</span>
+        )}
+      </div>
+      <ul className="table-rows">
+        {table.fields.map((f) => (
+          <li
+            key={f.name}
+            className={
+              data.write?.values.has(f.name)
+                ? "is-written"
+                : data.lit?.has(f.name)
+                  ? "is-lit"
+                  : undefined
+            }
+          >
+            <button
+              type="button"
+              className="table-row nodrag"
+              title={`${f.name}: where its value comes from and goes`}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onField?.(f.name);
+              }}
+            >
+              <span className="table-mark">
+                {f.name === table.key ? "PK" : data.references.has(f.name) ? "FK" : ""}
+              </span>
+              <span className="table-field">{f.name}</span>
+              {f.classification && !ROUTINE.has(f.classification) ? (
+                <span className="table-class">{f.classification}</span>
+              ) : null}
+              <span className="table-type" title={data.write?.values.get(f.name)}>
+                {data.write?.values.get(f.name) ?? f.type ?? ""}
+              </span>
+            </button>
+          </li>
+        ))}
+        {table.fields.length === 0 && !table.hidden ? (
+          <li className="table-empty">No fields modeled</li>
+        ) : null}
+        {table.hidden ? (
+          <li className="table-more">
+            +{table.hidden} more field{table.hidden === 1 ? "" : "s"}
+          </li>
+        ) : null}
+      </ul>
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+const ROUTINE = new Set(["public", "internal"]);
+
+export interface RowTableData extends Record<string, unknown> {
+  table: TableInfo;
+  /** The entry, short. */
+  label: string;
+  rows: RowInfo[];
+  columns: string[];
+  /** Each column's width, from the layout. */
+  columnWidths: number[];
+  /** Columns that point at another row. */
+  references: ReadonlySet<string>;
+  /** Each line's emphasis: the current step's rows, the rows they point at, the rest. */
+  lines: Emphasis[];
+  emphasis: Emphasis;
+  /** Rows the journey doesn't use, left out. */
+  hiddenRows?: number | undefined;
+}
+
+export type RowTableNode = Node<RowTableData, "rowtable">;
+
+/** A datastore table's rows during a journey: a line per record, with what changed lit. */
+export function RowTable({ data }: NodeProps<RowTableNode>) {
+  const { table, rows, columns } = data;
+  return (
+    <div className={`rows-card emphasis-${data.emphasis}`}>
+      <div className="rows-head">
+        <span className="table-name">{data.label}</span>
+        <span className="table-table">
+          {table.table} · {rows.length} row{rows.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <table className="rows-grid">
+        <colgroup>
+          <col style={{ width: ROWS_BADGE }} />
+          {columns.map((c, i) => (
+            <col key={c} style={{ width: data.columnWidths[i] }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th aria-label="Row" />
+            {columns.map((c) => (
+              <th key={c}>
+                {data.references.has(c) ? <span className="row-mark">→</span> : null}
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const badge = row.isNew
+              ? "new"
+              : row.changed.size
+                ? "changed"
+                : row.origin === "existing"
+                  ? ""
+                  : `${(row.step ?? 0) + 1}`;
+            return (
+              <tr
+                // Restart the highlight when a step writes the row again.
+                key={`${row.id ?? i}-${row.step ?? "x"}-${row.changed.size}`}
+                className={`line-${data.lines[i] ?? "normal"}${row.isNew ? " is-new" : ""} origin-${row.origin}`}
+                title={JSON.stringify(row.record, null, 2)}
+              >
+                <td className="rows-badge">
+                  {badge ? (
+                    <span
+                      className={`row-badge badge-${row.isNew ? "new" : row.changed.size ? "changed" : "step"}`}
+                      title={
+                        row.isNew || row.changed.size
+                          ? undefined
+                          : `Written at step ${(row.step ?? 0) + 1}`
+                      }
+                    >
+                      {badge}
+                    </span>
+                  ) : null}
+                </td>
+                {columns.map((c) => (
+                  <td key={c} className={row.changed.has(c) ? "is-changed" : undefined}>
+                    {showValue(row.record[c])}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+          {data.hiddenRows ? (
+            <tr
+              className="rows-hidden"
+              title={`${data.hiddenRows} other row${data.hiddenRows === 1 ? "" : "s"} the journey doesn't use`}
+            >
+              <td colSpan={columns.length + 1}>
+                +{data.hiddenRows} row{data.hiddenRows === 1 ? "" : "s"} not used
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+      <Handle type="target" position={Position.Left} className="handle" />
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+export interface OthersData extends Record<string, unknown> {
+  /** The tables folded away, by short entry name and table. */
+  tables: { entry: string; label: string; table: string }[];
+  emphasis: Emphasis;
+  /** Bring one table back. */
+  onShow: (entry: string) => void;
+  /** Show every table in the datastore. */
+  onShowAll: () => void;
+}
+
+export type OthersNode = Node<OthersData, "others">;
+
+/** A datastore's tables the journey doesn't use, folded into one box. */
+export function Others({ data }: NodeProps<OthersNode>) {
+  const listed = data.tables.slice(0, OTHERS_LISTED);
+  const more = data.tables.length - listed.length;
+  return (
+    <div className={`others-card emphasis-${data.emphasis}`}>
+      <Handle type="target" position={Position.Left} className="handle" />
+      <div className="others-head">
+        <span>
+          {data.tables.length} other table{data.tables.length === 1 ? "" : "s"}
+        </span>
+        <button
+          type="button"
+          className="link nodrag"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onShowAll();
+          }}
+        >
+          Show all
+        </button>
+      </div>
+      <p className="others-note">Not used by this journey</p>
+      <ul className="others-list">
+        {listed.map((t) => (
+          <li key={t.entry}>
+            <button
+              type="button"
+              className="nodrag"
+              title={`Show ${t.table}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onShow(t.entry);
+              }}
+            >
+              {t.label}
+            </button>
+          </li>
+        ))}
+        {more > 0 ? <li className="others-more">+{more} more</li> : null}
+      </ul>
+      <Handle type="source" position={Position.Right} className="handle" />
+    </div>
+  );
+}
+
+export const nodeTypes = { card: Card, table: Table, rowtable: RowTable, others: Others };

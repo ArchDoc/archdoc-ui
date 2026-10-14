@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getActor, getElement, overview } from "../src/index.js";
-import { model, root } from "./helpers.js";
+import { diagnostics, model, root } from "./helpers.js";
 
 const m = model({
   "archdoc.yaml": root(`
@@ -30,7 +30,7 @@ const m = model({
 
 describe("queries", () => {
   it("has a clean fixture", () => {
-    expect(m.diagnostics).toEqual([]);
+    expect(diagnostics(m)).toEqual([]);
   });
 
   it("getElement returns hierarchy, relationships both ways, inherited owners, and journeys", () => {

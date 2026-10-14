@@ -1,5 +1,5 @@
 import type { Model } from "@archdoc/core/browser";
-import { forwardRef, type ReactNode, useMemo } from "react";
+import { forwardRef, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Compare } from "../App.js";
 import { sensitivity } from "../graph/data.js";
 import type { GroupBy } from "../graph/groups.js";
@@ -29,6 +29,20 @@ interface Hit {
 export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sidebar(props, ref) {
   const { model, query } = props;
   const hits = useMemo(() => search(model, query), [model, query]);
+  const [open, toggleSection, openSection] = useOpenSections();
+  const section = (id: SectionId, title: string, count: number) => ({
+    id,
+    title,
+    count,
+    open: open.has(id),
+    onToggle: () => toggleSection(id),
+  });
+
+  // Picking something on the canvas opens the section that lists it.
+  const selectedSection = sectionOf(props.selected, props.journeyId, !!props.landscape);
+  useEffect(() => {
+    if (selectedSection) openSection(selectedSection);
+  }, [selectedSection, openSection]);
 
   return (
     <nav className="sidebar" aria-label="Model">
@@ -52,7 +66,7 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
       </div>
 
       {query ? (
-        <Section title={`${hits.length} result${hits.length === 1 ? "" : "s"}`}>
+        <Section id="results" title="Results" count={hits.length} open onToggle={() => {}}>
           {hits.map((h) => (
             <Item key={h.key} active={isActive(h.key)} onClick={() => select(h.key)} hint={h.hint}>
               {h.label}
@@ -61,9 +75,11 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
         </Section>
       ) : (
         <>
-          {props.compare ? <Changes {...props} compare={props.compare} /> : null}
-          {props.landscape ? <Landscape {...props} landscape={props.landscape} /> : null}
-          <Section title="Journeys">
+          {props.compare ? <Changes {...props} compare={props.compare} section={section} /> : null}
+          {props.landscape ? (
+            <Landscape {...props} landscape={props.landscape} section={section} />
+          ) : null}
+          <Section {...section("journeys", "Journeys", model.journeys.size)}>
             {[...model.journeys.values()].map((j) => (
               <Item
                 key={j.id}
@@ -85,7 +101,7 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
             ))}
             {model.journeys.size === 0 ? <p className="empty">No journeys yet.</p> : null}
           </Section>
-          <Section title="Actors">
+          <Section {...section("actors", "Actors", model.actors.size)}>
             {[...model.actors.values()].map((a) => (
               <Item
                 key={a.id}
@@ -98,7 +114,7 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
             ))}
           </Section>
           {model.data.size ? (
-            <Section title="Data">
+            <Section {...section("data", "Data", model.data.size)}>
               {[...model.data.values()].map((d) => {
                 const key = `data:${model.namespace}.${d.id}`;
                 const sensitive = sensitivity(d);
@@ -121,7 +137,13 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
               })}
             </Section>
           ) : null}
-          <Section title="Elements">
+          <Section
+            {...section(
+              "elements",
+              "Elements",
+              [...model.elements.values()].filter((e) => e.depth === 0).length,
+            )}
+          >
             <Tree {...props} parentId={undefined} />
           </Section>
         </>
@@ -140,11 +162,11 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
 });
 
 /** A landscape's repos and domains. */
-function Landscape(props: SidebarProps & { landscape: LandscapeInfo }) {
+function Landscape(props: SidebarProps & { landscape: LandscapeInfo; section: SectionFor }) {
   const { landscape } = props;
   return (
     <>
-      <Section title="Repos">
+      <Section {...props.section("repos", "Repos", landscape.repos.length)}>
         {landscape.repos.map((r) => (
           <Item
             key={r.namespace}
@@ -160,7 +182,7 @@ function Landscape(props: SidebarProps & { landscape: LandscapeInfo }) {
         ))}
       </Section>
       {landscape.domains.length ? (
-        <Section title="Domains">
+        <Section {...props.section("domains", "Domains", landscape.domains.length)}>
           {landscape.domains.map((d) => (
             <Item
               key={d.id}
@@ -194,7 +216,7 @@ function crossesRepos(model: Model, journeyId: string): boolean {
 const MARK = { added: "+", removed: "−", changed: "~", moved: "→" } as const;
 
 /** What changed since the base, as a clickable list. */
-function Changes(props: SidebarProps & { compare: Compare }) {
+function Changes(props: SidebarProps & { compare: Compare; section: SectionFor }) {
   const { diff, ref } = props.compare;
   const items = [
     ...diff.elements.map((c) => ({
@@ -213,7 +235,7 @@ function Changes(props: SidebarProps & { compare: Compare }) {
   ];
   const rels = diff.relationships.length;
   return (
-    <Section title={`Changes since ${ref}`}>
+    <Section {...props.section("changes", `Changes since ${ref}`, items.length + rels)}>
       {items.length === 0 && rels === 0 ? <p className="empty">The model didn't change.</p> : null}
       {items.map((i) => (
         <Item
@@ -281,13 +303,114 @@ function Tree(props: SidebarProps & { parentId: string | undefined }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+type SectionId =
+  | "results"
+  | "changes"
+  | "repos"
+  | "domains"
+  | "journeys"
+  | "actors"
+  | "data"
+  | "elements";
+
+interface SectionProps {
+  id: SectionId;
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}
+
+type SectionFor = (id: SectionId, title: string, count: number) => SectionProps;
+
+/** A sidebar section that opens and closes, like an accordion. */
+function Section(props: SectionProps & { children: ReactNode }) {
+  const body = `side-${props.id}`;
   return (
-    <section className="side-section">
-      <h2>{title}</h2>
-      <div className="side-list">{children}</div>
+    <section className={`side-section${props.open ? " is-open" : ""}`}>
+      <h2>
+        <button
+          type="button"
+          className="side-head"
+          aria-expanded={props.open}
+          aria-controls={body}
+          onClick={props.onToggle}
+        >
+          <span className="side-chevron" aria-hidden="true">
+            ▸
+          </span>
+          <span className="side-title">{props.title}</span>
+          <span className="side-count">{props.count}</span>
+        </button>
+      </h2>
+      {props.open ? (
+        <div className="side-list" id={body}>
+          {props.children}
+        </div>
+      ) : null}
     </section>
   );
+}
+
+const OPEN_KEY = "archdoc:sidebar-open";
+const DEFAULT_OPEN: SectionId[] = ["changes", "journeys", "data"];
+
+/** Which sections are open, remembered across visits. */
+function useOpenSections(): [
+  ReadonlySet<SectionId>,
+  (id: SectionId) => void,
+  (id: SectionId) => void,
+] {
+  const [open, setOpen] = useState<ReadonlySet<SectionId>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "null") as unknown;
+      if (Array.isArray(saved)) return new Set(saved as SectionId[]);
+    } catch {
+      // Storage can be unavailable or hold something else; the default is fine.
+    }
+    return new Set(DEFAULT_OPEN);
+  });
+  const save = useCallback((next: ReadonlySet<SectionId>) => {
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify([...next]));
+    } catch {
+      // Ignore: the sections just won't be remembered.
+    }
+    return next;
+  }, []);
+  const toggle = useCallback(
+    (id: SectionId) =>
+      setOpen((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return save(next);
+      }),
+    [save],
+  );
+  const openOne = useCallback(
+    (id: SectionId) => setOpen((prev) => (prev.has(id) ? prev : save(new Set([...prev, id])))),
+    [save],
+  );
+  return [open, toggle, openOne];
+}
+
+/** The section that lists a selection, if any. */
+function sectionOf(
+  selected: string | undefined,
+  journeyId: string | undefined,
+  landscape: boolean,
+): SectionId | undefined {
+  if (journeyId) return "journeys";
+  if (!selected) return undefined;
+  if (selected.startsWith("actor:")) return "actors";
+  if (selected.startsWith("data:") || selected.startsWith("field:")) return "data";
+  if (selected.startsWith("domain:")) return "domains";
+  if (selected.startsWith("element:")) {
+    // In a landscape, a repo's box is listed under Repos.
+    return landscape && !selected.slice(8).includes(".") ? "repos" : "elements";
+  }
+  return undefined;
 }
 
 function Item(props: {

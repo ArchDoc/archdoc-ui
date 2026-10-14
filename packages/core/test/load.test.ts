@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codes, model, root } from "./helpers.js";
+import { codes, diagnostics, model, root } from "./helpers.js";
 
 describe("buildModel", () => {
   it("merges actors, elements, and journeys from several files", () => {
@@ -26,7 +26,7 @@ describe("buildModel", () => {
           - { from: app, to: api }
       `,
     });
-    expect(m.diagnostics).toEqual([]);
+    expect(diagnostics(m)).toEqual([]);
     expect(m.namespace).toBe("rides");
     expect([...m.elements.keys()]).toEqual(["platform", "platform.app", "platform.api"]);
     expect(m.elements.get("platform.api")).toMatchObject({

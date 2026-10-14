@@ -32,7 +32,9 @@ journeys:
 
 export function ridesModel(): Model {
   const model = buildModel([{ path: "archdoc.yaml", text }]);
-  if (model.diagnostics.length) throw new Error(JSON.stringify(model.diagnostics));
+  // Structure only: the journeys don't model what each step sends.
+  const problems = model.diagnostics.filter((d) => d.code !== "journey/step-without-message");
+  if (problems.length) throw new Error(JSON.stringify(problems));
   return model;
 }
 
@@ -78,7 +80,9 @@ journeys:
 
 export function landscapeModel(): Model {
   const model = buildModel([{ path: "acme.landscape.json", text: landscapeText }]);
-  if (model.diagnostics.length) throw new Error(JSON.stringify(model.diagnostics));
+  // Structure only: the journeys don't model what each step sends.
+  const problems = model.diagnostics.filter((d) => d.code !== "journey/step-without-message");
+  if (problems.length) throw new Error(JSON.stringify(problems));
   return model;
 }
 
