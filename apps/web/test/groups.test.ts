@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { journeyInteractions } from "../src/graph/data.js";
 import { buildGraph, journeyEdges } from "../src/graph/graph.js";
 import { boundaryLabel, crossingOf, groupLandscape } from "../src/graph/groups.js";
 import { landscapeInfo, landscapeModel } from "./fixtures.js";
@@ -85,7 +86,12 @@ describe("landscape grouping", () => {
     const journey = model.journeys.get("request-refund");
     if (!journey) throw new Error("no journey");
     const grouping = groupLandscape(model, landscapeInfo, "team");
-    const edges = journeyEdges(model, { expanded: new Set(), grouping }, journey);
+    const edges = journeyEdges(
+      model,
+      { expanded: new Set(), grouping },
+      journey.id,
+      journeyInteractions(model, journey),
+    );
     expect(edges[2]).toMatchObject({
       source: "element:rides.api-gateway",
       target: "element:payments.charges",

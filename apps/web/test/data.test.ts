@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   dataFocus,
   dataPlaces,
+  exampleValue,
   hasData,
   journeyStores,
   lineageFocus,
@@ -157,8 +158,8 @@ data:
         { name: "id", type: "uuid", classification: undefined },
         { name: "card_last4", type: "string", classification: "pci" },
       ],
-      // A small schema shows every field.
-      hidden: 0,
+      // Closed until it's opened: its name, and how many fields it has.
+      open: false,
     });
     expect(open.edges.map((e) => `${e.source}.${e.reference?.field} -> ${e.target}`)).toEqual([
       "table:db:refunds.charge_id -> table:db:charges",
@@ -183,13 +184,9 @@ data:
         when: "auto",
       },
     ]);
-    // Writing through a mapping creates what it maps to, with the mapping's expressions.
+    // Writing through a mapping creates what it maps to; its values come from a simulation.
     expect(stepData(m, journey, 2).writes).toEqual([
-      {
-        entry: "payments.Refund",
-        created: true,
-        values: new Map([["amount_cents", "= request.amount_cents"]]),
-      },
+      { entry: "payments.Refund", created: true, values: new Map() },
     ]);
 
     const sample = {
@@ -238,11 +235,22 @@ data:
     expect(hasData(journey)).toBe(true);
     expect(hasData(m.journeys.get("plain") as never)).toBe(false);
     const sample = sampleSkeleton(m, journey);
+    // Example values a reader would expect, by each field's name and type.
     expect(sample).toEqual({
-      RefundRequest: { amount_cents: 0, email: "", note: "" },
-      Charge: { amount_cents: 0, status: "captured" },
+      RefundRequest: { amount_cents: 1200, email: "ana@example.com", note: "An example" },
+      Charge: { amount_cents: 1200, status: "captured" },
     });
-    // The skeleton runs: 0 <= 0 / 2 approves automatically.
-    expect(simulate(m, "refund", sample)?.outcomes).toEqual(["auto"]);
+    // The skeleton runs: 1200 is more than half of 1200, so it goes to a person.
+    expect(simulate(m, "refund", sample)?.outcomes).toEqual(["manual"]);
+  });
+
+  it("give keys and the fields that name them the same example, so records link up", () => {
+    expect(exampleValue("erp.Customer", "id", "string", undefined)).toBe("customer-1");
+    expect(exampleValue("erp.Order", "customer_id", "string", undefined)).toBe("customer-1");
+    expect(exampleValue("erp.SalesRep", "id", "string", undefined)).toBe("sales-rep-1");
+    expect(exampleValue("erp.Order", "sales_rep_id", "string", undefined)).toBe("sales-rep-1");
+    expect(exampleValue("x.Meter", "kwh", "number", undefined)).toBe(12.5);
+    expect(exampleValue("x.Line", "quantity", "int", undefined)).toBe(2);
+    expect(exampleValue("x.Order", "status", "enum", ["placed", "paid"])).toBe("placed");
   });
 });

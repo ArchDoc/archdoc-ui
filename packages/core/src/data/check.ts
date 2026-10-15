@@ -2,7 +2,7 @@ import type { JourneyStepSpec } from "@archdoc/spec";
 import type { Diagnostic, SourceLocation } from "../diagnostics.js";
 import { otherModels } from "../federation/consumers.js";
 import type { Model, Target } from "../model.js";
-import { dataFlows, stepMessage } from "./flows.js";
+import { dataFlows, stepMessage, stepStores } from "./flows.js";
 import { checkLogic } from "./logic.js";
 import { checkReferences } from "./references.js";
 import {
@@ -160,6 +160,23 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
       });
     }
   }
+  // Each step is one interaction: storing what a step writes is a step of its own.
+  if (scope === "local") {
+    for (const j of model.journeys.values()) {
+      for (const step of j.steps) {
+        if (!step.from || !step.to) continue;
+        for (const s of stepStores(model, step)) {
+          const what = list(s.entries.map((e) => shortData(model, e)));
+          out.push({
+            severity: "warning",
+            code: "journey/step-writes-elsewhere",
+            message: `Journey "${j.id}", step ${step.index + 1} (${short(step.from)} → ${short(step.to)}) also writes ${what} into ${s.store}. Make storing it a step of its own, from ${short(s.writer)} to ${s.store}, and move what it creates and changes there.`,
+            location: step.location,
+          });
+        }
+      }
+    }
+  }
   out.push(...checkLogic(model, scope));
   out.push(...checkReferences(model, scope));
   return out;
@@ -305,4 +322,16 @@ function fieldProblem(
     };
   }
   return undefined;
+}
+
+/** An entry as written in this model: unqualified when it's local. */
+function shortData(model: Model, entry: string): string {
+  const ns = `${model.namespace}.`;
+  return entry.startsWith(ns) ? entry.slice(ns.length) : entry;
+}
+
+/** "A", "A and B", "A, B, and C". */
+function list(items: string[]): string {
+  if (items.length < 3) return items.join(" and ");
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }

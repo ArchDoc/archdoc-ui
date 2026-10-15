@@ -7,7 +7,14 @@ import {
 } from "@archdoc/core/browser";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type DataFocus, dataFocus, lineageFocus, stepData } from "../graph/data.js";
+import {
+  type DataFocus,
+  dataFocus,
+  type Interaction,
+  lineageFocus,
+  type StepData,
+  stepData,
+} from "../graph/data.js";
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
@@ -31,7 +38,9 @@ export interface CanvasProps {
   simulation?: Simulation | undefined;
   selected?: string | undefined;
   journey?: JourneyNode | undefined;
-  step: number;
+  /** The open journey's interactions, and the one it's at. */
+  interactions: readonly Interaction[];
+  at: number;
   /** Node to bring into view once it's laid out. Cleared through onCentered. */
   centerOn?: string | undefined;
   onCentered: () => void;
@@ -39,6 +48,8 @@ export interface CanvasProps {
   onToggle: (elementId: string) => void;
   /** Show or hide a datastore's tables. */
   onTables: (elementId: string) => void;
+  /** Show or hide a table's fields, by qualified entry. */
+  onFields: (entry: string) => void;
   /** During a journey: show an open datastore's schema or its rows. */
   onStoreView: (elementId: string, view: "erd" | "rows") => void;
   /** Bring back one folded table, or every table in a datastore. */
@@ -49,7 +60,8 @@ export interface CanvasProps {
 }
 
 export function Canvas(props: CanvasProps) {
-  const { model, view, journey, step, centerOn, compare, grouping } = props;
+  const { model, view, journey, interactions, at, centerOn, compare, grouping } = props;
+  const interaction = journey ? interactions[at] : undefined;
   // A domain is selected from the sidebar; on the canvas it's its box.
   const selected = props.selected?.startsWith("domain:")
     ? `group:domain:${props.selected.slice(7)}`
@@ -76,19 +88,19 @@ export function Canvas(props: CanvasProps) {
   }, [graph]);
 
   const steps = useMemo(
-    () => (journey ? journeyEdges(model, view, journey) : []),
-    [model, view, journey],
+    () => (journey ? journeyEdges(model, view, journey.id, interactions) : []),
+    [model, view, journey, interactions],
   );
-  // Steps that go from one repo (or team, or domain) to another, and the box each one enters.
+  // Interactions that go from one repo (or team, or domain) to another, and the box each enters.
   const crossings = useMemo(() => {
     const out = new Map<number, string>();
     if (!journey || !grouping) return out;
-    for (const s of journey.steps) {
-      const c = s.from && s.to ? crossingOf(model, grouping, s.from, s.to) : undefined;
-      if (c) out.set(s.index, boundaryKey(grouping, c.to));
-    }
+    interactions.forEach((x, i) => {
+      const c = crossingOf(model, grouping, x.from, x.to);
+      if (c) out.set(i, boundaryKey(grouping, c.to));
+    });
     return out;
-  }, [model, journey, grouping]);
+  }, [model, journey, grouping, interactions]);
 
   // A selected data entry (or field's lineage): where it's stored, where it travels, and its tables.
   const focus = useMemo<
@@ -103,11 +115,26 @@ export function Canvas(props: CanvasProps) {
   }, [model, view, selected]);
   const fieldRefs = useMemo(() => fieldReferences(model), [model]);
 
-  // What the current journey step sends, and the records it writes.
-  const current = useMemo(
-    () => (journey ? stepData(model, journey, step, props.simulation) : undefined),
-    [model, journey, step, props.simulation],
-  );
+  // What the current interaction carries, and the records it writes: a step's
+  // arrow carries its message, and its writer storing it carries what it stores.
+  const current = useMemo((): StepData | undefined => {
+    if (!journey || !interaction) return undefined;
+    const d = stepData(model, journey, interaction.step, props.simulation);
+    const writes = d.writes.filter((w) => interaction.writes.includes(w.entry));
+    if (!interaction.store) return { ...d, writes };
+    const ns = `${model.namespace}.`;
+    return {
+      writes,
+      message: {
+        how: "writes",
+        entries: interaction.writes.map((entry) => ({
+          entry,
+          label: entry.startsWith(ns) ? entry.slice(ns.length) : entry,
+          fields: [],
+        })),
+      },
+    };
+  }, [model, journey, interaction, props.simulation]);
 
   // Tables of the focused entries, the field's own (or the entry's) first.
   const focusTables = useMemo(() => {
@@ -178,7 +205,7 @@ export function Canvas(props: CanvasProps) {
         }
       }
       for (const s of steps) {
-        const current = s.step === step;
+        const current = s.at === at;
         for (const k of [s.source, s.target]) {
           if (current) map.set(k, "current");
           else if (!map.has(k)) map.set(k, "highlight");
@@ -201,7 +228,7 @@ export function Canvas(props: CanvasProps) {
       }
     }
     return map;
-  }, [journey, steps, step, selected, graph, focus, focusTables, current, lines]);
+  }, [journey, steps, at, selected, graph, focus, focusTables, current, lines]);
   const dimming = journey !== undefined || selected !== undefined;
 
   const nodes = useMemo<(CardNode | TableNode | RowTableNode | OthersNode)[]>(() => {
@@ -288,7 +315,7 @@ export function Canvas(props: CanvasProps) {
               references: references.get(n.id) ?? new Set(),
               write: (() => {
                 const w = current?.writes.find((x) => x.entry === t.entry);
-                return w ? { created: w.created, values: w.values, step } : undefined;
+                return w ? { created: w.created, values: w.values, step: at } : undefined;
               })(),
               lit: focus?.fields
                 ? new Set(
@@ -298,6 +325,7 @@ export function Canvas(props: CanvasProps) {
                   )
                 : undefined,
               onField: (field: string) => props.onSelect(`field:${t.entry}.${field}`),
+              onFields: () => props.onFields(t.entry),
             },
           },
         ];
@@ -324,7 +352,7 @@ export function Canvas(props: CanvasProps) {
             containsChanges: overlay?.containsChanges.has(n.id),
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
-            entered: crossings.get(step) === n.id,
+            entered: crossings.get(at) === n.id,
             stores: focus?.stores.has(n.id),
             onToggle:
               element && element.childIds.length > 0 ? () => props.onToggle(element.id) : undefined,
@@ -355,13 +383,14 @@ export function Canvas(props: CanvasProps) {
     selected,
     props.onToggle,
     props.onTables,
+    props.onFields,
     props.onSelect,
     view.tables,
     overlay,
     compare,
     grouping,
     crossings,
-    step,
+    at,
     focus,
     current,
     fieldRefs,
@@ -385,11 +414,11 @@ export function Canvas(props: CanvasProps) {
         routeBetween.set(`${e.target}->${e.source}`, [...points].reverse());
       }
     }
-    // Steps that share a route spread their numbers along it, so none hides another.
+    // Interactions that share a route spread their numbers along it, so none hides another.
     const sharing = new Map<string, number[]>();
     for (const s of steps) {
       const pair = [s.source, s.target].sort().join("|");
-      sharing.set(pair, [...(sharing.get(pair) ?? []), s.step]);
+      sharing.set(pair, [...(sharing.get(pair) ?? []), s.at]);
     }
     const regular: RoutedEdge[] = layout.graph.edges.map((e) => {
       if (e.reference) {
@@ -454,7 +483,7 @@ export function Canvas(props: CanvasProps) {
     const journeyOverlay: RoutedEdge[] = steps
       .filter((s) => s.source !== s.target)
       .map((s) => {
-        const shared = sharing.get([s.source, s.target].sort().join("|")) ?? [s.step];
+        const shared = sharing.get([s.source, s.target].sort().join("|")) ?? [s.at];
         return {
           id: `step:${s.id}`,
           type: "routed" as const,
@@ -462,9 +491,9 @@ export function Canvas(props: CanvasProps) {
           target: s.target,
           data: {
             points: routeBetween.get(`${s.source}->${s.target}`),
-            labelAt: (shared.indexOf(s.step) + 1) / (shared.length + 1),
+            labelAt: (shared.indexOf(s.at) + 1) / (shared.length + 1),
             packet:
-              s.step === step
+              s.at === at
                 ? current?.message
                   ? { label: current.message.entries.map((e) => e.label).join(", ") }
                   : { label: "no message", missing: true }
@@ -473,17 +502,17 @@ export function Canvas(props: CanvasProps) {
           markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
           className: [
             "journey",
-            s.step === step ? "is-current" : "",
-            crossings.has(s.step) ? "is-crossing" : "",
+            s.at === at ? "is-current" : "",
+            crossings.has(s.at) ? "is-crossing" : "",
             props.simulation && props.simulation.steps[s.step]?.ran === false ? "is-skipped" : "",
           ]
             .filter(Boolean)
             .join(" "),
-          label: String(s.step + 1),
+          label: s.label,
           labelBgPadding: [6, 3] as [number, number],
           labelBgBorderRadius: 10,
-          animated: s.step === step,
-          zIndex: s.step === step ? 10 : 6,
+          animated: s.at === at,
+          zIndex: s.at === at ? 10 : 6,
         };
       });
     return [...regular, ...journeyOverlay];
@@ -491,7 +520,7 @@ export function Canvas(props: CanvasProps) {
     layout,
     journey,
     steps,
-    step,
+    at,
     selected,
     dimming,
     hoverEdge,
@@ -585,7 +614,7 @@ export function Canvas(props: CanvasProps) {
     [layout, graph, emphasis],
   );
   useEffect(() => {
-    const current = steps.find((s) => s.step === step);
+    const current = steps.find((s) => s.at === at);
     if (!current || !written) return;
     // The rows or tables themselves: the step's target may be the whole datastore around them.
     const targets = written.length ? written : [current.source, current.target];
@@ -597,7 +626,7 @@ export function Canvas(props: CanvasProps) {
         maxZoom: 1.1,
       });
     });
-  }, [steps, step, flow, written]);
+  }, [steps, at, flow, written]);
 
   return (
     <ReactFlow

@@ -214,10 +214,10 @@ journeys:
       - { from: checkout, to: cart-cache, action: Reads the cart }
       - { from: checkout, to: shop-db, action: Creates the order, via: cart-to-order }
       - { from: checkout, to: inventory, action: Reserves the items }
+      - { from: checkout, to: payment-provider, action: Charges the card, via: order-to-payment }
       - from: checkout
-        to: payment-provider
-        action: Charges the card
-        via: order-to-payment
+        to: shop-db
+        action: Marks the order paid
         changes: { Order.status: placed -> paid }
   ship-order:
     actor: shopper

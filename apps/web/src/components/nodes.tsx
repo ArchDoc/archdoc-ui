@@ -182,11 +182,13 @@ export interface TableData extends Record<string, unknown> {
   /** What the current journey step writes: a new row, or changed fields, with their values. */
   write?: { created: boolean; values: ReadonlyMap<string, string>; step: number } | undefined;
   onField?: ((field: string) => void) | undefined;
+  /** Show or hide its fields. */
+  onFields?: (() => void) | undefined;
 }
 
 export type TableNode = Node<TableData, "table">;
 
-/** A datastore's table, inside it: the entry it stores, and a row per field. */
+/** A datastore's table, inside it: the entry it stores, and, opened, a row per field. */
 export function Table({ data }: NodeProps<TableNode>) {
   const { table } = data;
   return (
@@ -196,56 +198,70 @@ export function Table({ data }: NodeProps<TableNode>) {
     >
       <Handle type="target" position={Position.Left} className="handle" />
       <div className="table-head">
-        <span className="table-name">{data.label}</span>
-        {data.write ? (
-          <span className="table-write">{data.write.created ? "+ new row" : "~ updated"}</span>
-        ) : (
-          <span className="table-table">{table.table}</span>
-        )}
+        <div className="table-title">
+          <span className="table-name">{data.label}</span>
+          {data.write ? (
+            <span className="table-write">{data.write.created ? "+ new row" : "~ updated"}</span>
+          ) : (
+            <span className="table-table">{table.table}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="table-toggle nodrag"
+          aria-expanded={table.open}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onFields?.();
+          }}
+        >
+          <span aria-hidden="true">{table.open ? "▾" : "▸"}</span>{" "}
+          {table.fields.length ? (
+            <>
+              {table.fields.length} field{table.fields.length === 1 ? "" : "s"}
+            </>
+          ) : (
+            "No fields modeled"
+          )}
+        </button>
       </div>
-      <ul className="table-rows">
-        {table.fields.map((f) => (
-          <li
-            key={f.name}
-            className={
-              data.write?.values.has(f.name)
-                ? "is-written"
-                : data.lit?.has(f.name)
-                  ? "is-lit"
-                  : undefined
-            }
-          >
-            <button
-              type="button"
-              className="table-row nodrag"
-              title={`${f.name}: where its value comes from and goes`}
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onField?.(f.name);
-              }}
+      {table.open && table.fields.length ? (
+        <ul className="table-rows">
+          {table.fields.map((f) => (
+            <li
+              key={f.name}
+              className={
+                data.write?.values.has(f.name)
+                  ? "is-written"
+                  : data.lit?.has(f.name)
+                    ? "is-lit"
+                    : undefined
+              }
             >
-              <span className="table-mark">
-                {f.name === table.key ? "PK" : data.references.has(f.name) ? "FK" : ""}
-              </span>
-              <span className="table-field">{f.name}</span>
-              {f.classification && !ROUTINE.has(f.classification) ? (
-                <span className="table-class">{f.classification}</span>
-              ) : null}
-              <span className="table-type" title={data.write?.values.get(f.name)}>
-                {data.write?.values.get(f.name) ?? f.type ?? ""}
-              </span>
-            </button>
-          </li>
-        ))}
-        {table.fields.length === 0 && !table.hidden ? (
-          <li className="table-empty">No fields modeled</li>
-        ) : null}
-        {table.hidden ? (
-          <li className="table-more">
-            +{table.hidden} more field{table.hidden === 1 ? "" : "s"}
-          </li>
-        ) : null}
-      </ul>
+              <button
+                type="button"
+                className="table-row nodrag"
+                title={`${f.name}: where its value comes from and goes`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onField?.(f.name);
+                }}
+              >
+                <span className="table-mark">
+                  {f.name === table.key ? "PK" : data.references.has(f.name) ? "FK" : ""}
+                </span>
+                <span className="table-field">{f.name}</span>
+                {f.classification && !ROUTINE.has(f.classification) ? (
+                  <span className="table-class">{f.classification}</span>
+                ) : null}
+                <span className="table-type" title={data.write?.values.get(f.name)}>
+                  {data.write?.values.get(f.name) ?? f.type ?? ""}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );

@@ -204,15 +204,19 @@ journeys:
     importance: critical
     steps:
       - { from: patient, to: patient-app, action: Describes the problem }
-      - from: patient-app
-        to: scheduling
-        action: Asks for a visit
+      - { from: patient-app, to: scheduling, action: Asks for a visit, decides: triage }
+      - from: scheduling
+        to: ehr.clinical-db
+        action: Saves the appointment, starting now
+        when: on-call
         via: request-to-appointment
-        decides: triage
-        branches:
-          on-call: { creates: { Appointment: { status: in_progress } } }
-          book: { creates: { Appointment: { status: booked } } }
-      - { from: scheduling, to: ehr.clinical-db, action: Saves the appointment }
+        creates: { Appointment: { status: in_progress } }
+      - from: scheduling
+        to: ehr.clinical-db
+        action: Saves the booked appointment
+        when: book
+        via: request-to-appointment
+        creates: { Appointment: { status: booked } }
       - { from: patient-app, to: video, action: Joins the call }
   prescribe:
     actor: clinician
@@ -220,11 +224,12 @@ journeys:
     importance: critical
     steps:
       - { from: clinician, to: clinician-console, action: Writes the order }
-      - { from: clinician-console, to: prescribing, action: Submits it, via: order-to-prescription }
+      - { from: clinician-console, to: prescribing, action: Submits it }
+      - { from: prescribing, to: ehr.clinical-db, action: Saves the prescription, via: order-to-prescription }
+      - { from: prescribing, to: pharmacy-network, action: Sends it to the pharmacy, via: prescription-to-erx }
       - from: prescribing
-        to: pharmacy-network
-        action: Sends it to the pharmacy
-        via: prescription-to-erx
+        to: ehr.clinical-db
+        action: Marks it sent
         changes: { Prescription.status: ordered -> sent }
       - { from: prescribing, to: reporting, action: Counts it }
 

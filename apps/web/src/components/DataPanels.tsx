@@ -247,7 +247,8 @@ export function SimulatePanel(props: {
   journey: JourneyNode;
   samples: { path: string; text: string }[];
   simulation?: Simulation | undefined;
-  onSimulate: (sample: Record<string, unknown> | undefined) => void;
+  /** Run the journey on a sample, named by `label`; undefined runs example data. */
+  onSimulate: (sample: Record<string, unknown> | undefined, label: string) => void;
   onStep: (step: number) => void;
 }) {
   const { model, journey } = props;
@@ -256,11 +257,16 @@ export function SimulatePanel(props: {
     [model, journey],
   );
   const [text, setText] = useState(skeleton);
+  // Where the text came from: a sample's path, or "" for example data.
+  const [source, setSource] = useState("");
+  const [edited, setEdited] = useState(false);
   const [error, setError] = useState<string>();
   useEffect(() => {
-    // A sample named after the journey, else the first one.
+    // A sample named after the journey, as the journey runs it; else example data.
     const named = props.samples.find((s) => (s.path.split("/").pop() ?? "").startsWith(journey.id));
-    setText((named ?? props.samples[0])?.text ?? skeleton);
+    setText(named?.text ?? skeleton);
+    setSource(named?.path ?? "");
+    setEdited(false);
     setError(undefined);
   }, [skeleton, props.samples, journey.id]);
 
@@ -270,7 +276,10 @@ export function SimulatePanel(props: {
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
         throw new Error("Write an object of records by data entry.");
       setError(undefined);
-      props.onSimulate(parsed as Record<string, unknown>);
+      props.onSimulate(
+        parsed as Record<string, unknown>,
+        edited ? `${source || "Example data"}, edited` : source || "Example data",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -286,42 +295,51 @@ export function SimulatePanel(props: {
         The records that exist when the journey starts. Nothing runs: the model's logic and mappings
         are evaluated in your browser.
       </p>
-      {props.samples.length > 1 ? (
-        <select
-          className="sample-pick"
-          aria-label="Sample"
-          onChange={(e) =>
-            setText(props.samples.find((s) => s.path === e.target.value)?.text ?? skeleton)
-          }
-        >
-          {props.samples.map((s) => (
-            <option key={s.path} value={s.path}>
-              {s.path}
-            </option>
-          ))}
-        </select>
-      ) : props.samples[0] ? (
-        <p className="muted">
-          From <code>{props.samples[0].path}</code>
-        </p>
-      ) : null}
+      <select
+        className="sample-pick"
+        aria-label="Sample"
+        value={source}
+        onChange={(e) => {
+          const path = e.target.value;
+          setSource(path);
+          setEdited(false);
+          setText(props.samples.find((s) => s.path === path)?.text ?? skeleton);
+        }}
+      >
+        <option value="">Example data</option>
+        {props.samples.map((s) => (
+          <option key={s.path} value={s.path}>
+            {s.path}
+          </option>
+        ))}
+      </select>
       <textarea
         className="sample"
         spellCheck={false}
         aria-label="Sample records, as JSON"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setEdited(true);
+        }}
         rows={10}
       />
       <div className="sample-actions">
         <button type="button" className="btn primary" onClick={run}>
           Run
         </button>
-        {sim ? (
-          <button type="button" className="btn ghost" onClick={() => props.onSimulate(undefined)}>
-            Clear
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => {
+            setSource("");
+            setEdited(false);
+            setText(skeleton);
+            props.onSimulate(undefined, "Example data");
+          }}
+        >
+          Reset
+        </button>
       </div>
       {error ? <p className="sim-problem">{error}</p> : null}
       {sim ? (

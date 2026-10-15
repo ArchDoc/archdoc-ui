@@ -140,7 +140,9 @@ describe("the landscape", () => {
       "rides.api-gateway (rides@1.0.0) uses payments.charges via proto/charges.proto: Asks for a refund",
     );
     expect(r.out).toContain("acme.goodwill-refund (critical) · actor support-agent · steps 2, 3");
-    expect(r.out).toContain("rides.request-refund (critical) · actor rider · steps 4, 5, 6");
+    expect(r.out).toContain(
+      "rides.request-refund (critical) · actor rider · steps 4, 5, 6, 7, 8, 9\n",
+    );
     const show = await run("rides", "show", "payments.charges");
     expect(show.out).toMatch(
       /^payments\.charges \(container\) · in payments@5\.0\.0, another repo/,
@@ -170,7 +172,7 @@ describe("the landscape", () => {
       "| acme.goodwill-refund (another repo): Make a rider whole after a bad trip | **critical** | acme.support-agent | 2, 3 |",
     );
     expect(r.out).toContain(
-      "| rides.request-refund (another repo): Get money back for a bad trip | **critical** | rides.rider | 4, 5, 6 |",
+      "| rides.request-refund (another repo): Get money back for a bad trip | **critical** | rides.rider | 4, 5, 6, 7, 8, 9 |",
     );
     expect(r.out).toContain(
       "changed charges (container): provides -proto/charges.proto +proto/charges.v2.proto",
@@ -257,7 +259,7 @@ describe("the landscape", () => {
       "     ~ changes trips.Trip.status: completed → refunded → trips.trips-db (trips)",
     );
 
-    // A large refund needs finance, so nothing is written to the ledger or the trip.
+    // A large refund needs finance: it's saved for finance, and nothing reaches the ledger or the trip.
     const sample = JSON.parse(
       await readFile(join(org, "rides/samples/refund-overcharge.json"), "utf8"),
     );
@@ -275,6 +277,9 @@ describe("the landscape", () => {
     expect(sim.outcomes).toEqual(["needs-finance-approval"]);
     expect(sim.records["payments.Refund"].status).toBe("pending_approval");
     expect(sim.steps.slice(4).map((s: { skipped?: string }) => s.skipped)).toEqual([
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      undefined,
+      "runs only when escalate-to-safety; the decision was needs-finance-approval",
       "runs only when auto-approve; the decision was needs-finance-approval",
       "runs only when auto-approve; the decision was needs-finance-approval",
       "runs only when auto-approve; the decision was needs-finance-approval",

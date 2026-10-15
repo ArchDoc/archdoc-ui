@@ -36,7 +36,8 @@ export interface DetailsProps {
   landscape?: LandscapeInfo | undefined;
   samples?: { path: string; text: string }[];
   simulation?: Simulation | undefined;
-  onSimulate?: (sample: Record<string, unknown> | undefined) => void;
+  /** Run the journey on a sample, named by `label`; undefined runs example data. */
+  onSimulate?: (sample: Record<string, unknown> | undefined, label: string) => void;
 }
 
 export function Details(props: DetailsProps) {

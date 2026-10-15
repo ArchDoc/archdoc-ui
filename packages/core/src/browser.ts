@@ -45,7 +45,9 @@ export {
   dataFlows,
   dataStores,
   type StepMessage,
+  type StepStore,
   stepMessage,
+  stepStores,
 } from "./data/flows.js";
 export {
   type FieldId,

@@ -204,7 +204,8 @@ journeys:
     importance: critical
     steps:
       - { from: policyholder, to: claims-app, action: Reports the accident }
-      - { from: claims-app, to: fnol, action: Files the claim, via: report-to-claim }
+      - { from: claims-app, to: fnol, action: Files the claim }
+      - { from: fnol, to: claims-db, action: Opens the claim, via: report-to-claim }
       - { from: fnol, to: photo-store, action: Stores the photos }
       - { from: fnol, to: policy-admin, action: Checks cover }
       - { from: fnol, to: damage-ai, action: Gets a repair estimate }
@@ -213,12 +214,10 @@ journeys:
         action: Asks for a decision
         decides: adjudicate
         branches:
-          straight-through: { changes: { Claim.status: open -> approved } }
-          adjuster-review:
-            changes: { Claim.status: open -> in_review }
-            next: adjuster-review
-          fraud-review: { changes: { Claim.status: open -> fraud_review } }
-          decline: { changes: { Claim.status: open -> declined } }
+          adjuster-review: { next: adjuster-review }
+      - { from: adjudication, to: claims-db, action: Approves it, when: straight-through, changes: { Claim.status: open -> approved } }
+      - { from: adjudication, to: claims-db, action: Holds it for fraud review, when: fraud-review, changes: { Claim.status: open -> fraud_review } }
+      - { from: adjudication, to: claims-db, action: Declines it, when: decline, changes: { Claim.status: open -> declined } }
       - { from: adjudication, to: payments, action: Pays out, when: straight-through, via: claim-to-payout }
       - { from: payments, to: bank-rails, action: Sends the transfer, when: straight-through }
       - { from: payments, to: claims-db, action: Marks it paid, when: straight-through, changes: { Claim.status: approved -> paid } }
@@ -227,6 +226,7 @@ journeys:
     goal: Settle a claim the rules couldn't
     importance: high
     steps:
+      - { from: adjudication, to: claims-db, action: Queues it for an adjuster, changes: { Claim.status: open -> in_review } }
       - { from: adjuster, to: adjuster-workbench, action: Reviews photos and the estimate }
       - { from: adjuster-workbench, to: adjudication, action: Approves an adjusted amount }
       - { from: adjudication, to: claims-db, action: Records it, changes: { Claim.status: in_review -> approved } }

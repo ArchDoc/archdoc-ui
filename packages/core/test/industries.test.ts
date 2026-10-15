@@ -219,7 +219,8 @@ describe("a big schema", () => {
   it("takes an order to cash, creating rows that point at the sample's and at each other", () => {
     const sim = run(m, "order-to-cash", sample);
     expect(sim.outcomes).toEqual(["confirm"]);
-    expect(sim.steps.every((s) => s.ran)).toBe(true);
+    // Every step runs but the one that saves an order on hold.
+    expect(sim.steps.filter((s) => !s.ran).map((s) => s.step)).toEqual([4]);
     // The sample's rows are passed on; the first of each is the one the journey read.
     expect(sim.seed["erp.Customer"]?.map((c) => c.id)).toEqual(["cust-1", "cust-2", "cust-3"]);
     // The new order is a new row, not the sample's older one.
