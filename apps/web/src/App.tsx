@@ -15,7 +15,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
 import { Sidebar } from "./components/Sidebar.js";
-import { dataPlaces, journeyInvolvement, journeyRows, journeyStores } from "./graph/data.js";
+import {
+  dataPlaces,
+  type Interaction,
+  interactionRows,
+  journeyInteractions,
+  journeyInvolvement,
+  journeyStores,
+  sampleSkeleton,
+  stepData,
+} from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import {
   boundaryLabel,
@@ -78,18 +87,26 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   const [compareOn, setCompareOn] = useState(true);
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   // The last simulation, with its sample, so it reruns when the model reloads.
-  const [simRun, setSimRun] = useState<{ journey: string; sample: Record<string, unknown> }>();
+  // What the open journey runs on: its own sample, example data, or a sample edited in the panel.
+  const [simRun, setSimRun] = useState<{
+    journey: string;
+    sample: Record<string, unknown>;
+    label: string;
+  }>();
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   // Datastores opened to show their tables, and those showing a journey's rows instead.
   const [tables, setTables] = useState<ReadonlySet<string>>(() => new Set());
   const [rowStores, setRowStores] = useState<ReadonlySet<string>>(() => new Set());
+  // Tables showing their fields, by qualified entry; the rest show only their names.
+  const [openFields, setOpenFields] = useState<ReadonlySet<string>>(() => new Set());
   // During a journey, datastores showing every table, and tables brought back one at a time.
   const [showAll, setShowAll] = useState<ReadonlySet<string>>(() => new Set());
   const [extra, setExtra] = useState<ReadonlySet<string>>(() => new Set());
   const [selected, setSelected] = useState<string>();
   const [focused, setFocused] = useState(false);
   const [journeyId, setJourneyId] = useState<string>();
-  const [step, setStep] = useState(0);
+  // The interaction the journey is at: a step's arrow, or its writer storing what it wrote.
+  const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [centerOn, setCenterOn] = useState<string>();
   const [query, setQuery] = useState("");
@@ -97,6 +114,12 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   const search = useRef<HTMLInputElement>(null);
 
   const journey = journeyId ? model.journeys.get(journeyId) : undefined;
+  const interactions = useMemo(
+    () => (journey ? journeyInteractions(model, journey) : []),
+    [model, journey],
+  );
+  const interaction: Interaction | undefined = interactions[at];
+  const step = interaction?.step ?? 0;
   const simulation = useMemo<Simulation | undefined>(
     () =>
       simRun && journey && simRun.journey === journey.id
@@ -130,8 +153,11 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   );
   // The rows the journey has at the current step, for stores showing rows.
   const rows = useMemo(
-    () => (journey && rowStores.size ? journeyRows(model, journey, step, simulation) : undefined),
-    [model, journey, step, simulation, rowStores],
+    () =>
+      journey && rowStores.size
+        ? interactionRows(model, journey, interactions, at, simulation)
+        : undefined,
+    [model, journey, interactions, at, simulation, rowStores],
   );
   // What the journey uses; the rest of its datastores folds away.
   const involved = useMemo(
@@ -144,6 +170,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       focus: focused && !journey ? selected : undefined,
       grouping,
       tables,
+      openFields,
       rows: rows && { stores: rowStores, data: rows },
       involved,
       showAll,
@@ -156,6 +183,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       selected,
       grouping,
       tables,
+      openFields,
       rows,
       rowStores,
       involved,
@@ -195,6 +223,12 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
         setTables((prev) =>
           stores.every((id) => prev.has(id)) ? prev : new Set([...prev, ...stores]),
         );
+        // A field's lineage lights up fields: open the tables it goes through.
+        if (key.startsWith("field:")) {
+          setOpenFields((prev) =>
+            entries.every((e) => prev.has(e)) ? prev : new Set([...prev, ...entries]),
+          );
+        }
         return;
       }
       if (key.startsWith("domain:")) {
@@ -233,6 +267,15 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     setCenterOn(`element:${id}`);
   }, []);
 
+  const toggleFields = useCallback((entry: string) => {
+    setOpenFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(entry)) next.delete(entry);
+      else next.add(entry);
+      return next;
+    });
+  }, []);
+
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -251,7 +294,7 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       setSelected(undefined);
       setFocused(false);
       setJourneyId(id);
-      setStep(0);
+      setAt(0);
       setPlaying(false);
       // Open the tables the journey writes to, so its data can be watched changing.
       const stores = journeyStores(model, j);
@@ -266,28 +309,29 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       setTables((prev) => new Set([...prev, ...stores]));
       setShowAll(new Set());
       setExtra(new Set());
-      // A sample named after the journey (samples/<journey>*.json) runs right away.
-      const sample = matchingSample(samples, id);
-      if (sample) setSimRun({ journey: id, sample });
+      // A sample named after the journey (samples/<journey>*.json) runs right away; else example data.
+      const named = matchingSample(samples, id);
+      setSimRun(
+        named
+          ? { journey: id, ...named }
+          : { journey: id, sample: sampleSkeleton(model, j), label: "Example data" },
+      );
     },
     [model, samples],
   );
 
-  const stepCount = journey?.steps.length ?? 0;
-  const go = useCallback(
-    (n: number) => setStep(Math.max(0, Math.min(stepCount - 1, n))),
-    [stepCount],
-  );
+  const count = interactions.length;
+  const go = useCallback((n: number) => setAt(Math.max(0, Math.min(count - 1, n))), [count]);
 
   useEffect(() => {
     if (!playing) return;
-    if (step >= stepCount - 1) {
+    if (at >= count - 1) {
       setPlaying(false);
       return;
     }
-    const t = setTimeout(() => setStep((s) => s + 1), 1800);
+    const t = setTimeout(() => setAt((s) => s + 1), 1800);
     return () => clearTimeout(t);
-  }, [playing, step, stepCount]);
+  }, [playing, at, count]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -301,20 +345,25 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
       } else if (!typing && e.key === "Escape") {
         select(undefined);
       } else if (!typing && journey && e.key === "ArrowRight") {
-        go(step + 1);
+        go(at + 1);
       } else if (!typing && journey && e.key === "ArrowLeft") {
-        go(step - 1);
+        go(at - 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [journey, step, go, select]);
+  }, [journey, at, go, select]);
 
-  const currentStep = journey?.steps[step];
   const crossing =
-    grouping && currentStep?.from && currentStep.to
-      ? crossingOf(model, grouping, currentStep.from, currentStep.to)
+    grouping && interaction
+      ? crossingOf(model, grouping, interaction.from, interaction.to)
       : undefined;
+  // What the current interaction carries: the step's message, or what its writer stores.
+  const carries = useMemo(() => {
+    if (!journey || !interaction) return [];
+    if (interaction.store) return interaction.writes;
+    return stepData(model, journey, interaction.step).message?.entries.map((e) => e.entry) ?? [];
+  }, [model, journey, interaction]);
   const errors = model.diagnostics.filter((d) => d.severity === "error");
   const warnings = model.diagnostics.filter((d) => d.severity === "warning");
 
@@ -414,124 +463,63 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
             view={view}
             selected={selected}
             journey={journey}
-            step={step}
+            interactions={interactions}
+            at={at}
             centerOn={centerOn}
             onCentered={() => setCenterOn(undefined)}
             onSelect={select}
             onToggle={toggle}
             onTables={toggleTables}
+            onFields={toggleFields}
             onStoreView={storeView}
             onShowTable={(entry) => setExtra((prev) => new Set([...prev, entry]))}
             onShowAll={(id) => setShowAll((prev) => new Set([...prev, id]))}
             compare={compare}
           />
         }
-        {journey && currentStep ? (
-          <section className="journey-bar" aria-label="Journey steps">
-            <div className="journey-bar-title">
-              <strong>{journey.spec.name ?? journey.id}</strong>
-              <span>
-                Step {step + 1} of {stepCount}
-              </span>
-            </div>
-            <p className="journey-bar-step">
-              <span className="step-path">
-                {currentStep.spec.from} → {currentStep.spec.to}
-              </span>
-              {currentStep.spec.action ? <span> {currentStep.spec.action}</span> : null}
-            </p>
-            {simulation ? <StepData simulation={simulation} step={step} /> : null}
-            {crossing ? (
-              <p className="journey-bar-crossing">
-                Crosses from {boundaryLabel(grouping as Grouping, crossing.from)} to{" "}
-                {boundaryLabel(grouping as Grouping, crossing.to)}
-              </p>
-            ) : null}
-            {journeyStoreIds.length ? (
-              <div className="journey-bar-stores">
-                {journeyStoreIds.map((id) => (
-                  <fieldset key={id} className="journey-store" aria-label={`${id}: schema or rows`}>
-                    <button
-                      type="button"
-                      className="link"
-                      title="Show it"
-                      onClick={() => setCenterOn(`element:${id}`)}
-                    >
-                      {model.elements.get(id)?.spec.name ?? id}
-                    </button>
-                    <span className="store-view">
-                      {(["erd", "rows"] as const).map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          className={
-                            (rowStores.has(id) ? "rows" : "erd") === v ? "is-on" : undefined
-                          }
-                          aria-pressed={(rowStores.has(id) ? "rows" : "erd") === v}
-                          onClick={() => storeView(id, v)}
-                        >
-                          {v === "erd" ? "ERD" : "Rows"}
-                        </button>
-                      ))}
-                    </span>
-                    <label className="journey-store-all">
-                      <input
-                        type="checkbox"
-                        checked={showAll.has(id)}
-                        onChange={(e) => {
-                          const on = e.currentTarget.checked;
-                          setShowAll((prev) => {
-                            const next = new Set(prev);
-                            if (on) next.add(id);
-                            else next.delete(id);
-                            return next;
-                          });
-                          if (!on) setExtra(new Set());
-                        }}
-                      />{" "}
-                      All tables
-                    </label>
-                  </fieldset>
-                ))}
-                {!simulation && rowStores.size ? (
-                  <span className="muted">
-                    Rows show what the steps declare; run a sample for real values.
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="journey-bar-controls">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => go(step - 1)}
-                disabled={step === 0}
-              >
-                ← Back
-              </button>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => {
-                  if (step >= stepCount - 1) setStep(0);
-                  setPlaying((p) => !p);
-                }}
-              >
-                {playing ? "Pause" : step >= stepCount - 1 ? "Replay" : "Play"}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => go(step + 1)}
-                disabled={step >= stepCount - 1}
-              >
-                Next →
-              </button>
-              <button type="button" className="btn ghost" onClick={() => select(undefined)}>
-                Close
-              </button>
-            </div>
-          </section>
+        {journey && interaction ? (
+          <JourneyCard
+            model={model}
+            name={journey.spec.name ?? journey.id}
+            steps={journey.steps.length}
+            interactions={interactions}
+            at={at}
+            carries={carries}
+            simulation={simulation}
+            data={simRun?.journey === journey.id ? simRun.label : undefined}
+            crossing={
+              crossing && grouping
+                ? `Crosses from ${boundaryLabel(grouping, crossing.from)} to ${boundaryLabel(grouping, crossing.to)}`
+                : undefined
+            }
+            playing={playing}
+            onGo={(n) => {
+              setPlaying(false);
+              go(n);
+            }}
+            onPlay={() => {
+              if (at >= count - 1) setAt(0);
+              setPlaying((p) => !p);
+            }}
+            onClose={() => select(undefined)}
+            stores={journeyStoreIds.map((id) => ({
+              id,
+              name: model.elements.get(id)?.spec.name ?? id,
+              view: rowStores.has(id) ? ("rows" as const) : ("erd" as const),
+              all: showAll.has(id),
+            }))}
+            onStore={(id) => setCenterOn(`element:${id}`)}
+            onStoreView={storeView}
+            onShowAll={(id, on) => {
+              setShowAll((prev) => {
+                const next = new Set(prev);
+                if (on) next.add(id);
+                else next.delete(id);
+                return next;
+              });
+              if (!on) setExtra(new Set());
+            }}
+          />
         ) : null}
       </main>
 
@@ -548,7 +536,12 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
           onJourney={openJourney}
           onStep={(n) => {
             setPlaying(false);
-            go(n);
+            go(
+              Math.max(
+                0,
+                interactions.findIndex((x) => x.step === n),
+              ),
+            );
           }}
           onFocus={setFocused}
           onToggle={toggle}
@@ -557,8 +550,17 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
           landscape={landscape}
           samples={samples}
           simulation={simulation}
-          onSimulate={(sample) => {
-            setSimRun(sample && journey ? { journey: journey.id, sample } : undefined);
+          onSimulate={(sample, label) => {
+            if (!journey) return;
+            setSimRun(
+              sample
+                ? { journey: journey.id, sample, label }
+                : {
+                    journey: journey.id,
+                    sample: sampleSkeleton(model, journey),
+                    label: "Example data",
+                  },
+            );
             setPlaying(false);
           }}
         />
@@ -567,21 +569,179 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
   );
 }
 
-/** What the current step does to the data, in the simulation. */
-function StepData({ simulation, step }: { simulation: Simulation; step: number }) {
-  const s = simulation.steps[step];
+interface JourneyCardProps {
+  model: Model;
+  name: string;
+  /** How many steps the journey has. */
+  steps: number;
+  interactions: readonly Interaction[];
+  at: number;
+  /** Qualified entries the current interaction carries. */
+  carries: string[];
+  simulation?: Simulation | undefined;
+  /** What the journey runs on: "Example data", or a sample's path. */
+  data?: string | undefined;
+  crossing?: string | undefined;
+  playing: boolean;
+  onGo: (at: number) => void;
+  onPlay: () => void;
+  onClose: () => void;
+  /** Datastores the journey writes to, with their tables open. */
+  stores: { id: string; name: string; view: "erd" | "rows"; all: boolean }[];
+  onStore: (id: string) => void;
+  onStoreView: (id: string, view: "erd" | "rows") => void;
+  onShowAll: (id: string, on: boolean) => void;
+}
+
+/**
+ * The open journey: what the current interaction does, first and largest;
+ * then who it goes between and what it carries; then the controls. How
+ * datastores are shown sits apart, at the bottom.
+ */
+function JourneyCard(props: JourneyCardProps) {
+  const { model, interactions, at } = props;
+  const x = interactions[at] as Interaction;
+  const last = at >= interactions.length - 1;
+  const ns = `${model.namespace}.`;
+  const short = (e: string) => (e.startsWith(ns) ? e.slice(ns.length) : e);
+  const name = (t: Interaction["from"]) =>
+    t.type === "external"
+      ? t.ref
+      : ((t.type === "element" ? model.elements.get(t.id)?.spec.name : undefined) ?? t.id);
+  const action =
+    x.action ?? (props.carries.length ? `Sends ${props.carries.map(short).join(", ")}` : "");
+  return (
+    <section className="journey-card" aria-label="Journey">
+      <header className="journey-card-head">
+        <span className="journey-card-name">{props.name}</span>
+        <span className="journey-card-count">
+          Step {x.label} of {props.steps}
+        </span>
+        <button
+          type="button"
+          className="journey-card-close"
+          aria-label="Close the journey"
+          title="Close"
+          onClick={props.onClose}
+        >
+          ×
+        </button>
+      </header>
+      <ol className="journey-progress" aria-hidden="true">
+        {interactions.map((y, i) => (
+          <li
+            key={y.label}
+            className={i < at ? "is-done" : i === at ? "is-current" : undefined}
+            title={`${y.label}. ${y.action ?? ""}`}
+          />
+        ))}
+      </ol>
+      <p className="journey-card-action" aria-live="polite">
+        {action}
+      </p>
+      <p className="journey-card-path">
+        <span className="step-path">
+          {name(x.from)} → {name(x.to)}
+        </span>
+        {props.carries.map((e) => (
+          <span key={e} className="journey-card-chip">
+            {short(e)}
+          </span>
+        ))}
+      </p>
+      {props.simulation ? <StepData simulation={props.simulation} interaction={x} /> : null}
+      {props.crossing ? <p className="journey-card-note">{props.crossing}</p> : null}
+      <div className="journey-card-controls">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => props.onGo(at - 1)}
+          disabled={at === 0}
+        >
+          ← Back
+        </button>
+        <button type="button" className="btn primary" onClick={props.onPlay}>
+          {props.playing ? "Pause" : last ? "Replay" : "Play"}
+        </button>
+        <button type="button" className="btn" onClick={() => props.onGo(at + 1)} disabled={last}>
+          Next →
+        </button>
+      </div>
+      {props.stores.length || props.data ? (
+        <footer className="journey-card-view">
+          {props.data ? (
+            <span
+              className="journey-card-data-source"
+              title="Change it in the details panel, under Simulate"
+            >
+              {props.data}
+            </span>
+          ) : null}
+          {props.stores.map((st) => (
+            <fieldset
+              key={st.id}
+              className="journey-store"
+              aria-label={`${st.name}: schema or rows`}
+            >
+              <button
+                type="button"
+                className="link"
+                title="Show it"
+                onClick={() => props.onStore(st.id)}
+              >
+                {st.name}
+              </button>
+              <span className="store-view">
+                {(["erd", "rows"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={st.view === v ? "is-on" : undefined}
+                    aria-pressed={st.view === v}
+                    onClick={() => props.onStoreView(st.id, v)}
+                  >
+                    {v === "erd" ? "ERD" : "Rows"}
+                  </button>
+                ))}
+              </span>
+              <label className="journey-store-all">
+                <input
+                  type="checkbox"
+                  checked={st.all}
+                  onChange={(e) => props.onShowAll(st.id, e.currentTarget.checked)}
+                />{" "}
+                All tables
+              </label>
+            </fieldset>
+          ))}
+        </footer>
+      ) : null}
+    </section>
+  );
+}
+
+/** What the current interaction does to the data, in the simulation. */
+function StepData({
+  simulation,
+  interaction,
+}: {
+  simulation: Simulation;
+  interaction: Interaction;
+}) {
+  const s = simulation.steps[interaction.step];
   if (!s) return null;
-  if (!s.ran) return <p className="journey-bar-data is-skipped">Skipped: {s.skipped}</p>;
+  if (!s.ran) return <p className="journey-card-data is-skipped">Skipped: {s.skipped}</p>;
+  // A step's arrow says what it decided; the writer storing it says what it wrote.
   const parts = [
-    s.decision ? `decides ${s.decision.outcome ?? "nothing"}` : "",
+    s.decision && !interaction.store ? `decides ${s.decision.outcome ?? "nothing"}` : "",
     ...s.events
-      .filter((e) => e.kind !== "sent")
+      .filter((e) => e.kind !== "sent" && interaction.writes.includes(e.entry))
       .map(
         (e) =>
           `${e.kind === "created" ? "+" : "~"} ${e.entry.split(".").slice(-1)[0]}${e.tables[0] ? ` → ${e.tables[0].table}` : ""}`,
       ),
   ].filter(Boolean);
-  return parts.length ? <p className="journey-bar-data">{parts.join(" · ")}</p> : null;
+  return parts.length ? <p className="journey-card-data">{parts.join(" · ")}</p> : null;
 }
 
 function ResizeHandle({ width, onResize }: { width: number; onResize: (w: number) => void }) {
@@ -645,13 +805,13 @@ function usePanelWidth(): [number, (w: number) => void] {
 export function matchingSample(
   samples: { path: string; text: string }[],
   journey: string,
-): Record<string, unknown> | undefined {
+): { sample: Record<string, unknown>; label: string } | undefined {
   const s = samples.find((x) => (x.path.split("/").pop() ?? "").startsWith(journey));
   if (!s) return undefined;
   try {
     const parsed = JSON.parse(s.text) as unknown;
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
+      ? { sample: parsed as Record<string, unknown>, label: s.path }
       : undefined;
   } catch {
     return undefined;

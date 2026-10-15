@@ -247,6 +247,63 @@ function writtenBy(model: Model, step: JourneyStep): string[] {
   return all.flatMap((e) => (e.startsWith(ns) ? [e, e.slice(ns.length)] : [e, `${ns}${e}`]));
 }
 
+/** A datastore a journey step writes into without going to it. */
+export interface StepStore {
+  /** The datastore: an element ID in this model, or a qualified ref in another repo's. */
+  store: string;
+  /**
+   * Who stores it: the step's target, unless only the step's source has a
+   * relationship to the datastore (a service recording what an external one answered).
+   */
+  writer: Target;
+  /** Whether it's in another repo. */
+  external: boolean;
+  /** Qualified entries the step writes there. */
+  entries: string[];
+}
+
+/**
+ * The datastores a step writes into that it doesn't go to: where what it
+ * creates and changes (in any branch), and what a mapping it goes through
+ * produces, are stored, other than the step's target and what that's inside.
+ * Storing them is an interaction of its own, from the step's target to the
+ * datastore. Empty when the target isn't an element, which can't store.
+ */
+export function stepStores(model: Model, step: JourneyStep): StepStore[] {
+  const { from, to } = step;
+  if (!to || to.type === "actor") return [];
+  const registry = new DataRegistry(model);
+  const ns = model.namespace;
+  const entries = [
+    ...writes(step.spec),
+    ...Object.values(step.spec.branches ?? {}).flatMap((b) => writes(b)),
+  ].map((e) => qualifyData(e, ns));
+  const mapping = step.spec.via ? registry.mapping(step.spec.via) : undefined;
+  const mapped = mapping && registry.target(mapping.node.spec.to, mapping.namespace);
+  if (mapped) entries.unshift(mapped.entry);
+  // The target, and what it's inside: writing there is the step itself.
+  const at = new Set(chainOf(model, to));
+  const out = new Map<string, StepStore>();
+  for (const entry of new Set(entries)) {
+    for (const s of registry.storedIn(entry)) {
+      const local = s.namespace === ns;
+      const store = local ? s.element : `${s.namespace}.${s.element}`;
+      if (at.has(local ? `element:${store}` : store)) continue;
+      const target = local ? `element:${store}` : store;
+      const reaches = (t: Target | undefined) =>
+        !!t &&
+        model.relationships.some(
+          (r) => chainOf(model, r.from).includes(key(t)) && key(r.to) === target,
+        );
+      const writer = !reaches(to) && from && from.type !== "actor" && reaches(from) ? from : to;
+      const found = out.get(store) ?? { store, writer, external: !local, entries: [] };
+      found.entries.push(entry);
+      out.set(store, found);
+    }
+  }
+  return [...out.values()];
+}
+
 /** The entries a step (or branch) creates or changes. */
 function writes(spec: {
   creates?: string | string[] | Record<string, unknown> | undefined;

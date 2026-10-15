@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { journeyInteractions } from "../src/graph/data.js";
 import { buildGraph, defaultExpanded, journeyEdges, journeyExpansion } from "../src/graph/graph.js";
 import { ridesModel } from "./fixtures.js";
 
@@ -77,13 +78,23 @@ describe("journeys", () => {
   });
 
   it("maps steps onto visible nodes", () => {
-    const closed = journeyEdges(model, { expanded: new Set() }, journey);
+    const closed = journeyEdges(
+      model,
+      { expanded: new Set() },
+      journey.id,
+      journeyInteractions(model, journey),
+    );
     expect(closed.map((s) => `${s.step}:${s.source}->${s.target}`)).toEqual([
       "0:actor:passenger->element:app",
       "1:element:app->element:platform",
       "2:element:platform->element:platform",
     ]);
-    const open = journeyEdges(model, { expanded: new Set(["platform"]) }, journey);
+    const open = journeyEdges(
+      model,
+      { expanded: new Set(["platform"]) },
+      journey.id,
+      journeyInteractions(model, journey),
+    );
     expect(open[2]).toMatchObject({
       source: "element:platform.api",
       target: "element:platform.db",

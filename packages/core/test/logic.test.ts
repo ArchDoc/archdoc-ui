@@ -122,7 +122,12 @@ describe("cel", () => {
 
 describe("mappings and logic", () => {
   it("are valid as written", () => {
-    expect(model().diagnostics.filter((d) => d.severity !== "info")).toEqual([]);
+    // Step 1 decides and writes in one, which simulate still runs; validate asks to split it.
+    expect(
+      model()
+        .diagnostics.filter((d) => d.severity !== "info")
+        .map((d) => d.code),
+    ).toEqual(["journey/step-writes-elsewhere"]);
   });
 
   it("report inputs, targets, fields, and expressions that don't hold", () => {
@@ -163,7 +168,7 @@ describe("mappings and logic", () => {
         .replace("when: auto-approve", "when: approved")
         .replace("via: refund-to-ledger", "via: refund-to-ledgr"),
     );
-    expect(messages(m, "journey/")).toEqual([
+    expect(messages(m, "journey/").filter((x) => !x.includes("step-writes-elsewhere"))).toEqual([
       'journey/unknown-branch: Journey "refund", step 1 has a branch "maybe", which refund-approval never decides. Its outcomes: escalate, auto-approve, needs-approval.',
       'journey/unknown-outcome: Journey "refund", step 2 runs when "approved", but no earlier step decides it. Earlier outcomes: escalate, auto-approve, needs-approval.',
       'journey/unknown-mapping: Journey "refund", step 2 writes via "refund-to-ledgr", which isn\'t a mapping.',

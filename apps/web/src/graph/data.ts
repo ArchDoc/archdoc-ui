@@ -12,7 +12,10 @@ import {
   SIMULATED_NOW,
   type Simulation,
   type StepMessage,
+  type StepStore,
   stepMessage,
+  stepStores,
+  type Target,
 } from "@archdoc/core/browser";
 import { liftKey, type RowInfo, rowKey, type ViewState } from "./graph.js";
 
@@ -130,8 +133,10 @@ export function hasData(journey: JourneyNode): boolean {
 
 /**
  * A starting sample for simulating a journey: a record for each entry its
- * steps send, its logic and mappings read, and its changes need, with a
- * placeholder value for each field by type.
+ * steps send, its logic and mappings read, and its changes need, with an
+ * example value for each field, by its name and type. Keys and the fields
+ * that name them agree (Customer.id and Order.customer_id are both
+ * "customer-1"), so the records link up.
  */
 export function sampleSkeleton(
   model: Model,
@@ -171,7 +176,7 @@ export function sampleSkeleton(
       const record = Object.fromEntries(
         Object.entries(entry?.node.spec.fields ?? {}).map(([name, f]) => [
           name,
-          example(f.type, f.values),
+          exampleValue(short(q), name, f.type, f.values),
         ]),
       );
       return [short(q), record];
@@ -179,23 +184,51 @@ export function sampleSkeleton(
   );
 }
 
-function example(type: string | undefined, values: (string | number)[] | undefined): unknown {
+/** An example value for a field, from its name and type: what a reader would expect to see. */
+export function exampleValue(
+  entry: string,
+  name: string,
+  type: string | undefined,
+  values: (string | number)[] | undefined,
+): unknown {
   if (values?.length) return values[0];
+  const words = name.toLowerCase();
   switch (type) {
     case "int":
+      if (/cents|amount|price|total|balance|cost|fee/.test(words)) return 1200;
+      if (/quantity|qty|count|units/.test(words)) return 2;
+      if (/(^|_)k?wh$/.test(words)) return 1500;
+      return 1;
     case "number":
-      return 0;
+      return /rate|ratio|score|percent/.test(words) ? 0.5 : 12.5;
     case "bool":
-      return false;
+      return true;
     case "timestamp":
       return SIMULATED_NOW;
     case "date":
       return SIMULATED_NOW.slice(0, 10);
-    case "uuid":
-      return "id-1";
-    default:
-      return "";
+    case "json":
+      return {};
   }
+  // A key, or a field that names one: the same value either way, so records link up.
+  if (words === "id") return `${kebab(entry.split(".").pop() ?? entry)}-1`;
+  if (words.endsWith("_id")) return `${kebab(name.slice(0, -3))}-1`;
+  if (words.includes("email")) return "ana@example.com";
+  if (words.includes("phone")) return "+44 20 7946 0000";
+  if (/(^|_)name$/.test(words)) return "Ana Silva";
+  if (words.includes("address")) return "1 Main Street";
+  if (words.includes("currency")) return "GBP";
+  if (words.includes("country")) return "GB";
+  if (/url|link/.test(words)) return "https://example.com";
+  if (/description|note|reason|comment|message|text|summary/.test(words)) return "An example";
+  return `${kebab(name)}-1`;
+}
+
+function kebab(s: string): string {
+  return s
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/[_\s]+/g, "-")
+    .toLowerCase();
 }
 
 /** Node key for a target, for use outside the graph module. */
@@ -318,13 +351,8 @@ export function stepData(
   if (step.spec.via) {
     const m = registry.mapping(step.spec.via);
     const t = m && registry.target(m.node.spec.to, m.namespace);
-    if (t) {
-      writes.push({
-        entry: t.entry,
-        created: true,
-        values: new Map(Object.entries(m.node.spec.fields).map(([k, v]) => [k, `= ${v}`])),
-      });
-    }
+    // Its fields are expressions, not data: the record is there, its values come from a simulation.
+    if (t) writes.push({ entry: t.entry, created: true, values: new Map() });
   }
   declare(step.spec);
   for (const [outcome, b] of Object.entries(step.spec.branches ?? {})) declare(b, outcome);
@@ -350,6 +378,74 @@ type Effects = {
   creates?: string | string[] | Record<string, Record<string, unknown>> | undefined;
   changes?: Record<string, string> | undefined;
 };
+
+/**
+ * One interaction of a journey: a step's own arrow, or, for a step that
+ * writes into a datastore it doesn't go to, the writer storing it there.
+ */
+export interface Interaction {
+  /** The journey step it's part of, 0-based. */
+  step: number;
+  /** As the explorer numbers it: "3" for a step's arrow, "3.1" for what it stores. */
+  label: string;
+  from: Target;
+  to: Target;
+  /** What it says it does: the step's action, or what it stores. */
+  action?: string | undefined;
+  /** Qualified entries this interaction writes. */
+  writes: string[];
+  /** For storing: the datastore and what goes into it. */
+  store?: StepStore | undefined;
+}
+
+/**
+ * A journey as interactions, one per arrow: each step, then, for a step that
+ * writes into a datastore it doesn't go to, its writer storing it there.
+ * Writing it as steps of their own is what `validate` asks for.
+ */
+export function journeyInteractions(model: Model, journey: JourneyNode): Interaction[] {
+  const ns = model.namespace;
+  return journey.steps.flatMap((s): Interaction[] => {
+    if (!s.from || !s.to) return [];
+    const stores = stepStores(model, s);
+    const elsewhere = new Set(stores.flatMap((st) => st.entries));
+    const own = stepData(model, journey, s.index)
+      .writes.map((w) => w.entry)
+      .filter((e) => !elsewhere.has(e));
+    return [
+      {
+        step: s.index,
+        label: String(s.index + 1),
+        from: s.from,
+        to: s.to,
+        action: s.spec.action,
+        writes: [...new Set(own)],
+      },
+      ...stores.map(
+        (st, i): Interaction => ({
+          step: s.index,
+          label: `${s.index + 1}.${i + 1}`,
+          from: st.writer,
+          to: st.external
+            ? {
+                type: "external",
+                namespace: st.store.slice(0, st.store.indexOf(".")),
+                ref: st.store,
+              }
+            : { type: "element", id: st.store },
+          action: `Stores ${listOf(st.entries.map((e) => shortRef(e, ns)))}`,
+          writes: st.entries,
+          store: st,
+        }),
+      ),
+    ];
+  });
+}
+
+function listOf(items: string[]): string {
+  if (items.length < 3) return items.join(" and ");
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
 
 /** Datastores that hold what a journey writes or sends, to open their tables. */
 export function journeyStores(model: Model, journey: JourneyNode): string[] {
@@ -474,6 +570,33 @@ export function journeyRows(
     }
   }
   return new Map([...rows].filter(([, l]) => l.length));
+}
+
+/**
+ * The rows at interaction `at`: as journeyRows has them after its step, or,
+ * when the step's writes come in a later interaction (its writer storing
+ * them), as they were before the step, with nothing new yet.
+ */
+export function interactionRows(
+  model: Model,
+  journey: JourneyNode,
+  interactions: readonly Interaction[],
+  at: number,
+  simulation?: Simulation,
+): Map<string, RowInfo[]> {
+  const x = interactions[at];
+  if (!x) return new Map();
+  const later =
+    x.writes.length === 0 && interactions.some((y) => y.step === x.step && y.writes.length > 0);
+  if (!later) return journeyRows(model, journey, x.step, simulation);
+  const rows = journeyRows(model, journey, x.step - 1, simulation);
+  for (const list of rows.values()) {
+    for (const r of list) {
+      r.changed = new Set();
+      r.isNew = false;
+    }
+  }
+  return rows;
 }
 
 /** What a journey uses in its datastores, so the rest can be folded away. */

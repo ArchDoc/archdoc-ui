@@ -347,14 +347,21 @@ journeys:
       - from: sales-portal
         to: order-service
         action: Places it, and credit control checks the account
-        via: request-to-order
         decides: credit-check
-        branches:
-          confirm:
-            creates:
-              Order: { status: confirmed }
-              OrderLine: { id: ol-1, order_id: so-1001, sku: WID-RED, quantity: 30, unit_price_cents: 1200, tax_rate_id: vat-20 }
-          credit-hold: { creates: { Order: { status: on_hold } } }
+      - from: order-service
+        to: erp-db
+        action: Saves the confirmed order with its first line
+        when: confirm
+        via: request-to-order
+        creates:
+          Order: { status: confirmed }
+          OrderLine: { id: ol-1, order_id: so-1001, sku: WID-RED, quantity: 30, unit_price_cents: 1200, tax_rate_id: vat-20 }
+      - from: order-service
+        to: erp-db
+        action: Saves the order on hold
+        when: credit-hold
+        via: request-to-order
+        creates: { Order: { status: on_hold } }
       - from: order-service
         to: erp-db
         action: Adds the second line
@@ -386,7 +393,11 @@ journeys:
         creates: { ShipmentLine: { id: sl-2, shipment_id: sh-1, order_line_id: ol-2, quantity: 10 } }
       - from: order-service
         to: billing-service
-        action: Invoices the order
+        action: Asks for the order to be invoiced
+        when: confirm
+      - from: billing-service
+        to: erp-db
+        action: Saves the invoice with its first line
         when: confirm
         via: order-to-invoice
         creates: { InvoiceLine: { id: il-1, invoice_id: inv-so-1001, order_line_id: ol-1, amount_cents: 36000 } }
@@ -399,6 +410,10 @@ journeys:
       - from: bank-feed
         to: billing-service
         action: Reports the payment
+        when: confirm
+      - from: billing-service
+        to: erp-db
+        action: Records the payment
         when: confirm
         via: transaction-to-payment
       - from: billing-service

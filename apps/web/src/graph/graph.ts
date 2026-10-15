@@ -19,6 +19,8 @@ export interface ViewState {
   grouping?: Grouping | undefined;
   /** Datastore element IDs opened to show their tables. */
   tables?: ReadonlySet<string> | undefined;
+  /** Qualified entries whose tables show their fields; the rest show only their names. */
+  openFields?: ReadonlySet<string> | undefined;
   /**
    * During a journey, what it uses: other tables fold into one box per
    * datastore, and other rows are hidden, except in `showAll` datastores and
@@ -67,8 +69,8 @@ export interface TableInfo {
   entry: string;
   key?: string | undefined;
   fields: { name: string; type?: string | undefined; classification?: string | undefined }[];
-  /** Fields left out of a big schema's compact tables. */
-  hidden?: number | undefined;
+  /** Whether it shows its fields, or only its name and how many fields it has. */
+  open: boolean;
 }
 
 export interface GraphNode {
@@ -125,8 +127,12 @@ export interface Graph {
 
 export interface JourneyEdge {
   id: string;
+  /** Index of the interaction it draws. */
+  at: number;
   /** 0-based step index. */
   step: number;
+  /** Its number on the canvas, such as "3" or "3.1". */
+  label: string;
   source: string;
   target: string;
 }
@@ -209,8 +215,6 @@ export function buildGraph(model: Model, state: ViewState): Graph {
       // During a journey, what it doesn't use folds away.
       const involved = state.showAll?.has(id) ? undefined : state.involved;
       const folded: { entry: string; table: string }[] = [];
-      // A big schema shows keys, foreign keys, and sensitive fields; the rest are counted.
-      const compact = stores.length > COMPACT_OVER;
       for (const [table, s] of stores) {
         const entry = qualifyData(s.entity, model.namespace);
         const key = s.key ?? "id";
@@ -245,7 +249,7 @@ export function buildGraph(model: Model, state: ViewState): Graph {
             hiddenChildren: 0,
             depth: el.depth + 1,
             size,
-            table: { element: id, table, entry, key, fields: [] },
+            table: { element: id, table, entry, key, fields: [], open: false },
             rows,
             columns,
             columnWidths,
@@ -268,18 +272,11 @@ export function buildGraph(model: Model, state: ViewState): Graph {
           folded.push({ entry, table });
           continue;
         }
-        const all = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
+        const fields = Object.entries(registry.entry(entry)?.node.spec.fields ?? {}).map(
           ([name, f]) => ({ name, type: f.type, classification: f.classification }),
         );
-        const linked = new Set(references.filter((r) => r.entry === entry).map((r) => r.field));
-        const fields = compact
-          ? all.filter(
-              (f) =>
-                f.name === key ||
-                linked.has(f.name) ||
-                (f.classification && !ROUTINE.has(f.classification)),
-            )
-          : all;
+        // Tables show their names until opened, so a big schema reads at a glance.
+        const open = state.openFields?.has(entry) ?? false;
         const node = tableKey(id, table);
         if (!byEntry.has(entry)) byEntry.set(entry, node);
         nodes.set(node, {
@@ -289,14 +286,14 @@ export function buildGraph(model: Model, state: ViewState): Graph {
           isGroup: false,
           hiddenChildren: 0,
           depth: el.depth + 1,
-          size: tableSize(fields.length + (fields.length < all.length ? 1 : 0)),
+          size: open ? tableSize(fields.length) : { width: TABLE_WIDTH, height: TABLE_HEADER + 4 },
           table: {
             element: id,
             table,
             entry,
             key: s.key,
             fields,
-            hidden: all.length - fields.length,
+            open,
           },
         });
       }
@@ -454,9 +451,6 @@ function tableSize(rows: number): { width: number; height: number } {
   return { width: TABLE_WIDTH, height: TABLE_HEADER + Math.max(1, rows) * TABLE_ROW + 8 };
 }
 
-/** Stores with more tables than this show compact tables. */
-export const COMPACT_OVER = 6;
-const ROUTINE = new Set(["public", "internal"]);
 export const ROWS_HEADER = 40;
 export const ROWS_COLUMNS = 22;
 export const ROWS_LINE = 22;
@@ -581,19 +575,21 @@ function rowPort(node: string, index: number, side: "in" | "out"): string {
   return `${node}#${index}:${side}`;
 }
 
-/** The steps of a journey as edges between visible nodes. */
-export function journeyEdges(model: Model, state: ViewState, journey: JourneyNode): JourneyEdge[] {
-  return journey.steps.flatMap((step) => {
-    if (!step.from || !step.to) return [];
-    return [
-      {
-        id: `${journey.id}#${step.index}`,
-        step: step.index,
-        source: liftKey(model, state, step.from),
-        target: liftKey(model, state, step.to),
-      },
-    ];
-  });
+/** A journey's interactions as edges between visible nodes. */
+export function journeyEdges(
+  model: Model,
+  state: ViewState,
+  journey: string,
+  interactions: readonly { step: number; label: string; from: Target; to: Target }[],
+): JourneyEdge[] {
+  return interactions.map((x, at) => ({
+    id: `${journey}#${x.label}`,
+    at,
+    step: x.step,
+    label: x.label,
+    source: liftKey(model, state, x.from),
+    target: liftKey(model, state, x.to),
+  }));
 }
 
 /** Element IDs to expand so every step endpoint of a journey is visible on its own. */

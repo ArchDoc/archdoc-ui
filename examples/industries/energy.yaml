@@ -222,8 +222,9 @@ journeys:
     importance: critical
     steps:
       - { from: smart-meters, to: head-end, action: Send their 15-minute readings }
-      - { from: head-end, to: readings-queue, action: Publishes them, via: raw-to-reading }
+      - { from: head-end, to: readings-queue, action: Publishes them }
       - { from: mdm, to: readings-queue, action: Consumes them }
+      - { from: mdm, to: timeseries-db, action: Validates and stores them, via: raw-to-reading }
       - from: mdm
         to: outage-board
         action: Checks the feeder for silent meters

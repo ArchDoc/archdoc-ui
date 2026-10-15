@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { journeyInvolvement, journeyRows } from "../src/graph/data.js";
 import {
   buildGraph,
-  COMPACT_OVER,
   defaultExpanded,
   ROWS_BADGE,
   reorderRows,
@@ -48,10 +47,12 @@ describe("journey rows", () => {
     expect(ids(start, "Order")).toEqual(["so-0950"]);
     expect(start.get("erp.Order")?.[0]?.origin).toBe("existing");
 
-    const placed = journeyRows(model, journey, 1, sim);
+    // Placing the order writes nothing; saving it, the next step, does.
+    expect(ids(journeyRows(model, journey, 1, sim), "Order")).toEqual(["so-0950"]);
+    const placed = journeyRows(model, journey, 2, sim);
     expect(ids(placed, "Order")).toEqual(["so-0950", "so-1001"]);
     const order = placed.get("erp.Order")?.[1];
-    expect(order).toMatchObject({ origin: "created", step: 1, isNew: true });
+    expect(order).toMatchObject({ origin: "created", step: 2, isNew: true });
     expect(order?.record.status).toBe("confirmed");
     expect(ids(placed, "OrderLine")).toEqual(["ol-0950-1", "ol-1"]);
 
@@ -67,10 +68,8 @@ describe("journey rows", () => {
   });
 
   it("without a simulation, show what the steps that always run declare", () => {
-    // The order the mapping declares; every step after the credit check runs only when it confirms.
-    const declared = journeyRows(model, journey, last);
-    expect([...declared.keys()]).toEqual(["erp.Order"]);
-    expect(declared.get("erp.Order")?.[0]?.record).toMatchObject({ id: "= 'so-' + request.ref" });
+    // Every step that writes runs only for an outcome of the credit check.
+    expect(journeyRows(model, journey, last).size).toBe(0);
     const rides = buildModel([
       {
         path: "a.yaml",
@@ -111,21 +110,32 @@ journeys:
 describe("the ERP database on the canvas", () => {
   const db = new Set(["erp-db"]);
 
-  it("shows compact tables: keys, foreign keys, and sensitive fields, with the rest counted", () => {
-    expect(24).toBeGreaterThan(COMPACT_OVER);
+  it("shows each table's name until it's opened, then every field", () => {
     const graph = buildGraph(model, { expanded: defaultExpanded(model), tables: db });
     const tables = graph.nodes.filter((n) => n.kind === "table");
     expect(tables).toHaveLength(24);
-    const order = tables.find((n) => n.table?.entry === "erp.Order")?.table;
-    expect(order?.fields.map((f) => f.name)).toEqual([
+    expect(tables.every((t) => t.table?.open === false)).toBe(true);
+    // Closed, every table is the same small box; the foreign keys still join them.
+    expect(new Set(tables.map((t) => t.size?.height)).size).toBe(1);
+    expect(graph.edges.filter((e) => e.reference).length).toBeGreaterThan(25);
+
+    const opened = buildGraph(model, {
+      expanded: defaultExpanded(model),
+      tables: db,
+      openFields: new Set(["erp.Order"]),
+    });
+    const order = opened.nodes.find((n) => n.table?.entry === "erp.Order");
+    expect(order?.table?.open).toBe(true);
+    expect(order?.table?.fields.map((f) => f.name)).toEqual([
       "id",
       "customer_id",
       "ship_to",
       "price_list_id",
       "sales_rep_id",
+      "total_cents",
+      "status",
     ]);
-    expect(order?.hidden).toBe(2);
-    expect(graph.edges.filter((e) => e.reference).length).toBeGreaterThan(25);
+    expect(order?.size?.height).toBeGreaterThan(tables[0]?.size?.height ?? 0);
   });
 
   it("shows the journey's rows instead, a small table each, with a line from each row to the row it names", () => {

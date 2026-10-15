@@ -613,43 +613,135 @@ kbd {
   overflow: hidden;
 }
 
-.journey-bar {
+/* The open journey: what the current interaction does, then who and what, then controls. */
+.journey-card {
   position: absolute;
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
-  width: min(640px, calc(100% - 32px));
+  width: min(600px, calc(100% - 32px));
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgb(14 26 44 / 14%);
-  padding: 12px 14px;
-  display: grid;
-  gap: 6px;
+  overflow: hidden;
   z-index: 10;
 }
 
-.journey-bar-title {
+.journey-card-head {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.86rem;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 0 16px;
+  font-size: 0.76rem;
+  color: var(--muted);
 }
 
-.journey-bar-title span {
-  color: var(--muted);
+.journey-card-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.journey-card-count {
   font-family: var(--f-mono);
+  font-size: 0.72rem;
+}
+
+.journey-card-close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.journey-card-close:hover,
+.journey-card-close:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* A segment per interaction: done, current, still to come. */
+.journey-progress {
+  display: flex;
+  gap: 3px;
+  margin: 8px 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journey-progress li {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.journey-progress li.is-done {
+  background: color-mix(in srgb, var(--brand) 45%, var(--line));
+}
+
+.journey-progress li.is-current {
+  background: var(--brand);
+}
+
+.journey-card-action {
+  margin: 12px 16px 0;
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.journey-card-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 16px 0;
+}
+
+.journey-card-chip {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--k-data) 12%, var(--surface));
+  color: var(--k-data);
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+}
+
+.journey-card-controls {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px 14px;
+}
+
+/* How datastores are shown, apart from what's happening. */
+.journey-card-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
   font-size: 0.78rem;
 }
 
-.journey-bar-step {
-  margin: 0;
-}
-
-.journey-bar-controls {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+.journey-card-data-source {
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
 }
 
 .step-path {
@@ -1252,13 +1344,13 @@ kbd {
   stroke-width: 4;
 }
 
-.journey-bar-crossing {
-  margin: 0;
+.journey-card-note {
+  margin: 6px 16px 0;
   font-size: 0.8rem;
   color: var(--brand);
 }
 
-.journey-bar-crossing::before {
+.journey-card-note::before {
   content: "↪ ";
 }
 
@@ -1415,14 +1507,14 @@ ol.timeline > li.is-skipped {
   font-size: 0.82rem;
 }
 
-.journey-bar-data {
-  margin: 0;
+.journey-card-data {
+  margin: 6px 16px 0;
   font-family: var(--f-mono);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--k-data);
 }
 
-.journey-bar-data.is-skipped {
+.journey-card-data.is-skipped {
   color: var(--muted);
 }
 
@@ -1491,13 +1583,37 @@ ol.timeline > li.is-skipped {
 
 .table-head {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: 52px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.table-title {
+  display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  height: 52px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
+  min-width: 0;
+}
+
+.table-toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.table-toggle:hover,
+.table-toggle:focus-visible {
+  color: var(--brand);
 }
 
 .table-name {
@@ -1569,11 +1685,6 @@ ol.timeline > li.is-skipped {
   font-family: var(--f-mono);
   color: var(--muted);
   font-size: 0.7rem;
-}
-
-.table-empty {
-  padding: 2px 10px;
-  color: var(--muted);
 }
 
 /* A foreign key between two tables. */
@@ -1755,13 +1866,6 @@ table.fields.compact caption {
   margin-left: 4px;
 }
 
-.table-more {
-  padding: 2px 10px 0 34px;
-  color: var(--muted);
-  font-family: var(--f-mono);
-  font-size: 0.68rem;
-}
-
 .row-badge {
   flex: none;
   padding: 0 6px;
@@ -1786,16 +1890,6 @@ table.fields.compact caption {
 
 .react-flow__edge[id^="rowref:"] path {
   stroke-dasharray: none;
-}
-
-/* The datastores a journey writes to, in the journey bar. */
-.journey-bar-stores {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  margin: 6px 0 2px;
-  font-size: 0.8rem;
 }
 
 .journey-store {
