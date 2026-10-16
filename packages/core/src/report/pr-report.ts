@@ -83,6 +83,13 @@ export function prReport(input: PrReportInput): PrReport {
     if (c.kind !== "removed" && model.elements.has(c.id) && !touchedFiles.has(c.id))
       touchedFiles.set(c.id, 0);
   }
+  // A relationship added, changed, or removed touches the element it starts from.
+  for (const c of diff.relationships) {
+    const from = ((c.after ?? c.before) as { from?: { type: string; id?: string } } | undefined)
+      ?.from;
+    const id = from?.type === "element" ? from.id : undefined;
+    if (id && model.elements.has(id) && !touchedFiles.has(id)) touchedFiles.set(id, 0);
+  }
 
   const journeys = new Map<string, PrReport["journeys"][number]>();
   const actors = new Map<string, { id: string; kind: string }>();

@@ -563,6 +563,11 @@ kbd {
   stroke-dasharray: 6 5;
 }
 
+/* A subscription to a topic or event: messages go asynchronously, publisher to subscriber. */
+.react-flow__edge.rel.is-async path {
+  stroke-dasharray: 10 3 2 3;
+}
+
 .react-flow__edge.rel.is-dim {
   opacity: 0.2;
 }
@@ -1700,6 +1705,11 @@ ol.timeline > li.is-skipped {
   stroke-width: 2.5;
   stroke-dasharray: 6 6;
   animation: data-flow 0.9s linear infinite;
+}
+
+/* An edge the data travels against, such as an answer coming back. */
+.react-flow__edge.rel.is-flow-back path {
+  animation-direction: reverse;
 }
 
 @keyframes data-flow {

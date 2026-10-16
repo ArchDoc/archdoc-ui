@@ -212,6 +212,7 @@ export function composeLandscape(landscape: Model): ComposedLandscape {
         ...(r.description ? { description: r.description } : {}),
         ...(r.technology ? { technology: r.technology } : {}),
         ...(r.via ? { via: r.via } : {}),
+        ...(r.transport ? { transport: r.transport } : {}),
         ...(r.sends.length ? { sends: r.sends.map((d) => dataRef(ns, d)) } : {}),
         ...(r.status !== "active" ? { status: r.status } : {}),
         ...(r.provenance ? { provenance: r.provenance } : {}),

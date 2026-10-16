@@ -1,5 +1,16 @@
-import { changedFiles, diffModels, loadModelAtRef, mergeBase, prReport } from "@archdoc/core";
+import {
+  changedFiles,
+  check,
+  diffModels,
+  type Finding,
+  loadModel,
+  loadModelAtRef,
+  type MarkedFinding,
+  mergeBase,
+  prReport,
+} from "@archdoc/core";
 import type { Io } from "../io.js";
+import { isModelPath } from "../model-path.js";
 import { runCheck } from "./check.js";
 
 export interface ReportOptions {
@@ -21,6 +32,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
   }
   const format = options.format ?? "markdown";
   try {
+    if (isModelPath(io.cwd, options.base)) return await reportFiles(options.base, options, io);
     const { model, findings } = await runCheck(
       { model: options.model, base: options.base },
       io.cwd,
@@ -47,4 +59,38 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
     io.err(err instanceof Error ? err.message : String(err));
     return 2;
   }
+}
+
+/**
+ * The report for two models on disk, such as an example and its variant: the
+ * model checked on its own (there's no code to compare it with), with what the
+ * base didn't already have marked as introduced.
+ */
+async function reportFiles(base: string, options: ReportOptions, io: Io): Promise<number> {
+  const target = options.model ?? ".";
+  const [baseModel, model] = await Promise.all([
+    loadModel(base, { cwd: io.cwd }),
+    loadModel(target, { cwd: io.cwd }),
+  ]);
+  const key = (f: Finding) => `${f.code} ${f.message}`;
+  const before = new Set(check(baseModel).findings.map(key));
+  const findings: MarkedFinding[] = check(model).findings.map((f) => ({
+    ...f,
+    introduced: !before.has(key(f)),
+  }));
+  const r = prReport({
+    model,
+    base: baseModel,
+    changedFiles: [],
+    diff: diffModels(baseModel, model),
+    findings,
+    diagrams: options.diagrams !== false,
+    label: `${base} → ${target}`,
+  });
+  io.out(
+    (options.format ?? "markdown") === "json"
+      ? JSON.stringify({ ...r, markdown: undefined }, null, 2)
+      : r.markdown,
+  );
+  return 0;
 }

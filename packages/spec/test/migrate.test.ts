@@ -4,7 +4,7 @@ import { parse } from "yaml";
 import { isV1Model, ModelFileSchema, migrateV1 } from "../src/index.js";
 
 const example = (name: string) =>
-  parse(readFileSync(new URL(`../../../examples/v1/${name}.yaml`, import.meta.url), "utf8"));
+  parse(readFileSync(new URL(`./fixtures/v1/${name}.yaml`, import.meta.url), "utf8"));
 
 describe("isV1Model", () => {
   it("detects v1 documents and leaves v2 alone", () => {

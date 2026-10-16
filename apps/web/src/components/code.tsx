@@ -1,4 +1,10 @@
-import { type CodeMap, type JourneyStep, literalPrefix, type Model } from "@archdoc/core/browser";
+import {
+  type CodeMap,
+  type JourneyStep,
+  literalPrefix,
+  type Model,
+  snippetLabel,
+} from "@archdoc/core/browser";
 import { useState } from "react";
 import type { RepoLinks } from "../model/useModel.js";
 
@@ -8,19 +14,27 @@ export interface CodeContext {
   files: ReadonlySet<string>;
 }
 
-/** A link to a file or directory on the repository's web host. */
-export function webLink(repo: RepoLinks, path: string, isFile: boolean): string | undefined {
+/** A link to a file or directory on the repository's web host, at its lines when given ("40-88"). */
+export function webLink(
+  repo: RepoLinks,
+  path: string,
+  isFile: boolean,
+  lines?: string,
+): string | undefined {
   const ref = repo.branch ?? repo.commit;
   if (!repo.webUrl || !ref) return undefined;
   const encode = (p: string) => p.split("/").map(encodeURIComponent).join("/");
+  // GitHub and GitLab both read #L40-L88 (GitLab as #L40-88; it takes either form's start).
+  const at = isFile && lines ? `#L${lines.replace("-", "-L")}` : "";
   // Branch names can contain slashes; GitHub and GitLab take them as is.
-  return `${repo.webUrl}/${isFile ? "blob" : "tree"}/${encode(ref)}/${encode(path)}`;
+  return `${repo.webUrl}/${isFile ? "blob" : "tree"}/${encode(ref)}/${encode(path)}${at}`;
 }
 
-/** A link that opens the path in VS Code on this machine. */
-export function editorLink(repo: RepoLinks, path: string): string | undefined {
+/** A link that opens the path in VS Code on this machine, at its first line when given. */
+export function editorLink(repo: RepoLinks, path: string, lines?: string): string | undefined {
   if (!repo.root) return undefined;
-  return `vscode://file${repo.root.startsWith("/") ? "" : "/"}${repo.root}/${path}`;
+  const at = lines ? `:${lines.split("-")[0]}` : "";
+  return `vscode://file${repo.root.startsWith("/") ? "" : "/"}${repo.root}/${path}${at}`;
 }
 
 /** The part of a code path that's a real file or directory, for linking a glob. */
@@ -41,13 +55,15 @@ export function PathLinks({
   repo,
   path,
   isFile,
+  lines,
 }: {
   repo: RepoLinks;
   path: string;
   isFile: boolean;
+  lines?: string | undefined;
 }) {
-  const web = webLink(repo, path, isFile);
-  const editor = editorLink(repo, path);
+  const web = webLink(repo, path, isFile, lines);
+  const editor = editorLink(repo, path, lines);
   return (
     <span className="path-links">
       {web ? (
@@ -87,11 +103,14 @@ export function CodeSection({
   return (
     <>
       <ul className="code-list">
-        {element.code.map((c) => {
+        {element.code.map((c, i) => {
           const t = linkTarget(c.path, ctx.files);
           return (
-            <li key={c.path}>
-              <code>{c.path}</code>
+            // biome-ignore lint/suspicious/noArrayIndexKey: a path can be listed again for another snippet.
+            <li key={`${c.path}#${i}`}>
+              <code title={c.symbol ? `The declaration of ${c.symbol}` : undefined}>
+                {snippetLabel(c)}
+              </code>
               {stale.has(c.path) ? (
                 <span
                   className="chip small warn"
@@ -100,7 +119,7 @@ export function CodeSection({
                   matches nothing
                 </span>
               ) : (
-                <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} />
+                <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} lines={c.lines} />
               )}
               {c.description ? <p>{c.description}</p> : null}
             </li>

@@ -1,7 +1,8 @@
-# Healthcare: a telehealth clinic. Patients book visits, see a clinician by
-# video, and get prescriptions sent to their pharmacy. Exercises protected
-# health information (phi) rules, a triage decision, and a prescription
-# lifecycle.
+# Sensitive data: a telehealth clinic. Fields say what they hold (phi for
+# health information, pii for who someone is), records have lifecycles and
+# retention, and rules say where classified data may be stored and where it
+# may never go. validate and the PR report flag a change that breaks them, and
+# the explorer marks sensitive fields wherever the data travels.
 archdoc: "2.0"
 namespace: clinic
 name: Telehealth clinic

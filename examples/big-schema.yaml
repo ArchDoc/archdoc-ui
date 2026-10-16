@@ -1,9 +1,10 @@
-# ERP: order to cash for a wholesale distributor. One database holds the
-# whole business (24 tables, with foreign keys between most of them), and
+# Big schema: order to cash for a wholesale distributor. One database holds
+# the whole business (24 tables, with foreign keys between most of them), and
 # one journey takes an order from the portal through credit check, stock,
-# shipping, invoicing, and payment. A big schema to read in the explorer, and
-# a journey whose rows reference each other: run it with
-# samples/order-to-cash.json and switch the database to Rows.
+# shipping, invoicing, and payment. In the explorer, tables show their names
+# until opened; during the journey, the ones it doesn't touch fold away, and
+# Rows shows the records it creates, linked to the rows they point at.
+# order-to-cash.sample.json seeds several rows per table and runs on its own.
 archdoc: "2.0"
 namespace: erp
 name: Wholesale ERP

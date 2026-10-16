@@ -27,9 +27,15 @@ export class Resolver {
   element(ref: string, scope?: string): Resolution {
     const own = this.stripNamespace(ref);
     if (own !== undefined) {
-      return this.elementIds.has(own)
-        ? { status: "resolved", target: { type: "element", id: own } }
-        : { status: "unresolved", hint: `No element "${own}" in namespace "${this.namespace}".` };
+      if (this.elementIds.has(own))
+        return { status: "resolved", target: { type: "element", id: own } };
+      // A top-level element named like the namespace: shop.orders in namespace shop.
+      if (this.elementIds.has(ref))
+        return { status: "resolved", target: { type: "element", id: ref } };
+      return {
+        status: "unresolved",
+        hint: `No element "${own}" in namespace "${this.namespace}".`,
+      };
     }
 
     for (let s = scope; ; s = parentOf(s)) {

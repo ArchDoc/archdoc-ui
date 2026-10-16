@@ -7,8 +7,8 @@ import { loadModel } from "@archdoc/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listTags, publish, resolveVersion, sync } from "../src/index.js";
 
-// The demo org from examples/acme, as four git repositories side by side.
-const examples = fileURLToPath(new URL("../../../examples/acme/", import.meta.url));
+// The demo org from examples/org, as four git repositories side by side.
+const examples = fileURLToPath(new URL("../../../examples/org/", import.meta.url));
 let org: string;
 const at = (repo: string) => join(org, repo);
 const git = (repo: string, ...args: string[]) =>

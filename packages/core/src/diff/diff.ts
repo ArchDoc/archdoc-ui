@@ -154,6 +154,8 @@ function relationships(m: Model): Map<string, RelationshipView> {
         description: r.description,
         status: r.status,
         ...(r.technology ? { technology: r.technology } : {}),
+        ...(r.via ? { via: r.via } : {}),
+        ...(r.transport ? { transport: r.transport } : {}),
         ...(r.sends.length ? { sends: r.sends } : {}),
         ...(r.provenance ? { provenance: r.provenance } : {}),
       },

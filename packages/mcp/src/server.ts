@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { checkRepository } from "@archdoc/analyzers";
 import {
   diffModels,
   formatActor,
+  formatCode,
   formatData,
   formatDiagnostics,
   formatDiff,
@@ -15,6 +17,7 @@ import {
   formatOverview,
   formatSearch,
   formatSimulation,
+  getElement,
   impact,
   type LoadedModel,
   lineage,
@@ -44,7 +47,7 @@ Start every coding task here, before you grep or read files:
 2. Call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules.
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
-archdoc_locate tells you which element owns a file.
+archdoc_locate tells you which element owns a file. archdoc_code returns the code a component points at, with the text of its snippets, so read it before searching the files yourself.
 
 When a change touches data (what a component sends or stores, how a record is mapped, or a decision such as an approval rule), call archdoc_data on the entry to see its fields, classifications, and where it's stored and sent; archdoc_lineage on a field to see every place its value is copied or derived, across repos; and archdoc_simulate to see which branch a journey takes for a sample request and which records it writes.
 
@@ -178,6 +181,31 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
         const out = formatElement(m, id);
         if (!out) throw new Error(notFound(m, id, "element"));
         return out;
+      }),
+  );
+
+  server.registerTool(
+    "archdoc_code",
+    {
+      title: "An element's code",
+      description:
+        "The code an element points at, to read before searching: each path with what it's for, and the text of each snippet (a line range or a declared symbol, such as the function a component's logic lives in), numbered by line. Use it on the components a change touches.",
+      inputSchema: { id: z.string().describe("Element ID, e.g. toolchain.core.data") },
+      annotations: READ_ONLY,
+    },
+    ({ id }) =>
+      withModel((m) => {
+        const e = getElement(m, id)?.element;
+        if (!e) throw new Error(notFound(m, id, "element"));
+        return formatCode(e.id, e.code, (path) => {
+          const absolute = resolve(m.baseDir, path);
+          if (relative(m.baseDir, absolute).startsWith("..")) return undefined;
+          try {
+            return readFileSync(absolute, "utf8");
+          } catch {
+            return undefined;
+          }
+        });
       }),
   );
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import {
   applySchemas,
@@ -50,7 +51,21 @@ export async function checkRepository(
   // Data entries' sources: their fields fill in what the model leaves out, and drift is reported.
   const schemas = options.code === false ? [] : await importSchemas(ctx, model);
   applySchemas(model, schemas);
-  const result = checkModel(model, { observed, files, schemas });
+  const inRepo = new Set(files);
+  const result = checkModel(model, {
+    observed,
+    files,
+    schemas,
+    // Snippets are read from the repository's own files.
+    read: (path) => {
+      if (!inRepo.has(path)) return undefined;
+      try {
+        return readFileSync(resolve(model.baseDir, path), "utf8");
+      } catch {
+        return undefined;
+      }
+    },
+  });
 
   let findings: MarkedFinding[] = result.findings;
   if (options.base) {

@@ -68,8 +68,11 @@ elements:
               codemap: Turns a file path into its owning element
           codemap:
             kind: component
-            description: Maps code to elements. locate (most specific owner wins), files per element, unmapped files, stale paths.
-            code: [{ path: packages/core/src/codemap/** }]
+            description: Maps code to elements. locate (most specific owner wins), files per element, unmapped files, stale paths, and the snippets a code reference points at.
+            code:
+              - { path: packages/core/src/codemap/** }
+              - { path: packages/core/src/codemap/codemap.ts, symbol: locate, description: Which element owns a path }
+              - { path: packages/core/src/codemap/snippet.ts, symbol: findSnippet, description: The lines or declaration a code reference points at }
           report:
             kind: component
             description: Text, JSON, and Mermaid answers shared by the CLI and MCP, so people and agents read the same words. Draws the PR report's diagrams of the change and its journeys.
@@ -125,7 +128,10 @@ elements:
           data:
             kind: component
             description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage and journey simulation.
-            code: [{ path: packages/core/src/data/** }]
+            code:
+              - { path: packages/core/src/data/** }
+              - { path: packages/core/src/data/flows.ts, symbol: stepMessage, description: The message a journey step carries }
+              - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample }
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:

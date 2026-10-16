@@ -28,6 +28,29 @@ afterEach(async () => {
 afterAll(() => rm(tmp, { recursive: true, force: true }));
 
 describe("view server", () => {
+  it("compares with another model file, and finds samples named after journeys", async () => {
+    const examples = join(tmp, "examples");
+    await mkdir(examples, { recursive: true });
+    const model = (desc: string) =>
+      `archdoc: "2.0"\nnamespace: shop\nelements:\n  web: { kind: container, description: ${desc} }\n`;
+    await writeFile(join(examples, "shop.yaml"), model("Before"));
+    await writeFile(join(examples, "shop.next.yaml"), model("After"));
+    await writeFile(join(examples, "buy.sample.json"), "{}");
+    server = await startViewServer({
+      target: "shop.next.yaml",
+      cwd: examples,
+      webDir: web,
+      base: "shop.yaml",
+    });
+    const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+      base: { ref: string; sources: { text: string }[] };
+      samples: { path: string }[];
+    };
+    expect(payload.base.ref).toBe("shop.yaml");
+    expect(payload.base.sources[0]?.text).toContain("Before");
+    expect(payload.samples.map((s) => s.path)).toContain("buy.sample.json");
+  });
+
   it("serves the model sources and the explorer", async () => {
     server = await startViewServer({ target: ".", cwd: repo, webDir: web });
     expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);

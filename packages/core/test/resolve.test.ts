@@ -24,6 +24,12 @@ describe("Resolver", () => {
     expect(resolver.element("db")).toMatchObject({ status: "ambiguous" });
   });
 
+  it("finds a top-level element named like the namespace by its full id", () => {
+    const shop = new Resolver("shop", new Set(), new Set(["shop", "shop.orders"]), new Set());
+    expect(shop.element("shop.orders")).toMatchObject({ target: { id: "shop.orders" } });
+    expect(shop.element("shop.nope")).toMatchObject({ status: "unresolved" });
+  });
+
   it("treats the own namespace prefix as absolute", () => {
     expect(resolver.element("rides.platform.db", "platform.api")).toMatchObject({
       target: { id: "platform.db" },

@@ -27,9 +27,9 @@ describe("archdoc validate", () => {
   });
 
   it("fails with file:line diagnostics on a v1 file", async () => {
-    const r = await run("validate", "examples/v1/blog.yaml");
+    const r = await run("validate", "packages/spec/test/fixtures/v1/blog.yaml");
     expect(r.code).toBe(1);
-    expect(r.err).toContain("examples/v1/blog.yaml:1:1 error spec/v1-model");
+    expect(r.err).toContain("packages/spec/test/fixtures/v1/blog.yaml:1:1 error spec/v1-model");
   });
 
   it("prints JSON", async () => {
@@ -42,7 +42,7 @@ describe("archdoc validate", () => {
 describe("archdoc migrate", () => {
   it("writes a v2 model that validates", async () => {
     const out = join(tmp, "blog.yaml");
-    const r = await run("migrate", "examples/v1/blog.yaml", "-o", out);
+    const r = await run("migrate", "packages/spec/test/fixtures/v1/blog.yaml", "-o", out);
     expect(r.code).toBe(0);
     expect(r.err).toContain("note:");
     expect(parse(await readFile(out, "utf8"))).toMatchObject({ archdoc: "2.0", namespace: "blog" });
@@ -50,8 +50,41 @@ describe("archdoc migrate", () => {
   });
 
   it("refuses files that are already v2", async () => {
-    const r = await run("migrate", "examples/blog.yaml");
+    const r = await run("migrate", "examples/quickstart.yaml");
     expect(r.code).toBe(1);
+  });
+});
+
+describe("comparing two model files", () => {
+  it("diff shows what the second adds", async () => {
+    const r = await run("diff", "examples/quickstart.yaml", "examples/quickstart.add-reviews.yaml");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(
+      "Model changes (examples/quickstart.yaml → examples/quickstart.add-reviews.yaml): elements 2 added",
+    );
+    expect(r.out).toContain("+ shop.reviews (container)");
+  });
+
+  it("report flags what the change breaks, and the journeys it goes through", async () => {
+    const pii = await run(
+      "report",
+      "--base",
+      "examples/quickstart.yaml",
+      "-m",
+      "examples/quickstart.pii-to-analytics.yaml",
+      "--no-diagrams",
+    );
+    expect(pii.out).toContain('breaks rule "no-personal-data-out"');
+    const dropped = await run(
+      "report",
+      "--base",
+      "examples/quickstart.yaml",
+      "-m",
+      "examples/quickstart.drop-payments.yaml",
+      "--no-diagrams",
+    );
+    expect(dropped.out).toContain("| check-out: Buy what's in the cart | **critical** | shopper |");
+    expect(dropped.out).toContain("journey/broken-step");
   });
 });
 

@@ -49,7 +49,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .description("Open the explorer in your browser")
     .argument("[path]", "repository, .archdoc directory, or model file", ".")
     .option("-w, --watch", "reload the explorer when model files change")
-    .option("-b, --base <ref>", "show what changed in the model since this branch or commit")
+    .option(
+      "-b, --base <ref>",
+      "show what changed in the model since this branch or commit, or since another model file",
+    )
     .option(
       "-l, --landscape",
       "show the landscape: this model composed with every model it imports",
@@ -107,7 +110,8 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .description("Print the details of an element, actor, or journey")
     .argument("<id>", "element, actor, or journey ID")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .action((id: string, opts: { model?: string }) => run(show(id, opts, io)));
+    .option("--code", "print the code snippets an element points at")
+    .action((id: string, opts: { model?: string; code?: boolean }) => run(show(id, opts, io)));
 
   program
     .command("map")
@@ -179,7 +183,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .description("The architectural impact of a change, as markdown for a pull request comment")
     .requiredOption(
       "-b, --base <ref>",
-      "the branch or commit the change is compared with, such as main",
+      "the branch or commit the change is compared with, such as main, or a model file",
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "markdown or json", "markdown")
@@ -193,13 +197,20 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .description(
       "What changed in the model: actors, elements, relationships, journeys, data, rules",
     )
-    .argument("[range]", "HEAD (default), a ref, a..b, or a...b (what a pull request shows)")
+    .argument(
+      "[range]",
+      "HEAD (default), a ref, a..b, a...b (what a pull request shows), or a model file",
+    )
+    .argument("[after]", "with a model file as the range, the model file to compare it with")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "text, markdown, mermaid, or json", "text")
     .option("--exit-code", "exit 1 when the model changed")
     .action(
-      (range: string | undefined, opts: { model?: string; format?: string; exitCode?: boolean }) =>
-        run(diff(range, opts, io)),
+      (
+        range: string | undefined,
+        after: string | undefined,
+        opts: { model?: string; format?: string; exitCode?: boolean },
+      ) => run(diff(range, opts, io, after)),
     );
 
   program

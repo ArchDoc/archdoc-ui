@@ -1,10 +1,14 @@
-import type { JourneyNode, Model, Relationship, Target } from "@archdoc/core/browser";
 import {
   DataRegistry,
   type FieldReference,
   fieldReferences,
+  type JourneyNode,
+  type Model,
   nodeKey,
   qualifyData,
+  type Relationship,
+  subscriptionOf,
+  type Target,
 } from "@archdoc/core/browser";
 import type { Involvement } from "./data.js";
 import type { Grouping } from "./groups.js";
@@ -111,6 +115,11 @@ export interface GraphEdge {
   relationships: Relationship[];
   /** All of them are planned. */
   planned: boolean;
+  /**
+   * A subscription to a topic or event: drawn from the publisher to the
+   * subscriber, the way its messages go, with the channel and how it travels.
+   */
+  subscription?: { channel: string; transport?: string | undefined } | undefined;
   /** A field pointing at another table's (a foreign key), rather than relationships. */
   reference?: { field: string; to: string } | undefined;
   /** Between rows: the line in each table of rows. */
@@ -352,8 +361,11 @@ export function buildGraph(model: Model, state: ViewState): Graph {
 
   const edges = new Map<string, GraphEdge>();
   for (const rel of model.relationships) {
-    const source = liftKey(model, state, rel.from);
-    const target = liftKey(model, state, rel.to);
+    // A subscription is drawn the way its messages go: from the publisher to the subscriber.
+    const sub = subscriptionOf(model, rel);
+    const [source, target] = sub
+      ? [liftKey(model, state, rel.to), liftKey(model, state, rel.from)]
+      : [liftKey(model, state, rel.from), liftKey(model, state, rel.to)];
     if (
       source === target ||
       // A repo taken apart has no box to point at.
@@ -364,9 +376,10 @@ export function buildGraph(model: Model, state: ViewState): Graph {
     ) {
       continue;
     }
-    if (rel.to.type === "external" && !nodes.has(target)) {
-      nodes.set(target, {
-        id: target,
+    const outside = liftKey(model, state, rel.to);
+    if (rel.to.type === "external" && !nodes.has(outside)) {
+      nodes.set(outside, {
+        id: outside,
         kind: "external",
         isGroup: false,
         hiddenChildren: 0,
@@ -385,6 +398,7 @@ export function buildGraph(model: Model, state: ViewState): Graph {
         target,
         relationships: [rel],
         planned: rel.status === "planned",
+        ...(sub ? { subscription: { channel: sub.channel, transport: sub.transport } } : {}),
       });
     }
   }

@@ -15,11 +15,11 @@ import { countCrossings } from "../src/graph/route.js";
 
 // The ERP example: one database with 24 tables, and an order-to-cash journey
 // whose sample seeds several rows per table.
-const dir = new URL("../../../examples/industries/", import.meta.url);
+const dir = new URL("../../../examples/", import.meta.url);
 const model = buildModel([
-  { path: "erp.yaml", text: readFileSync(new URL("erp.yaml", dir), "utf8") },
+  { path: "big-schema.yaml", text: readFileSync(new URL("big-schema.yaml", dir), "utf8") },
 ]);
-const sample = JSON.parse(readFileSync(new URL("samples/order-to-cash.json", dir), "utf8"));
+const sample = JSON.parse(readFileSync(new URL("order-to-cash.sample.json", dir), "utf8"));
 const journey = model.journeys.get("order-to-cash");
 if (!journey) throw new Error("no journey");
 const sim = simulate(model, "order-to-cash", sample);

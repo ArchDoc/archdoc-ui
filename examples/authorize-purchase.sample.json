@@ -1,0 +1,17 @@
+{
+  "AuthRequest": {
+    "pan": "4111111111111111",
+    "amount_cents": 4200,
+    "merchant_category": "5812",
+    "country": "GB"
+  },
+  "Account": { "id": "acc-1", "holder_name": "Ana Silva", "available_cents": 150000 },
+  "Card": {
+    "token": "tok-ana",
+    "pan": "4111111111111111",
+    "expiry": "09/29",
+    "account_id": "acc-1",
+    "frozen": false
+  },
+  "Score": { "risk": 0.12 }
+}

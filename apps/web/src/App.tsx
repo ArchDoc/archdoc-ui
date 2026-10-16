@@ -37,6 +37,10 @@ import { type LandscapeInfo, type RepoLinks, useModel } from "./model/useModel.j
 
 export function App() {
   const state = useModel();
+  const samples = useMemo(
+    () => (state.status === "ready" ? samplesFor(state.model, state.samples) : []),
+    [state],
+  );
   if (state.status === "loading") return <Splash>Loading the model…</Splash>;
   if (state.status === "error") {
     return (
@@ -57,7 +61,7 @@ export function App() {
         repo={state.repo}
         base={state.base}
         landscape={state.landscape}
-        samples={state.samples}
+        samples={samples}
       />
     </ReactFlowProvider>
   );
@@ -850,4 +854,20 @@ function Splash({ children }: { children: React.ReactNode }) {
       <p>{children}</p>
     </div>
   );
+}
+
+/**
+ * The samples for this model: any in a samples/ directory, and the
+ * <journey>.sample.json files named after one of its journeys (a folder of
+ * single-file models keeps each model's samples next to it).
+ */
+export function samplesFor(
+  model: Model,
+  samples: { path: string; text: string }[],
+): { path: string; text: string }[] {
+  return samples.filter((s) => {
+    if (/(^|\/)samples\//.test(s.path)) return true;
+    const name = s.path.split("/").pop() ?? "";
+    return [...model.journeys.keys()].some((j) => name.startsWith(`${j}.`));
+  });
 }

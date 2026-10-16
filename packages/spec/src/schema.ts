@@ -54,6 +54,12 @@ export const RelationshipSchema = z.strictObject({
       "The contract this relationship goes through: an api, topic, or event the target provides",
     ),
   status: StatusSchema.optional(),
+  transport: z
+    .string()
+    .optional()
+    .describe(
+      "How it travels, when it isn't the contract's: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+    ),
   sends: OneOrMany.optional().describe("Data entries sent along this relationship"),
   tags: StringList.optional(),
   provenance: ProvenanceSchema.optional(),
@@ -69,6 +75,17 @@ export const CodeRefSchema = z.union([
   z.strictObject({
     path: z.string().min(1).describe("A file, directory, or glob relative to the repo root"),
     description: z.string().optional(),
+    lines: z
+      .union([z.number().int().positive(), z.string().regex(/^\d+(-\d+)?$/)])
+      .optional()
+      .describe("A snippet of a file: one line, or a range such as 40-88"),
+    symbol: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+      ),
   }),
 ]);
 
@@ -99,6 +116,12 @@ export const ActorSchema = z.strictObject({
 const contract = {
   description: z.string().optional(),
   status: StatusSchema.optional(),
+  transport: z
+    .string()
+    .optional()
+    .describe(
+      "How it travels: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+    ),
   accepts: OneOrMany.optional().describe("Data entries it accepts"),
   returns: OneOrMany.optional().describe("Data entries it returns"),
   carries: OneOrMany.optional().describe("Data entries a topic or event carries"),

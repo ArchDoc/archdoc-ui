@@ -28,6 +28,13 @@ export {
 } from "./codemap/codemap.js";
 export { compileGlob, literalPrefix, normalizePath } from "./codemap/glob.js";
 export {
+  findSnippet,
+  formatCode,
+  isSnippet,
+  type Snippet,
+  snippetLabel,
+} from "./codemap/snippet.js";
+export {
   compile as compileCel,
   evaluate as evaluateCel,
   type FieldRef,
@@ -46,8 +53,10 @@ export {
   dataStores,
   type StepMessage,
   type StepStore,
+  type Subscription,
   stepMessage,
   stepStores,
+  subscriptionOf,
 } from "./data/flows.js";
 export {
   type FieldId,

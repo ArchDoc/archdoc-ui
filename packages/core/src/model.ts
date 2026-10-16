@@ -41,6 +41,10 @@ export interface ActorNode {
 export interface CodeRef {
   path: string;
   description?: string | undefined;
+  /** A snippet: one line or a range, as written ("40-88"). */
+  lines?: string | undefined;
+  /** A snippet: the declaration it points at. */
+  symbol?: string | undefined;
 }
 
 export interface ElementNode {
@@ -67,6 +71,8 @@ export interface Relationship {
   technology?: string | undefined;
   /** The target's contract this goes through, such as an api path or a topic. */
   via?: string | undefined;
+  /** How it travels, such as kafka or grpc, when it isn't the contract's. */
+  transport?: string | undefined;
   status: Status;
   sends: string[];
   provenance?: Provenance | undefined;

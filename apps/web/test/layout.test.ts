@@ -36,31 +36,37 @@ const overlaps = (a: Box, b: Box) =>
 
 // Regression fixtures for v0's layout bugs: orphan nodes got NaN positions, and
 // users with no dependencies broke the ranking.
-describe.each([
-  ["rides fixture", ridesModel()],
-  ["blog example", example("blog")],
-  ["mealplanner example", example("mealplanner")],
-  ["ridesharing example", example("ridesharing")],
-])("layoutGraph: %s", (_name, model) => {
+describe.each([["rides fixture", ridesModel()]])("layoutGraph: %s", (_name, model) => {
   it("places every node at a finite position, with no sibling overlaps", async () => {
     await expectClean(buildGraph(model, { expanded: defaultExpanded(model) }));
   });
 });
 
-// The industry examples, with every datastore opened into its tables.
+// The examples, with every datastore opened into its tables.
 describe.each(
-  ["healthcare", "banking", "ecommerce", "logistics", "insurance", "energy"].map((name) => [
-    name,
-    example(`industries/${name}`),
-  ]),
+  [
+    "quickstart",
+    "modular-monolith",
+    "event-driven",
+    "decisions",
+    "sensitive-data",
+    "big-schema",
+  ].map((name) => [name, example(name)]),
 )("layoutGraph: the %s example", (_name, model) => {
   it("places every node and routes every edge, tables and foreign keys too", async () => {
     const tables = new Set(
       [...model.elements.values()].filter((e) => e.spec.stores).map((e) => e.id),
     );
-    const graph = buildGraph(model, { expanded: defaultExpanded(model), tables });
+    // Every box open, so stores inside a container show too.
+    const expanded = new Set(
+      [...model.elements.values()].filter((e) => e.childIds.length).map((e) => e.id),
+    );
+    const graph = buildGraph(model, { expanded, tables });
     expect(graph.nodes.some((n) => n.table)).toBe(true);
-    expect(graph.edges.some((e) => e.reference)).toBe(true);
+    // Foreign keys between tables, where a store holds tables that point at each other.
+    if (["decisions", "sensitive-data", "big-schema", "modular-monolith"].includes(_name)) {
+      expect(graph.edges.some((e) => e.reference)).toBe(true);
+    }
     await expectClean(graph);
   });
 });

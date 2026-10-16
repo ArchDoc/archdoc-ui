@@ -41,10 +41,17 @@ export interface DataFocus {
   nodes: Set<string>;
   /** Visible edges it travels along, as source->target. */
   edges: Set<string>;
+  /** source->target in the direction it goes; an edge it travels against isn't here. */
+  along: Set<string>;
 }
 
 export function dataFocus(model: Model, view: ViewState, entry: string): DataFocus {
-  const focus: DataFocus = { stores: new Set(), nodes: new Set(), edges: new Set() };
+  const focus: DataFocus = {
+    stores: new Set(),
+    nodes: new Set(),
+    edges: new Set(),
+    along: new Set(),
+  };
   const same = (data: string) => qualifyData(data, model.namespace) === entry;
   for (const s of dataStores(model)) {
     if (same(s.data)) focus.stores.add(liftKey(model, view, { type: "element", id: s.element }));
@@ -66,6 +73,7 @@ export function dataFocus(model: Model, view: ViewState, entry: string): DataFoc
     // Edges point along declared relationships, which may run against the data (a response).
     focus.edges.add(`${a}->${b}`);
     focus.edges.add(`${b}->${a}`);
+    focus.along.add(`${a}->${b}`);
   }
   return focus;
 }
@@ -93,12 +101,14 @@ export function lineageFocus(model: Model, view: ViewState, ref: string): Lineag
     stores: new Set(),
     nodes: new Set(),
     edges: new Set(),
+    along: new Set(),
   };
   for (const entry of entries) {
     const f = dataFocus(model, view, entry);
     for (const k of f.stores) focus.stores.add(k);
     for (const k of f.nodes) focus.nodes.add(k);
     for (const k of f.edges) focus.edges.add(k);
+    for (const k of f.along) focus.along.add(k);
   }
   return focus;
 }
@@ -409,6 +419,8 @@ export function journeyInteractions(model: Model, journey: JourneyNode): Interac
     if (!s.from || !s.to) return [];
     const stores = stepStores(model, s);
     const elsewhere = new Set(stores.flatMap((st) => st.entries));
+    // A subscriber's step to what it subscribes to plays the way the message goes: to the subscriber.
+    const against = stepMessage(model, s)?.against === true;
     const own = stepData(model, journey, s.index)
       .writes.map((w) => w.entry)
       .filter((e) => !elsewhere.has(e));
@@ -416,8 +428,8 @@ export function journeyInteractions(model: Model, journey: JourneyNode): Interac
       {
         step: s.index,
         label: String(s.index + 1),
-        from: s.from,
-        to: s.to,
+        from: against ? s.to : s.from,
+        to: against ? s.from : s.to,
         action: s.spec.action,
         writes: [...new Set(own)],
       },

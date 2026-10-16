@@ -32,6 +32,7 @@ describe("archdoc MCP server", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "archdoc_check",
+      "archdoc_code",
       "archdoc_data",
       "archdoc_diff",
       "archdoc_get_actor",
@@ -77,6 +78,12 @@ describe("archdoc MCP server", () => {
   });
 
   it("answers element, actor, journey, overview, and validate", async () => {
+    // A component's code: what each path is for, and its snippets' text.
+    const code = (await call("archdoc_code", { id: "toolchain.core.codemap" })).text;
+    expect(code).toContain(
+      "packages/core/src/codemap/codemap.ts (locate) · Which element owns a path",
+    );
+    expect(code).toMatch(/\d+ \| export function locate\(model: Model, path: string\): Located \{/);
     expect((await call("archdoc_get_element", { id: "core" })).text).toContain(
       "toolchain.core (container)",
     );

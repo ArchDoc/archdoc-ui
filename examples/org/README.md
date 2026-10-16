@@ -27,7 +27,7 @@ It writes `PLAYGROUND.md` with every command, and an `archdoc` command in `.play
 To try it by hand:
 
 ```bash
-cp -r examples/acme /tmp/acme && cd /tmp/acme
+cp -r examples/org /tmp/acme && cd /tmp/acme
 for repo in payments trips rides landscape; do
   (cd $repo && git init -q && git add -A && git commit -qm init && git tag v1.0.0)
 done

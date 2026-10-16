@@ -1,0 +1,142 @@
+# Modular monolith: a bookstore that ships as one Rails app, taken apart into
+# the components inside it. Each component points at its code, down to the
+# snippets that hold its logic, so an agent can read the right lines before
+# searching (`archdoc show bookstore.checkout --code`, or the archdoc_code MCP
+# tool). Rules keep the parts apart, owners say who looks after each, and one
+# dependency an agent suggested waits for review.
+archdoc: "2.0"
+namespace: books
+name: Bookstore
+description: One Rails app that sells books, decomposed into its parts.
+
+actors:
+  reader:
+    kind: person
+    uses:
+      bookstore.storefront: { description: Browses and buys books, sends: OrderForm }
+  catalog-team: { kind: team, members: ["@books/catalog"] }
+  checkout-team: { kind: team, members: ["@books/checkout"] }
+
+elements:
+  bookstore:
+    kind: container
+    technology: Ruby on Rails
+    description: The whole store, deployed as one unit. Its parts only talk through their public classes.
+    documentation: docs/architecture/modules.md
+    links:
+      - { url: "https://guides.rubyonrails.org/engines.html", title: Rails engines }
+    code: [app/**, config/**]
+    elements:
+      storefront:
+        kind: component
+        description: Pages and controllers. Holds no business rules.
+        owners: [catalog-team]
+        code:
+          - app/controllers/**
+          - app/views/**
+          - { path: app/controllers/checkouts_controller.rb, symbol: CheckoutsController.create, description: Turns the order form into a checkout }
+        uses:
+          catalog: { description: Finds books, sends: BookQuery }
+          cart: { description: Adds to the cart, sends: CartItem }
+          checkout: { description: Places the order, sends: OrderForm }
+      catalog:
+        kind: component
+        description: Books, editions, and search.
+        owners: [catalog-team]
+        tags: [domain]
+        code:
+          - app/domains/catalog/**
+          - { path: app/domains/catalog/search.rb, symbol: Catalog::Search.call, description: Ranks books for a query }
+        uses:
+          db: { description: Reads books, sends: Book }
+      cart:
+        kind: component
+        description: What a reader is about to buy.
+        owners: [checkout-team]
+        tags: [domain]
+        code: [app/domains/cart/**]
+        uses:
+          db: { description: Keeps carts, sends: CartItem }
+          catalog:
+            description: Prices the items
+            sends: BookQuery
+            provenance: { source: suggested, by: agent:claude-code, evidence: app/domains/cart/pricing.rb }
+      checkout:
+        kind: component
+        description: Turns a cart into a paid order.
+        owners: [checkout-team]
+        tags: [domain]
+        code:
+          - app/domains/checkout/**
+          - { path: app/domains/checkout/place_order.rb, symbol: Checkout::PlaceOrder.call, description: "Charges the card, then saves the order" }
+          - { path: app/domains/checkout/place_order.rb, lines: 1-20, description: "What placing an order needs, and the errors it raises" }
+        uses:
+          cart: { description: Empties the cart, sends: CartItem }
+          payments: { description: Charges the card, sends: Payment }
+          db: { description: Saves orders, sends: Order }
+      notifications:
+        kind: component
+        status: planned
+        description: Order emails, moving out of checkout.
+        owners: [checkout-team]
+        code: [app/domains/notifications/**]
+        uses:
+          mailer: { description: Sends receipts, sends: Receipt }
+      reports:
+        kind: component
+        status: deprecated
+        description: Nightly sales reports, replaced by the warehouse.
+        code: [app/domains/reports/**]
+        uses:
+          db: { description: Reads orders, sends: Order }
+      db:
+        kind: datastore
+        technology: Postgres
+        stores:
+          books: { entity: Book, key: isbn }
+          carts: { entity: CartItem, key: id }
+          orders: { entity: Order, key: id }
+  payments:
+    kind: external
+    description: Stripe.
+  mailer:
+    kind: external
+    status: planned
+    description: Postmark, for transactional email.
+
+data:
+  BookQuery: { kind: message, fields: { text: { type: string } } }
+  Book:
+    kind: entity
+    fields: { isbn: { type: string }, title: { type: string }, price_cents: { type: int } }
+  CartItem:
+    kind: entity
+    fields: { id: { type: string }, isbn: { type: string, references: Book }, quantity: { type: int } }
+  OrderForm: { kind: message, fields: { cart_id: { type: string }, card_token: { type: string } } }
+  Payment: { kind: message, fields: { amount_cents: { type: int }, card_token: { type: string } } }
+  Order:
+    kind: entity
+    fields: { id: { type: string }, total_cents: { type: int }, status: { type: enum, values: [placed, paid] } }
+  Receipt: { kind: message, fields: { order_id: { type: string, references: Order } } }
+
+journeys:
+  buy-a-book:
+    actor: reader
+    goal: Buy the book they found
+    importance: critical
+    steps:
+      - { from: reader, to: bookstore.storefront, action: Searches for a title }
+      - { from: bookstore.storefront, to: bookstore.catalog, action: Finds matching books }
+      - { from: bookstore.storefront, to: bookstore.cart, action: Adds one to the cart }
+      - { from: bookstore.storefront, to: bookstore.checkout, action: Checks out }
+      - { from: bookstore.checkout, to: payments, action: Charges the card }
+      - { from: bookstore.checkout, to: bookstore.db, action: Saves the paid order, creates: { Order: { id: order-1, status: paid } } }
+      - { from: bookstore.checkout, to: bookstore.cart, action: Empties the cart }
+
+rules:
+  - id: pages-hold-no-data
+    description: Controllers go through a domain; they never reach the database.
+    deny: { from: bookstore.storefront, to: { kind: datastore } }
+  - id: only-checkout-charges
+    description: Card charges go through checkout, so refunds and receipts can't be bypassed.
+    allow-only: { to: payments, from: [bookstore.checkout] }

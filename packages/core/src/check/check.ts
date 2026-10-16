@@ -1,4 +1,5 @@
 import { type CodeMap, locate, resolveCodeMap } from "../codemap/codemap.js";
+import { findSnippet, isSnippet, snippetLabel } from "../codemap/snippet.js";
 import { evaluateDataRules } from "../data/rules.js";
 import { type ImportedSchema, schemaDrift } from "../data/schemas.js";
 import type { Severity, SourceLocation } from "../diagnostics.js";
@@ -37,6 +38,8 @@ export interface CheckOptions {
   observed?: ObservedDependency[];
   /** Repository files, for stale code paths. */
   files?: readonly string[];
+  /** A repository file's text, for code snippets that no longer match it. */
+  read?: (path: string) => string | undefined;
   /** What schema importers read for data entries' sources, for schema drift. */
   schemas?: readonly ImportedSchema[];
 }
@@ -162,6 +165,29 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
         files: e?.location ? [e.location.file] : [],
         location: e?.location,
       });
+    }
+  }
+
+  // Snippets: the lines are still there, and the file still declares the symbol.
+  if (options.read) {
+    for (const e of model.elements.values()) {
+      for (const ref of e.code) {
+        if (!isSnippet(ref)) continue;
+        const text = options.read(ref.path);
+        // A file that's gone is a stale path, reported above.
+        if (text === undefined) continue;
+        const found = findSnippet(ref, text);
+        if (!("problem" in found)) continue;
+        findings.push({
+          severity: "warning",
+          code: "drift/stale-snippet",
+          message: `${e.id} points at ${snippetLabel(ref)}, but ${ref.path} ${found.problem}. Update the snippet.`,
+          element: e.id,
+          evidence: [],
+          files: [ref.path, ...(e.location ? [e.location.file] : [])],
+          location: e.location,
+        });
+      }
     }
   }
 

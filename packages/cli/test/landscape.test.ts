@@ -45,7 +45,7 @@ beforeAll(async () => {
   await mkdir(join(org, "web"), { recursive: true });
   await writeFile(join(org, "web/index.html"), "<!doctype html><title>explorer</title>");
   process.env.ARCHDOC_WEB_DIR = join(org, "web");
-  await cp(fileURLToPath(new URL("../../../examples/acme/", import.meta.url)), org, {
+  await cp(fileURLToPath(new URL("../../../examples/org/", import.meta.url)), org, {
     recursive: true,
   });
   for (const repo of ["payments", "trips", "rides", "landscape"]) {

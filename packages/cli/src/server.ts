@@ -16,6 +16,7 @@ import {
   type SourcesAtRef,
 } from "@archdoc/core";
 import { landscapePayload, loadLandscape } from "./landscape.js";
+import { isModelPath } from "./model-path.js";
 
 export interface ViewServerOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -64,7 +65,9 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
   const initial = await readModelSources(options.target, { cwd: options.cwd });
   // The base doesn't change while the server runs, so read it once.
   const base: SourcesAtRef | undefined = options.base
-    ? await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
+    ? isModelPath(options.cwd ?? process.cwd(), options.base)
+      ? await sourcesOfFile(options.base, options.cwd)
+      : await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
     : undefined;
 
   const server = createServer(async (req, res) => {
@@ -220,12 +223,25 @@ export function findWebDir(): string | undefined {
   return candidates.find((d): d is string => !!d && existsSync(join(d, "index.html")));
 }
 
-/** Sample records for simulating journeys: JSON files in any samples/ directory. */
+/** Another model on disk, as the base to compare with, in place of a git ref. */
+async function sourcesOfFile(path: string, cwd?: string): Promise<SourcesAtRef> {
+  const read = await readModelSources(path, { cwd });
+  if (!read) throw new Error(`No ArchDoc model at ${path}.`);
+  return { ref: path, commit: "", root: read.root, sources: read.sources };
+}
+
+/**
+ * Sample records for simulating journeys: JSON files in any samples/
+ * directory, and <journey>.sample.json files anywhere, such as next to a
+ * single-file model.
+ */
 async function readSamples(
   baseDir: string,
   files: readonly string[],
 ): Promise<{ path: string; text: string }[]> {
-  const paths = files.filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f)).slice(0, 50);
+  const paths = files
+    .filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f) || /\.sample\.json$/.test(f))
+    .slice(0, 50);
   const out: { path: string; text: string }[] = [];
   for (const path of paths) {
     const text = await readFile(join(baseDir, path), "utf8").catch(() => undefined);

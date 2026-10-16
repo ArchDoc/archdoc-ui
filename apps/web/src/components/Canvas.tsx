@@ -188,13 +188,14 @@ export function Canvas(props: CanvasProps) {
       return map;
     }
     if (journey) {
-      // Tables the current step writes to, or the message it carries is stored in.
-      const touched = new Set([
-        ...(current?.writes.map((w) => w.entry) ?? []),
-        ...(current?.message?.entries.map((e) => e.entry) ?? []),
-      ]);
+      // Tables the current step writes to are current, and the camera goes to them; tables
+      // that only store what its message carries are lit, and the camera stays on the arrow.
+      const written = new Set(current?.writes.map((w) => w.entry) ?? []);
+      const carried = new Set(current?.message?.entries.map((e) => e.entry) ?? []);
       for (const n of graph.nodes) {
-        if (n.kind === "table" && n.table && touched.has(n.table.entry)) map.set(n.id, "current");
+        if (n.kind === "table" && n.table && written.has(n.table.entry)) map.set(n.id, "current");
+        else if (n.kind === "table" && n.table && carried.has(n.table.entry))
+          map.set(n.id, "highlight");
         // A table of rows is current when the step writes one of its rows.
         if (n.kind === "rowtable") {
           const lit = lines.get(n.id);
@@ -213,13 +214,11 @@ export function Canvas(props: CanvasProps) {
       }
     } else if (selected) {
       map.set(selected, "current");
-      if (selected.startsWith("group:")) {
-        // A selected team or domain lights up what's in it.
-        const parent = new Map(graph.nodes.map((n) => [n.id, n.parentId]));
-        for (const n of graph.nodes) {
-          for (let p = n.parentId; p; p = parent.get(p)) {
-            if (p === selected) map.set(n.id, "highlight");
-          }
+      // A selected box lights up what's in it: a team's or domain's elements, a datastore's tables.
+      const parent = new Map(graph.nodes.map((n) => [n.id, n.parentId]));
+      for (const n of graph.nodes) {
+        for (let p = n.parentId; p; p = parent.get(p)) {
+          if (p === selected) map.set(n.id, "highlight");
         }
       }
       for (const e of graph.edges) {
@@ -233,6 +232,12 @@ export function Canvas(props: CanvasProps) {
 
   const nodes = useMemo<(CardNode | TableNode | RowTableNode | OthersNode)[]>(() => {
     if (!layout) return [];
+    // A table without emphasis of its own looks like the datastore it's in: at full
+    // strength while the datastore is lit or selected, faded only when it is.
+    const inherited = (parent: string | undefined): Emphasis => {
+      const e = parent ? emphasis.get(parent) : undefined;
+      return e === "current" || e === "highlight" || !dimming ? "normal" : "dim";
+    };
     const shortEntry = (entry: string) =>
       entry.startsWith(`${model.namespace}.`) ? entry.slice(model.namespace.length + 1) : entry;
     const references = new Map<string, Set<string>>();
@@ -311,7 +316,7 @@ export function Canvas(props: CanvasProps) {
               label: t.entry.startsWith(`${model.namespace}.`)
                 ? t.entry.slice(model.namespace.length + 1)
                 : t.entry,
-              emphasis: emphasis.get(n.id) ?? (dimming ? "dim" : "normal"),
+              emphasis: emphasis.get(n.id) ?? inherited(n.parentId),
               references: references.get(n.id) ?? new Set(),
               write: (() => {
                 const w = current?.writes.find((x) => x.entry === t.entry);
@@ -447,8 +452,11 @@ export function Canvas(props: CanvasProps) {
       const lit = focus
         ? focus.edges.has(e.id)
         : !journey && selected !== undefined && (e.source === selected || e.target === selected);
-      const label = e.relationships
-        .map((r) => r.description)
+      // A subscription names its channel and how it travels.
+      const channel = e.subscription
+        ? `${e.subscription.channel}${e.subscription.transport ? ` (${e.subscription.transport})` : ""}`
+        : "";
+      const label = [channel, ...e.relationships.map((r) => r.description)]
         .filter(Boolean)
         .join(" · ");
       return {
@@ -466,9 +474,11 @@ export function Canvas(props: CanvasProps) {
             ? "is-suggested"
             : "",
           overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
+          e.subscription ? "is-async" : "",
           lit ? "is-lit" : "",
-          // A selected message or field travels along its arrows.
+          // A selected message or field travels along its arrows, the way it goes.
           lit && focus ? "is-flow" : "",
+          lit && focus && !focus.along.has(e.id) ? "is-flow-back" : "",
           dimming && !lit ? "is-dim" : "",
         ]
           .filter(Boolean)
