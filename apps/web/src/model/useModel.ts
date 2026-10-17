@@ -67,6 +67,8 @@ export type ModelState =
   | {
       status: "ready";
       model: Model;
+      /** The model's own files, to compare them with another version's. */
+      sources: { root: string; sources: ModelSource[] };
       watch: boolean;
       files: string[];
       snippets: Record<string, SnippetPlace>;
@@ -114,6 +116,7 @@ export function useModel(): ModelState {
       setState((prev) => ({
         status: "ready",
         model,
+        sources: { root: payload.root, sources: payload.sources },
         watch: payload.watch,
         files: payload.files ?? [],
         snippets: payload.snippets ?? {},

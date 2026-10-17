@@ -1,11 +1,9 @@
 import {
+  buildModel,
   DataRegistry,
-  diffModels,
   formatDiagnostic,
   lineage,
   type Model,
-  type ModelDiff,
-  prReport,
   resolveCodeMap,
   type Simulation,
   type SnippetPlace,
@@ -34,6 +32,15 @@ import {
   type Grouping,
   groupLandscape,
 } from "./graph/groups.js";
+import { type Compare, compareModels } from "./model/compare.js";
+import {
+  type Pair,
+  type Refs,
+  readHash,
+  useCompared,
+  useRefs,
+  writeHash,
+} from "./model/useCompare.js";
 import { type LandscapeInfo, type RepoLinks, useModel } from "./model/useModel.js";
 
 export function App() {
@@ -42,6 +49,29 @@ export function App() {
     () => (state.status === "ready" ? samplesFor(state.model, state.samples) : []),
     [state],
   );
+  const refs = useRefs();
+  const [initial] = useState(readHash);
+  const [tab, setTab] = useState<Tab>(initial.tab ?? "explore");
+  const [chosen, setChosen] = useState<Pair | undefined>(initial.pair);
+  const preset = state.status === "ready" ? state.base : undefined;
+  // `archdoc view --base` picks the base until someone picks another.
+  const presetRef = preset?.ref ?? refs?.base;
+  const pair = useMemo<Pair | undefined>(
+    () => chosen ?? (presetRef ? { base: presetRef } : undefined),
+    [chosen, presetRef],
+  );
+  const compared = useCompared(pair, preset);
+  const sources = state.status === "ready" ? state.sources : undefined;
+  const compare = useMemo<Compare | undefined>(() => {
+    if (!pair || compared.status !== "ready") return undefined;
+    // The model's files alone, as the base was built, so only what they change shows.
+    const head =
+      compared.head ??
+      (sources?.sources.length ? buildModel(sources.sources, { root: sources.root }) : undefined);
+    return head ? compareModels(pair.base, compared.base, pair.head, head) : undefined;
+  }, [pair, compared, sources]);
+  useEffect(() => writeHash(tab, chosen), [tab, chosen]);
+
   if (state.status === "loading") return <Splash>Loading the model…</Splash>;
   if (state.status === "error") {
     return (
@@ -52,21 +82,58 @@ export function App() {
       </Splash>
     );
   }
+  const changes: ChangesControl | undefined =
+    preset || refs?.branches.length
+      ? {
+          refs,
+          pair,
+          onPair: setChosen,
+          compare,
+          note:
+            compared.status === "loading"
+              ? `Reading the model at ${[pair?.base, pair?.head].filter(Boolean).join(" and ")}…`
+              : compared.status === "error"
+                ? compared.message
+                : pair
+                  ? undefined
+                  : "Pick a branch to compare with.",
+        }
+      : undefined;
   return (
     <ReactFlowProvider>
       <Explorer
-        model={state.model}
+        // A branch's model replaces the working tree's while the Changes tab shows it.
+        model={
+          tab === "changes" && compared.status === "ready" && compared.head
+            ? compared.head
+            : state.model
+        }
         watch={state.watch}
         reloads={state.reloads}
         files={state.files}
         snippets={state.snippets}
         repo={state.repo}
-        base={state.base}
+        tab={changes ? tab : "explore"}
+        onTab={setTab}
+        changes={changes}
         landscape={state.landscape}
         samples={samples}
       />
     </ReactFlowProvider>
   );
+}
+
+type Tab = "explore" | "changes";
+
+/** What the Changes tab compares and how to pick it. */
+interface ChangesControl {
+  /** Undefined on a static host, where only the base the page was built with exists. */
+  refs?: Refs | undefined;
+  pair?: Pair | undefined;
+  onPair: (pair: Pair) => void;
+  compare?: Compare | undefined;
+  /** Why there's nothing to show yet. */
+  note?: string | undefined;
 }
 
 interface ExplorerProps {
@@ -76,18 +143,11 @@ interface ExplorerProps {
   files: string[];
   snippets: Record<string, SnippetPlace>;
   repo: RepoLinks;
-  base?: { ref: string; model: Model } | undefined;
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  changes?: ChangesControl | undefined;
   landscape?: LandscapeInfo | undefined;
   samples: { path: string; text: string }[];
-}
-
-/** What the explorer needs to show changes against a base. */
-export interface Compare {
-  ref: string;
-  base: Model;
-  diff: ModelDiff;
-  /** IDs of journeys the changes affect. */
-  journeys: Set<string>;
 }
 
 function Explorer({
@@ -97,11 +157,12 @@ function Explorer({
   files,
   snippets,
   repo,
-  base,
+  tab,
+  onTab,
+  changes,
   landscape,
   samples,
 }: ExplorerProps) {
-  const [compareOn, setCompareOn] = useState(true);
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   // The last simulation, with its sample, so it reruns when the model reloads.
   // What the open journey runs on: its own sample, example data, or a sample edited in the panel.
@@ -144,12 +205,8 @@ function Explorer({
         : undefined,
     [model, journey, simRun],
   );
-  const compare = useMemo<Compare | undefined>(() => {
-    if (!base || !compareOn) return undefined;
-    const diff = diffModels(base.model, model);
-    const affected = prReport({ model, changedFiles: [], diff, findings: [] }).journeys;
-    return { ref: base.ref, base: base.model, diff, journeys: new Set(affected.map((j) => j.id)) };
-  }, [base, compareOn, model]);
+  // The canvas shows what changed only on the Changes tab.
+  const compare = tab === "changes" ? changes?.compare : undefined;
   const code = useMemo(
     () => ({ codemap: resolveCodeMap(model, files), repo, files: new Set(files), snippets }),
     [model, files, repo, snippets],
@@ -392,6 +449,40 @@ function Explorer({
           <span>ArchDoc</span>
           <span className="model-name">{model.name ?? model.namespace}</span>
         </div>
+        {changes ? (
+          <div className="tabs" role="tablist" aria-label="View">
+            <button
+              type="button"
+              role="tab"
+              className="tab"
+              aria-selected={tab === "explore"}
+              onClick={() => onTab("explore")}
+            >
+              Explore
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="tab"
+              aria-selected={tab === "changes"}
+              onClick={() => onTab("changes")}
+              title={
+                changes.pair
+                  ? `What changes ${changes.pair.head ?? "the working tree"} makes to the model since ${changes.pair.base}`
+                  : "Compare the model on two branches"
+              }
+            >
+              Changes
+              {changes.compare ? (
+                <span
+                  className={`tab-count${changes.compare.groups.breaks.some((b) => b.kind === "error") ? " has-breaks" : ""}`}
+                >
+                  {changes.compare.count}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        ) : null}
         <div className="topbar-right">
           {landscape ? (
             <fieldset className="segmented" aria-label="Group the landscape by">
@@ -415,17 +506,7 @@ function Explorer({
               ))}
             </fieldset>
           ) : null}
-          {base ? (
-            <button
-              type="button"
-              className={`btn compare-toggle${compareOn ? " is-on" : ""}`}
-              aria-pressed={compareOn}
-              onClick={() => setCompareOn((on) => !on)}
-              title={`Show what changed in the model since ${base.ref}`}
-            >
-              Changes since {base.ref}
-            </button>
-          ) : null}
+          {tab === "changes" && changes ? <PairPicker changes={changes} /> : null}
           {watch ? (
             <span
               className="live"
@@ -467,6 +548,7 @@ function Explorer({
         onToggle={toggle}
         onJourney={openJourney}
         compare={compare}
+        changesNote={tab === "changes" ? changes?.note : undefined}
         landscape={landscape}
         onGroupBy={setGroupBy}
       />
@@ -858,6 +940,61 @@ function exists(model: Model, key: string, landscape?: LandscapeInfo): boolean {
   if (key.startsWith("element:")) return model.elements.has(key.slice(8));
   return model.relationships.some(
     (r) => r.to.type === "external" && `external:${r.to.ref}` === key,
+  );
+}
+
+const WORKING_TREE = "";
+
+/** The two versions the Changes tab compares: a base, and a branch or the working tree. */
+function PairPicker({ changes }: { changes: ChangesControl }) {
+  const { refs, pair } = changes;
+  if (!refs?.branches.length) {
+    // A static page compares only what it was built with.
+    return pair ? (
+      <span className="pair">
+        <span className="pair-ref">{pair.base}</span> →{" "}
+        <span className="pair-ref">{pair.head ?? "this version"}</span>
+      </span>
+    ) : null;
+  }
+  const options = (extra: string | undefined) =>
+    [...(extra && !refs.branches.includes(extra) ? [extra] : []), ...refs.branches].map((b) => (
+      <option key={b} value={b}>
+        {b}
+      </option>
+    ));
+  return (
+    <fieldset className="pair">
+      <legend>Compare</legend>
+      <label>
+        <span className="sr-only">Base</span>
+        <select
+          value={pair?.base ?? ""}
+          onChange={(e) => changes.onPair({ base: e.target.value, head: pair?.head })}
+          title="The version the changes are since"
+        >
+          {pair ? null : <option value="">Pick a base…</option>}
+          {options(pair?.base)}
+        </select>
+      </label>
+      <span aria-hidden="true">→</span>
+      <label>
+        <span className="sr-only">Head</span>
+        <select
+          value={pair?.head ?? WORKING_TREE}
+          disabled={!pair}
+          onChange={(e) =>
+            pair && changes.onPair({ base: pair.base, head: e.target.value || undefined })
+          }
+          title="The version with the changes"
+        >
+          <option value={WORKING_TREE}>
+            Working tree{refs.current ? ` (${refs.current})` : ""}
+          </option>
+          {options(pair?.head)}
+        </select>
+      </label>
+    </fieldset>
   );
 }
 

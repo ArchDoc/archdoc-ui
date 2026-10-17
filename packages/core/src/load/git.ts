@@ -23,6 +23,31 @@ export async function resolveRef(cwd: string, ref: string): Promise<string | und
   }
 }
 
+/** The repository's local and remote-tracking branches, most recent first, and the one checked out. */
+export async function listBranches(
+  cwd: string,
+): Promise<{ current?: string | undefined; branches: string[] }> {
+  try {
+    const out = await git(
+      cwd,
+      "for-each-ref",
+      "--format=%(refname)",
+      "--sort=-committerdate",
+      "refs/heads",
+      "refs/remotes",
+    );
+    const current = (await git(cwd, "branch", "--show-current").catch(() => "")).trim();
+    const branches = out
+      .split("\n")
+      // A remote's HEAD only points at another of its branches.
+      .filter((ref) => ref && !ref.endsWith("/HEAD"))
+      .map((ref) => ref.replace(/^refs\/(heads|remotes)\//, ""));
+    return { current: current || undefined, branches: [...new Set(branches)] };
+  } catch {
+    return { branches: [] };
+  }
+}
+
 export async function mergeBase(cwd: string, a: string, b: string): Promise<string | undefined> {
   try {
     return (await git(cwd, "merge-base", a, b)).trim() || undefined;

@@ -8,6 +8,7 @@ import { contextFor, importSchemas } from "@archdoc/analyzers";
 import {
   buildModel,
   federationDir,
+  listBranches,
   listRepoFiles,
   readFederationInput,
   readModelSources,
@@ -126,6 +127,34 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             sources: base.sources,
           },
         });
+      }
+      if (url.pathname === "/api/refs") {
+        const { current, branches } = await listBranches(options.cwd);
+        return json(res, 200, { current, branches, base: options.base });
+      }
+      if (url.pathname === "/api/compare") {
+        // Only branches (and the --base the server started with), never arbitrary git arguments.
+        const allowed = new Set((await listBranches(options.cwd)).branches);
+        if (base) allowed.add(base.ref);
+        const at = async (ref: string | null) => {
+          if (ref === null || ref === "") return undefined;
+          if (!allowed.has(ref))
+            throw new RangeError(`"${ref}" is not a branch in this repository.`);
+          if (ref === base?.ref) return base;
+          return readModelSourcesAtRef(options.target, ref, { cwd: options.cwd });
+        };
+        try {
+          const [from, to] = await Promise.all([
+            at(url.searchParams.get("base")),
+            at(url.searchParams.get("head")),
+          ]);
+          if (!from) return json(res, 400, { error: "Pick a base branch to compare with." });
+          // No head means the working tree, which /api/model already sends.
+          return json(res, 200, { base: from, head: to });
+        } catch (err) {
+          if (err instanceof RangeError) return json(res, 400, { error: err.message });
+          throw err;
+        }
       }
       if (url.pathname === "/api/events") {
         if (!watching) return json(res, 404, { error: "Start with --watch for live reload." });

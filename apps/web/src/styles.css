@@ -1200,9 +1200,147 @@ kbd {
   stroke-linecap: round;
 }
 
-.compare-toggle.is-on {
-  background: var(--chg-changed);
-  border-color: var(--chg-changed);
+/* ---------- Explore | Changes ---------- */
+
+.tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 24px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--brand);
+}
+
+.tab-count {
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--chg-changed-soft);
+  color: var(--chg-changed);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tab-count.has-breaks {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.pair legend {
+  float: left;
+  margin-right: 2px;
+  font-size: 0.78rem;
+}
+
+.pair select {
+  max-width: 220px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 4px 8px;
+  font: inherit;
+}
+
+.pair-ref {
+  font-family: var(--f-mono);
+  color: var(--ink);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.change-group + .change-group {
+  margin-top: 8px;
+}
+
+.change-group h3 {
+  margin: 4px 8px 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.change-group h3 .count {
+  font-weight: 400;
+}
+
+.change-group .side-item-label {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+}
+
+.change-group .side-item-hint {
+  flex-shrink: 0;
+}
+
+.change-group .side-item:disabled {
+  cursor: default;
+  background: none;
+}
+
+.change-detail {
+  display: block;
+  margin-left: 1em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-mark.change-error,
+.side-item-hint.change-error {
+  color: var(--err);
+}
+
+.change-mark.change-warning,
+.side-item-hint.change-warning {
+  color: var(--warn);
 }
 
 .topbar-right {
