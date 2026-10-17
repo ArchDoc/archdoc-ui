@@ -3,6 +3,8 @@ import {
   type JourneyStep,
   literalPrefix,
   type Model,
+  type SnippetPlace,
+  snippetKey,
   snippetLabel,
 } from "@archdoc/core/browser";
 import { useState } from "react";
@@ -12,6 +14,8 @@ export interface CodeContext {
   codemap: CodeMap;
   repo: RepoLinks;
   files: ReadonlySet<string>;
+  /** Where each code snippet is, by snippetKey, as the server read it from the files. */
+  snippets?: Readonly<Record<string, SnippetPlace>> | undefined;
 }
 
 /** A link to a file or directory on the repository's web host, at its lines when given ("40-88"). */
@@ -105,12 +109,21 @@ export function CodeSection({
       <ul className="code-list">
         {element.code.map((c, i) => {
           const t = linkTarget(c.path, ctx.files);
+          // A symbol's lines, as the server found its declaration; written lines as they are.
+          const place = ctx.snippets?.[snippetKey(c)];
+          const found = place && "start" in place ? place : undefined;
+          const lines = found ? `${found.start}-${found.end}` : c.lines;
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: a path can be listed again for another snippet.
             <li key={`${c.path}#${i}`}>
               <code title={c.symbol ? `The declaration of ${c.symbol}` : undefined}>
                 {snippetLabel(c)}
               </code>
+              {found ? (
+                <span className="code-lines">
+                  lines {found.start}–{found.end}
+                </span>
+              ) : null}
               {stale.has(c.path) ? (
                 <span
                   className="chip small warn"
@@ -118,8 +131,12 @@ export function CodeSection({
                 >
                   matches nothing
                 </span>
+              ) : place && "problem" in place ? (
+                <span className="chip small warn" title={`${c.path} ${place.problem}`}>
+                  doesn't match the code
+                </span>
               ) : (
-                <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} lines={c.lines} />
+                <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} lines={lines} />
               )}
               {c.description ? <p>{c.description}</p> : null}
             </li>

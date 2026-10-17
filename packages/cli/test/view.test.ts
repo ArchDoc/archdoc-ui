@@ -28,6 +28,28 @@ afterEach(async () => {
 afterAll(() => rm(tmp, { recursive: true, force: true }));
 
 describe("view server", () => {
+  it("says where each code snippet is, so the explorer links a symbol to its lines", async () => {
+    const shop = join(tmp, "shop");
+    await mkdir(join(shop, ".archdoc"), { recursive: true });
+    await mkdir(join(shop, "src"), { recursive: true });
+    await writeFile(
+      join(shop, "src", "orders.ts"),
+      "import x from 'y';\n\nexport function place() {\n  return x;\n}\n",
+    );
+    await writeFile(
+      join(shop, ".archdoc", "archdoc.yaml"),
+      'archdoc: "2.0"\nnamespace: shop\nelements:\n  orders:\n    kind: component\n    code:\n      - { path: src/orders.ts, symbol: place }\n      - { path: src/orders.ts, symbol: gone }\n',
+    );
+    server = await startViewServer({ target: ".", cwd: shop, webDir: web });
+    const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+      snippets: Record<string, unknown>;
+    };
+    expect(payload.snippets).toEqual({
+      "src/orders.ts##place": { start: 3, end: 5 },
+      "src/orders.ts##gone": { problem: "doesn't declare gone" },
+    });
+  });
+
   it("compares with another model file, and finds samples named after journeys", async () => {
     const examples = join(tmp, "examples");
     await mkdir(examples, { recursive: true });

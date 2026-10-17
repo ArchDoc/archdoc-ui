@@ -8,6 +8,7 @@ import {
   prReport,
   resolveCodeMap,
   type Simulation,
+  type SnippetPlace,
   simulate,
 } from "@archdoc/core/browser";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -58,6 +59,7 @@ export function App() {
         watch={state.watch}
         reloads={state.reloads}
         files={state.files}
+        snippets={state.snippets}
         repo={state.repo}
         base={state.base}
         landscape={state.landscape}
@@ -72,6 +74,7 @@ interface ExplorerProps {
   watch: boolean;
   reloads: number;
   files: string[];
+  snippets: Record<string, SnippetPlace>;
   repo: RepoLinks;
   base?: { ref: string; model: Model } | undefined;
   landscape?: LandscapeInfo | undefined;
@@ -87,7 +90,17 @@ export interface Compare {
   journeys: Set<string>;
 }
 
-function Explorer({ model, watch, reloads, files, repo, base, landscape, samples }: ExplorerProps) {
+function Explorer({
+  model,
+  watch,
+  reloads,
+  files,
+  snippets,
+  repo,
+  base,
+  landscape,
+  samples,
+}: ExplorerProps) {
   const [compareOn, setCompareOn] = useState(true);
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   // The last simulation, with its sample, so it reruns when the model reloads.
@@ -138,8 +151,8 @@ function Explorer({ model, watch, reloads, files, repo, base, landscape, samples
     return { ref: base.ref, base: base.model, diff, journeys: new Set(affected.map((j) => j.id)) };
   }, [base, compareOn, model]);
   const code = useMemo(
-    () => ({ codemap: resolveCodeMap(model, files), repo, files: new Set(files) }),
-    [model, files, repo],
+    () => ({ codemap: resolveCodeMap(model, files), repo, files: new Set(files), snippets }),
+    [model, files, repo, snippets],
   );
 
   // After a live reload, drop references to things that no longer exist.

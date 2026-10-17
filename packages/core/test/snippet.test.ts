@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildModel, check, findSnippet, formatCode } from "../src/index.js";
+import {
+  buildModel,
+  check,
+  findSnippet,
+  formatCode,
+  resolveSnippets,
+  snippetKey,
+} from "../src/index.js";
 
 const ts = `import { x } from "y";
 
@@ -84,6 +91,14 @@ elements:
     expect(findings.filter((f) => f.code === "drift/stale-snippet").map((f) => f.message)).toEqual([
       "app.refunds points at src/refunds.ts (cancel), but src/refunds.ts doesn't declare cancel. Update the snippet.",
     ]);
+    // Where each snippet is, for linking a symbol to its lines without the file's text.
+    expect(resolveSnippets(m, read)).toEqual({
+      [snippetKey({ path: "src/refunds.ts", symbol: "Refunds.approve" })]: { start: 4, end: 6 },
+      [snippetKey({ path: "src/refunds.ts", symbol: "cancel" })]: {
+        problem: "doesn't declare cancel",
+      },
+      [snippetKey({ path: "src/refunds.ts", lines: "11-14" })]: { start: 11, end: 14 },
+    });
     const refs = m.elements.get("app.refunds")?.code ?? [];
     expect(formatCode("app.refunds", refs, read)).toBe(
       [

@@ -1,4 +1,4 @@
-import { existsSync, type FSWatcher, watch } from "node:fs";
+import { existsSync, type FSWatcher, readFileSync, watch } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -13,6 +13,7 @@ import {
   readModelSources,
   readModelSourcesAtRef,
   repoInfo,
+  resolveSnippets,
   type SourcesAtRef,
 } from "@archdoc/core";
 import { landscapePayload, loadLandscape } from "./landscape.js";
@@ -89,11 +90,22 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
           repoInfo(read.baseDir),
           readFederationInput(await federationDir(read.source), options.cwd),
         ]);
+        const model = buildModel(read.sources, { root: read.root });
+        const inRepo = new Set(files);
         return json(res, 200, {
           root: read.root,
           sources: read.sources,
           watch: watching,
           files,
+          // Where each code snippet is, so the explorer links a symbol to its lines.
+          snippets: resolveSnippets(model, (path) => {
+            if (!inRepo.has(path)) return undefined;
+            try {
+              return readFileSync(join(read.baseDir, path), "utf8");
+            } catch {
+              return undefined;
+            }
+          }),
           // Other repos' models, so the explorer checks and simulates across repos like the CLI.
           federation: {
             lockPath: federation.lockPath,
@@ -103,12 +115,9 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
           },
           samples: await readSamples(read.baseDir, files),
           // What data entries' schema sources say (types, values, foreign keys), as check reads them.
-          schemas: (
-            await importSchemas(
-              contextFor(read.baseDir, files),
-              buildModel(read.sources, { root: read.root }),
-            )
-          ).filter((s) => !s.error),
+          schemas: (await importSchemas(contextFor(read.baseDir, files), model)).filter(
+            (s) => !s.error,
+          ),
           repo: { ...repo, root: read.baseDir },
           base: base && {
             ref: base.ref,

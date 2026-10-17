@@ -1,4 +1,4 @@
-import type { CodeRef } from "../model.js";
+import type { CodeRef, Model } from "../model.js";
 
 /** The part of a file a code reference points at. */
 export interface Snippet {
@@ -132,4 +132,35 @@ export function formatCode(
     });
   }
   return out.join("\n");
+}
+
+/** A code reference's key among resolved snippets: its path, lines, and symbol. */
+export function snippetKey(ref: CodeRef): string {
+  return `${ref.path}#${ref.lines ?? ""}#${ref.symbol ?? ""}`;
+}
+
+/** Where a snippet is (1-based, inclusive), or why it can't be found. */
+export type SnippetPlace = { start: number; end: number } | { problem: string };
+
+/**
+ * Where each snippet in a model is, by snippetKey: the lines a symbol's
+ * declaration spans, for linking to them without the file's text. Files
+ * `read` doesn't return are left out.
+ */
+export function resolveSnippets(
+  model: Model,
+  read: (path: string) => string | undefined,
+): Record<string, SnippetPlace> {
+  const out: Record<string, SnippetPlace> = {};
+  for (const e of model.elements.values()) {
+    for (const ref of e.code) {
+      const key = snippetKey(ref);
+      if (!isSnippet(ref) || key in out) continue;
+      const text = read(ref.path);
+      if (text === undefined) continue;
+      const found = findSnippet(ref, text);
+      out[key] = "problem" in found ? found : { start: found.start, end: found.end };
+    }
+  }
+  return out;
 }

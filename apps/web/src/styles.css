@@ -2094,3 +2094,12 @@ table.fields.compact caption {
   font-size: 0.72rem;
   cursor: pointer;
 }
+
+/* Where a code snippet is in its file. */
+.code-lines {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+}

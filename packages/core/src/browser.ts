@@ -31,7 +31,10 @@ export {
   findSnippet,
   formatCode,
   isSnippet,
+  resolveSnippets,
   type Snippet,
+  type SnippetPlace,
+  snippetKey,
   snippetLabel,
 } from "./codemap/snippet.js";
 export {
