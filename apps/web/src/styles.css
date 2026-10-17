@@ -2103,3 +2103,9 @@ table.fields.compact caption {
   font-family: var(--f-mono);
   font-size: 0.7rem;
 }
+
+/* Arrows can't be selected, which makes React Flow ignore the mouse on them;
+   relationships still show what they say on hover. */
+.react-flow__edge.rel.inactive {
+  pointer-events: visibleStroke;
+}
