@@ -7,3 +7,6 @@ coverage/
 !.vscode/extensions.json
 packages/cli/web/
 .playground/
+
+# Explorer screenshots taken while working on it
+.screenshots/

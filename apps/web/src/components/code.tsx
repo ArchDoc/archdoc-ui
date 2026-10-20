@@ -116,34 +116,35 @@ export function CodeSection({
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: a path can be listed again for another snippet.
             <li key={`${c.path}#${i}`}>
-              <code title={c.symbol ? `The declaration of ${c.symbol}` : undefined}>
-                {snippetLabel(c)}
-              </code>
-              {found ? (
-                <span className="code-lines">
-                  lines {found.start}–{found.end}
-                </span>
-              ) : null}
               {stale.has(c.path) ? (
-                <span
-                  className="chip small warn"
-                  title="No file in the repository matches this path"
-                >
-                  matches nothing
-                </span>
-              ) : place && "problem" in place ? (
-                <span className="chip small warn" title={`${c.path} ${place.problem}`}>
-                  doesn't match the code
+                <span className="code-missing" title="Fix the path in the model, or add the code">
+                  No files match <code>{c.path}</code>
                 </span>
               ) : (
-                <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} lines={lines} />
+                <>
+                  <code title={c.symbol ? `The declaration of ${c.symbol}` : undefined}>
+                    {snippetLabel(c)}
+                  </code>
+                  {found ? (
+                    <span className="code-lines">
+                      lines {found.start}–{found.end}
+                    </span>
+                  ) : null}
+                  {place && "problem" in place ? (
+                    <span className="code-missing" title={`${c.path} ${place.problem}`}>
+                      Doesn't match the code
+                    </span>
+                  ) : (
+                    <PathLinks repo={ctx.repo} path={t.path} isFile={t.isFile} lines={lines} />
+                  )}
+                </>
               )}
               {c.description ? <p>{c.description}</p> : null}
             </li>
           );
         })}
       </ul>
-      {ctx.files.size > 0 ? (
+      {ctx.files.size > 0 && mapped.length > 0 ? (
         <details className="files" open={mapped.length > 0 && mapped.length <= 12}>
           <summary>
             {mapped.length} file{mapped.length === 1 ? "" : "s"}

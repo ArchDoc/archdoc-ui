@@ -37,6 +37,7 @@ export {
   snippetKey,
   snippetLabel,
 } from "./codemap/snippet.js";
+export { type BranchOutcome, type JourneyItem, journeyBranches } from "./data/branches.js";
 export {
   compile as compileCel,
   evaluate as evaluateCel,

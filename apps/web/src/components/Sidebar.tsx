@@ -1,224 +1,130 @@
-import type { Model } from "@archdoc/core/browser";
-import { forwardRef, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { DataRegistry, type Model } from "@archdoc/core/browser";
+import { forwardRef, type ReactNode, useMemo, useState } from "react";
 import { sensitivity } from "../graph/data.js";
-import type { GroupBy } from "../graph/groups.js";
 import type { ChangeItem, Compare } from "../model/compare.js";
+import { journeysByImportance } from "../model/stories.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 
-export interface SidebarProps {
+/* The left column of the Journeys, Data, and Changes tabs, and the search in the top bar. */
+
+/** The journeys, most important first: pick one to read it as a story. */
+export function JourneyList(props: {
   model: Model;
-  query: string;
-  onQuery: (q: string) => void;
-  expanded: ReadonlySet<string>;
-  selected?: string | undefined;
   journeyId?: string | undefined;
-  onSelect: (key: string) => void;
-  onToggle: (elementId: string) => void;
   onJourney: (id: string) => void;
-  compare?: Compare | undefined;
-  /** On the Changes tab, why there's no comparison yet. */
-  changesNote?: string | undefined;
+  /** Journeys a comparison affects. */
+  affected?: ReadonlySet<string> | undefined;
   landscape?: LandscapeInfo | undefined;
-  onGroupBy?: ((by: GroupBy) => void) | undefined;
-}
-
-interface Hit {
-  key: string;
-  label: string;
-  hint: string;
-}
-
-export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sidebar(props, ref) {
-  const { model, query } = props;
-  const hits = useMemo(() => search(model, query), [model, query]);
-  const [open, toggleSection, openSection] = useOpenSections();
-  const section = (id: SectionId, title: string, count: number) => ({
-    id,
-    title,
-    count,
-    open: open.has(id),
-    onToggle: () => toggleSection(id),
-  });
-
-  // Picking something on the canvas opens the section that lists it.
-  const selectedSection = sectionOf(props.selected, props.journeyId, !!props.landscape);
-  useEffect(() => {
-    if (selectedSection) openSection(selectedSection);
-  }, [selectedSection, openSection]);
-
+}) {
+  const journeys = useMemo(() => journeysByImportance(props.model), [props.model]);
   return (
-    <nav className="sidebar" aria-label="Model">
-      <div className="search">
-        <input
-          ref={ref}
-          type="search"
-          placeholder="Search  ⌘K"
-          value={query}
-          onChange={(e) => props.onQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && hits[0]) {
-              select(hits[0].key);
-            } else if (e.key === "Escape") {
-              props.onQuery("");
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label="Search actors, elements, and journeys"
-        />
-      </div>
-
-      {query ? (
-        <Section id="results" title="Results" count={hits.length} open onToggle={() => {}}>
-          {hits.map((h) => (
-            <Item key={h.key} active={isActive(h.key)} onClick={() => select(h.key)} hint={h.hint}>
-              {h.label}
-            </Item>
-          ))}
-        </Section>
-      ) : (
-        <>
-          {props.compare ? (
-            <Changes {...props} compare={props.compare} section={section} />
-          ) : props.changesNote ? (
-            <Section {...section("changes", "Changes", 0)}>
-              <p className="empty">{props.changesNote}</p>
-            </Section>
-          ) : null}
-          {props.landscape ? (
-            <Landscape {...props} landscape={props.landscape} section={section} />
-          ) : null}
-          <Section {...section("journeys", "Journeys", model.journeys.size)}>
-            {[...model.journeys.values()].map((j) => (
-              <Item
-                key={j.id}
-                active={props.journeyId === j.id}
-                onClick={() => props.onJourney(j.id)}
-                hint={
-                  props.compare?.journeys.has(j.id) ? "affected" : (j.spec.importance ?? "normal")
-                }
-                hintClass={`importance-${j.spec.importance ?? "normal"}${props.compare?.journeys.has(j.id) ? " is-affected" : ""}`}
-              >
-                {j.spec.name ?? j.id}
-                {props.landscape && crossesRepos(model, j.id) ? (
-                  <span className="cross-mark" title="Goes through more than one repo">
-                    {" "}
-                    ⇄
-                  </span>
-                ) : null}
-              </Item>
-            ))}
-            {model.journeys.size === 0 ? <p className="empty">No journeys yet.</p> : null}
-          </Section>
-          <Section {...section("actors", "Actors", model.actors.size)}>
-            {[...model.actors.values()].map((a) => (
-              <Item
-                key={a.id}
-                active={props.selected === `actor:${a.id}`}
-                onClick={() => props.onSelect(`actor:${a.id}`)}
-                hint={a.spec.kind}
-              >
-                {a.spec.name ?? a.id}
-              </Item>
-            ))}
-          </Section>
-          {model.data.size ? (
-            <Section {...section("data", "Data", model.data.size)}>
-              {[...model.data.values()].map((d) => {
-                const key = `data:${model.namespace}.${d.id}`;
-                const sensitive = sensitivity(d);
-                return (
-                  <Item
-                    key={d.id}
-                    active={
-                      props.selected === key ||
-                      props.selected?.startsWith(`field:${model.namespace}.${d.id}.`) === true
-                    }
-                    onClick={() => props.onSelect(key)}
-                    hint={
-                      sensitive.length ? `${d.spec.kind} · ${sensitive.join(", ")}` : d.spec.kind
-                    }
-                    hintClass={sensitive.length ? "is-sensitive" : undefined}
-                  >
-                    {d.spec.name ?? d.id}
-                  </Item>
-                );
-              })}
-            </Section>
-          ) : null}
-          <Section
-            {...section(
-              "elements",
-              "Elements",
-              [...model.elements.values()].filter((e) => e.depth === 0).length,
-            )}
-          >
-            <Tree {...props} parentId={undefined} />
-          </Section>
-        </>
-      )}
+    <nav className="side-list" aria-label="Journeys">
+      <h2 className="side-title">Journeys</h2>
+      {journeys.length === 0 ? <p className="empty">No journeys yet.</p> : null}
+      {journeys.map((j) => (
+        <Item
+          key={j.id}
+          active={props.journeyId === j.id}
+          onClick={() => props.onJourney(j.id)}
+          sub={j.spec.goal && j.spec.name ? j.spec.goal : undefined}
+          tag={
+            <span className={`importance importance-${j.spec.importance ?? "normal"}`}>
+              {j.spec.importance ?? "normal"}
+            </span>
+          }
+        >
+          {j.spec.name ?? j.spec.goal ?? j.id}
+          {props.affected?.has(j.id) ? <span className="badge-changed"> · affected</span> : null}
+        </Item>
+      ))}
     </nav>
   );
+}
 
-  function isActive(key: string) {
-    return key.startsWith("journey:") ? props.journeyId === key.slice(8) : props.selected === key;
-  }
+/** One data entry, from this model or another repo's. */
+interface DataItem {
+  key: string;
+  label: string;
+  kind: string;
+  marks: string[];
+}
 
-  function select(key: string) {
-    if (key.startsWith("journey:")) props.onJourney(key.slice(8));
-    else props.onSelect(key);
-  }
-});
-
-/** A landscape's repos and domains. */
-function Landscape(props: SidebarProps & { landscape: LandscapeInfo; section: SectionFor }) {
-  const { landscape } = props;
+/** The data the model knows: every entry, by repo, with what's sensitive marked. */
+export function DataList(props: {
+  model: Model;
+  selected?: string | undefined;
+  onSelect: (key: string) => void;
+}) {
+  const { model } = props;
+  const [filter, setFilter] = useState("");
+  const groups = useMemo(() => dataGroups(model), [model]);
+  const q = filter.trim().toLowerCase();
+  const shown = groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => !q || `${i.key} ${i.label}`.toLowerCase().includes(q)),
+    }))
+    .filter((g) => g.items.length);
+  const active = (key: string) =>
+    props.selected === key || props.selected?.startsWith(`field:${key.slice(5)}.`) === true;
   return (
-    <>
-      <Section {...props.section("repos", "Repos", landscape.repos.length)}>
-        {landscape.repos.map((r) => (
-          <Item
-            key={r.namespace}
-            active={props.selected === `element:${r.namespace}`}
-            onClick={() => {
-              props.onGroupBy?.("repo");
-              props.onSelect(`element:${r.namespace}`);
-            }}
-            hint={r.version ?? r.commit?.slice(0, 7)}
-          >
-            {r.name ?? r.namespace}
-          </Item>
-        ))}
-      </Section>
-      {landscape.domains.length ? (
-        <Section {...props.section("domains", "Domains", landscape.domains.length)}>
-          {landscape.domains.map((d) => (
+    <nav className="side-list" aria-label="Data">
+      <h2 className="side-title">Data</h2>
+      <input
+        type="search"
+        className="side-filter"
+        placeholder="Filter"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        aria-label="Filter data entries"
+      />
+      {shown.length === 0 ? <p className="empty">No data entries.</p> : null}
+      {shown.map((g) => (
+        <section key={g.namespace} className="side-group">
+          {groups.length > 1 ? <h3>{g.name}</h3> : null}
+          {g.items.map((d) => (
             <Item
-              key={d.id}
-              active={props.selected === `domain:${d.id}`}
-              onClick={() => props.onSelect(`domain:${d.id}`)}
-              hint={`${d.members.length} member${d.members.length === 1 ? "" : "s"}`}
+              key={d.key}
+              active={active(d.key)}
+              onClick={() => props.onSelect(d.key)}
+              tag={
+                <span className="side-tags">
+                  {d.marks.map((m) => (
+                    <span key={m} className="mark-sensitive">
+                      {m}
+                    </span>
+                  ))}
+                  <span className="muted">{d.kind}</span>
+                </span>
+              }
             >
-              {d.name ?? d.id}
+              {d.label}
             </Item>
           ))}
-        </Section>
-      ) : null}
-    </>
+        </section>
+      ))}
+    </nav>
   );
 }
 
-/** True when a journey's steps touch more than one repo. */
-function crossesRepos(model: Model, journeyId: string): boolean {
-  const repos = new Set<string>();
-  for (const s of model.journeys.get(journeyId)?.steps ?? []) {
-    for (const t of [s.from, s.to]) {
-      if (t?.type !== "element") continue;
-      let top = model.elements.get(t.id);
-      while (top?.parentId) top = model.elements.get(top.parentId);
-      if (top?.spec.tags?.includes("repo")) repos.add(top.id);
-    }
-  }
-  return repos.size > 1;
+/** Data entries by repo, this model's first. */
+export function dataGroups(model: Model): { namespace: string; name: string; items: DataItem[] }[] {
+  const registry = new DataRegistry(model);
+  const spaces = [...registry.models].sort(([a], [b]) =>
+    a === model.namespace ? -1 : b === model.namespace ? 1 : a.localeCompare(b),
+  );
+  return spaces
+    .map(([ns, m]) => ({
+      namespace: ns,
+      name: m.name ?? ns,
+      items: [...m.data.values()].map((d) => ({
+        key: `data:${ns}.${d.id}`,
+        label: d.spec.name ?? d.id,
+        kind: d.spec.kind,
+        marks: sensitivity(d),
+      })),
+    }))
+    .filter((g) => g.items.length);
 }
 
 const MARK = {
@@ -230,219 +136,161 @@ const MARK = {
   warning: "!",
 } as const;
 
-const GROUPS = [
-  ["breaks", "What breaks"],
-  ["journeys", "Journeys affected"],
-  ["elements", "Elements and arrows"],
-  ["data", "Data"],
-  ["suggested", "Suggested facts to review"],
-] as const;
-
-/** What changed since the base, grouped by what to look at first. */
-function Changes(props: SidebarProps & { compare: Compare; section: SectionFor }) {
-  const { groups, ref, head, count, diff } = props.compare;
+/**
+ * What changed since the base, in the order a reviewer needs it: the verdict
+ * (the same words as the PR comment), what blocks, what to check and how to
+ * fix it, who to ask, then the journeys, elements, uses, and data.
+ */
+export function ChangesList(props: {
+  compare?: Compare | undefined;
+  /** Why there's no comparison yet. */
+  note?: string | undefined;
+  selected?: string | undefined;
+  journeyId?: string | undefined;
+  onSelect: (key: string) => void;
+  onJourney: (id: string) => void;
+}) {
+  const c = props.compare;
+  if (!c) {
+    return (
+      <nav className="side-list changes" aria-label="Changes">
+        <h2 className="side-title">Changes</h2>
+        <p className="empty">{props.note ?? "Pick a branch to compare with."}</p>
+      </nav>
+    );
+  }
+  const { summary, groups } = c;
   const pick = (i: ChangeItem) => {
     if (!i.key) return;
     if (i.key.startsWith("journey:")) props.onJourney(i.key.slice(8));
     else props.onSelect(i.key);
   };
-  const other = diff.mappings.length + diff.logic.length + diff.rules.length;
-  return (
-    <Section {...props.section("changes", `${head ?? "Changes"} since ${ref}`, count)}>
-      {count === 0 && groups.suggested.length === 0 ? (
-        <p className="empty">The model didn't change.</p>
-      ) : null}
-      {GROUPS.map(([id, title]) =>
-        groups[id].length ? (
-          <div key={id} className={`change-group change-group-${id}`}>
-            <h3>
-              {title} <span className="count">{groups[id].length}</span>
-            </h3>
-            {groups[id].map((i) => (
-              <Item
-                key={`${i.kind} ${i.key} ${i.label}`}
-                active={
-                  !!i.key && (props.selected === i.key || `journey:${props.journeyId}` === i.key)
-                }
+  const attention = summary.attention.filter((a) => a.code !== "model/suggested");
+  const verb = { approve: "approves", inform: "knows", verify: "still works" };
+  const other = c.diff.mappings.length + c.diff.logic.length + c.diff.rules.length;
+  const list = (title: string, items: ChangeItem[]) =>
+    items.length ? (
+      <section className="change-group">
+        <h3>
+          {title} <span className="count">{items.length}</span>
+        </h3>
+        <ul>
+          {items.map((i) => (
+            <li key={`${i.kind} ${i.key} ${i.label} ${i.repo ?? ""}`}>
+              <button
+                type="button"
+                className={`change-item${props.selected === i.key || `journey:${props.journeyId}` === i.key ? " is-active" : ""}`}
                 onClick={() => pick(i)}
-                hint={i.hint}
-                hintClass={`change-${i.kind}`}
                 disabled={!i.key}
               >
-                <span className={`change-mark change-${i.kind}`}>{MARK[i.kind]}</span> {i.label}
-                {i.detail ? <span className="change-detail">{i.detail}</span> : null}
-              </Item>
+                <span className={`change-mark change-${i.kind}`} title={i.kind}>
+                  {MARK[i.kind]}
+                </span>
+                <span className="change-text">
+                  <span className="change-label">{i.label}</span>
+                  <span className="change-detail">
+                    {[i.repo, i.hint, i.detail].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
+  return (
+    <nav className="side-list changes" aria-label="Changes">
+      <h2 className="side-title">
+        {c.head ?? "Working tree"} since {c.ref}
+      </h2>
+      <p className={`verdict verdict-${summary.verdict}`}>{summary.headline.join(" · ")}</p>
+      {summary.blocking.length ? (
+        <section className="change-group">
+          <h3>
+            Blocking <span className="count">{summary.blocking.length}</span>
+          </h3>
+          {summary.blocking.map((b) => (
+            <Concern
+              key={`${b.code}${b.detail}`}
+              tone="breaks"
+              concern={b}
+              onSelect={b.element ? () => props.onSelect(`element:${b.element}`) : undefined}
+            />
+          ))}
+        </section>
+      ) : null}
+      {attention.length ? (
+        <section className="change-group">
+          <h3>
+            To check <span className="count">{attention.length}</span>
+          </h3>
+          {attention.map((a) => (
+            <Concern
+              key={`${a.code}${a.detail}`}
+              tone="check"
+              concern={a}
+              onSelect={a.element ? () => props.onSelect(`element:${a.element}`) : undefined}
+            />
+          ))}
+        </section>
+      ) : null}
+      {summary.asks.length ? (
+        <section className="change-group">
+          <h3>Before merging</h3>
+          <ul className="asks">
+            {summary.asks.map((a) => (
+              <li key={`${a.kind}${a.who}`}>
+                <strong>{a.who}</strong> {verb[a.kind]} <span className="muted">· {a.why}</span>
+              </li>
             ))}
-          </div>
-        ) : null,
-      )}
+          </ul>
+        </section>
+      ) : null}
+      {list("Journeys affected", groups.journeys)}
+      {list("Elements and uses", groups.elements)}
+      {list("Data", groups.data)}
+      {list("Suggested facts to review", groups.suggested)}
+      {c.count === 0 && groups.suggested.length === 0 ? (
+        <p className="empty">The model didn't change.</p>
+      ) : null}
       {other ? (
         <p className="empty">
           Also {other} change{other === 1 ? "" : "s"} to mappings, logic, or rules.
         </p>
       ) : null}
-    </Section>
+    </nav>
   );
 }
 
-function Tree(props: SidebarProps & { parentId: string | undefined }) {
-  const { model, parentId } = props;
-  const ids = parentId
-    ? (model.elements.get(parentId)?.childIds ?? [])
-    : [...model.elements.values()].filter((e) => e.depth === 0).map((e) => e.id);
-  if (ids.length === 0) return null;
+function Concern(props: {
+  tone: "breaks" | "check";
+  concern: Compare["summary"]["blocking"][number];
+  onSelect?: (() => void) | undefined;
+}) {
+  const { concern: c } = props;
   return (
-    <ul className="tree">
-      {ids.map((id) => {
-        const el = model.elements.get(id);
-        if (!el) return null;
-        const open = props.expanded.has(id);
-        const key = `element:${id}`;
-        return (
-          <li key={id}>
-            <div className={`tree-row${props.selected === key ? " is-active" : ""}`}>
-              {el.childIds.length ? (
-                <button
-                  type="button"
-                  className="tree-toggle"
-                  onClick={() => props.onToggle(id)}
-                  aria-expanded={open}
-                  aria-label={open ? `Collapse ${el.key}` : `Expand ${el.key}`}
-                >
-                  {open ? "▾" : "▸"}
-                </button>
-              ) : (
-                <span className="tree-toggle" />
-              )}
-              <button type="button" className="tree-label" onClick={() => props.onSelect(key)}>
-                {el.spec.name ?? el.key}
-              </button>
-              <span className={`tree-kind kind-${el.spec.kind}`}>{el.spec.kind}</span>
-            </div>
-            {open ? <Tree {...props} parentId={id} /> : null}
-          </li>
-        );
-      })}
-    </ul>
+    <div className={`concern concern-${props.tone}`}>
+      <p className="concern-title">
+        {props.onSelect ? (
+          <button type="button" className="link" onClick={props.onSelect}>
+            {c.title}
+          </button>
+        ) : (
+          c.title
+        )}
+      </p>
+      <p className="concern-detail">{c.detail}</p>
+      {c.fix ? <p className="concern-fix">To fix: {c.fix}</p> : null}
+      {c.where ? <code className="concern-where">{c.where}</code> : null}
+    </div>
   );
-}
-
-type SectionId =
-  | "results"
-  | "changes"
-  | "repos"
-  | "domains"
-  | "journeys"
-  | "actors"
-  | "data"
-  | "elements";
-
-interface SectionProps {
-  id: SectionId;
-  title: string;
-  count: number;
-  open: boolean;
-  onToggle: () => void;
-}
-
-type SectionFor = (id: SectionId, title: string, count: number) => SectionProps;
-
-/** A sidebar section that opens and closes, like an accordion. */
-function Section(props: SectionProps & { children: ReactNode }) {
-  const body = `side-${props.id}`;
-  return (
-    <section className={`side-section${props.open ? " is-open" : ""}`}>
-      <h2>
-        <button
-          type="button"
-          className="side-head"
-          aria-expanded={props.open}
-          aria-controls={body}
-          onClick={props.onToggle}
-        >
-          <span className="side-chevron" aria-hidden="true">
-            ▸
-          </span>
-          <span className="side-title">{props.title}</span>
-          <span className="side-count">{props.count}</span>
-        </button>
-      </h2>
-      {props.open ? (
-        <div className="side-list" id={body}>
-          {props.children}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-const OPEN_KEY = "archdoc:sidebar-open";
-const DEFAULT_OPEN: SectionId[] = ["changes", "journeys", "data"];
-
-/** Which sections are open, remembered across visits. */
-function useOpenSections(): [
-  ReadonlySet<SectionId>,
-  (id: SectionId) => void,
-  (id: SectionId) => void,
-] {
-  const [open, setOpen] = useState<ReadonlySet<SectionId>>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "null") as unknown;
-      if (Array.isArray(saved)) return new Set(saved as SectionId[]);
-    } catch {
-      // Storage can be unavailable or hold something else; the default is fine.
-    }
-    return new Set(DEFAULT_OPEN);
-  });
-  const save = useCallback((next: ReadonlySet<SectionId>) => {
-    try {
-      localStorage.setItem(OPEN_KEY, JSON.stringify([...next]));
-    } catch {
-      // Ignore: the sections just won't be remembered.
-    }
-    return next;
-  }, []);
-  const toggle = useCallback(
-    (id: SectionId) =>
-      setOpen((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return save(next);
-      }),
-    [save],
-  );
-  const openOne = useCallback(
-    (id: SectionId) => setOpen((prev) => (prev.has(id) ? prev : save(new Set([...prev, id])))),
-    [save],
-  );
-  return [open, toggle, openOne];
-}
-
-/** The section that lists a selection, if any. */
-function sectionOf(
-  selected: string | undefined,
-  journeyId: string | undefined,
-  landscape: boolean,
-): SectionId | undefined {
-  if (journeyId) return "journeys";
-  if (!selected) return undefined;
-  if (selected.startsWith("actor:")) return "actors";
-  if (selected.startsWith("data:") || selected.startsWith("field:")) return "data";
-  if (selected.startsWith("domain:")) return "domains";
-  if (selected.startsWith("element:")) {
-    // In a landscape, a repo's box is listed under Repos.
-    return landscape && !selected.slice(8).includes(".") ? "repos" : "elements";
-  }
-  return undefined;
 }
 
 function Item(props: {
   active: boolean;
   onClick: () => void;
-  hint?: string;
-  hintClass?: string;
-  disabled?: boolean;
+  sub?: string | undefined;
+  tag?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -450,15 +298,78 @@ function Item(props: {
       type="button"
       className={`side-item${props.active ? " is-active" : ""}`}
       onClick={props.onClick}
-      disabled={props.disabled}
+      aria-current={props.active ? "true" : undefined}
     >
-      <span className="side-item-label">{props.children}</span>
-      {props.hint ? (
-        <span className={`side-item-hint ${props.hintClass ?? ""}`}>{props.hint}</span>
-      ) : null}
+      <span className="side-item-label">
+        {props.children}
+        {props.sub ? <span className="side-item-sub">{props.sub}</span> : null}
+      </span>
+      {props.tag ?? null}
     </button>
   );
 }
+
+interface Hit {
+  key: string;
+  label: string;
+  hint: string;
+}
+
+/** Search in the top bar: journeys, actors, data, and elements by name, description, or technology. */
+export const SearchBox = forwardRef<
+  HTMLInputElement,
+  { model: Model; onPick: (key: string) => void }
+>(function SearchBox(props, ref) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const hits = useMemo(() => search(props.model, query).slice(0, 12), [props.model, query]);
+  const pick = (key: string) => {
+    props.onPick(key);
+    setQuery("");
+    setOpen(false);
+  };
+  return (
+    <div className="search">
+      <input
+        ref={ref}
+        type="search"
+        placeholder="Search  ⌘K"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && hits[0]) pick(hits[0].key);
+          else if (e.key === "Escape") {
+            setQuery("");
+            e.currentTarget.blur();
+          }
+        }}
+        aria-label="Search journeys, actors, data, and elements"
+      />
+      {open && query ? (
+        <ul className="search-results">
+          {hits.length === 0 ? <li className="empty">Nothing matches.</li> : null}
+          {hits.map((h) => (
+            <li key={h.key}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(h.key)}
+              >
+                <span>{h.label}</span>
+                <span className="muted">{h.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+});
 
 /** Case-insensitive match on IDs, names, descriptions, and technology. */
 export function search(model: Model, query: string): Hit[] {
@@ -477,13 +388,9 @@ export function search(model: Model, query: string): Hit[] {
       hits.push({ key: `actor:${a.id}`, label: a.spec.name ?? a.id, hint: a.spec.kind });
     }
   }
-  for (const d of model.data.values()) {
-    if (match(d.id, d.spec.name, d.spec.description, ...Object.keys(d.spec.fields ?? {}))) {
-      hits.push({
-        key: `data:${model.namespace}.${d.id}`,
-        label: d.spec.name ?? d.id,
-        hint: d.spec.kind,
-      });
+  for (const g of dataGroups(model)) {
+    for (const d of g.items) {
+      if (match(d.key.slice(5), d.label)) hits.push({ key: d.key, label: d.label, hint: d.kind });
     }
   }
   for (const e of model.elements.values()) {

@@ -10,9 +10,16 @@ import {
 
 export type Emphasis = "normal" | "highlight" | "current" | "dim";
 
+/** A box's shape, which is how the map says what kind of thing it is. */
+export type Shape = "pill" | "box" | "store" | "dashed" | "frame";
+
 export interface CardData extends Record<string, unknown> {
   family: "actor" | "element" | "external" | "group";
+  shape: Shape;
+  /** Lives in another repo, or outside the system: drawn dashed. */
+  dashed?: boolean | undefined;
   label: string;
+  /** What it is, for the tooltip: container, datastore, person, repo… */
   kind: string;
   detail?: string | undefined;
   status?: string | undefined;
@@ -23,7 +30,6 @@ export interface CardData extends Record<string, unknown> {
   isGroup: boolean;
   /** In the before/after view: how this changed. */
   change?: "added" | "changed" | "removed" | undefined;
-  /** A collapsed box with changes inside. */
   /** How many changes are inside the box; it counts as changed. */
   changesInside?: number | undefined;
   emphasis: Emphasis;
@@ -43,15 +49,13 @@ export interface CardData extends Record<string, unknown> {
 
 export type CardNode = Node<CardData, "card">;
 
+/** The one small icon a box may have: who an actor is. */
 const ACTOR_ICONS: Record<string, string> = {
   person: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0",
   role: "M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z",
   team: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20a6 6 0 0 1 12 0m-2 0a6 6 0 0 1 10 0",
   organization: "M4 21V5l8-3 8 3v16M9 21v-5h6v5M8 8h2m4 0h2M8 12h2m4 0h2",
   agent: "M5 9h14v10H5zM12 5v4M9 13h.01M15 13h.01M9 16h6M3 13h2m14 0h2",
-  repo: "M6 3h10l3 3v15H6zM6 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2M10 8h5M10 12h5",
-  domain: "M12 3l9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5",
-  data: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
 };
 
 function Icon({ kind }: { kind: string }) {
@@ -64,12 +68,13 @@ function Icon({ kind }: { kind: string }) {
   );
 }
 
-/** One card renderer for actors, elements, external references, and groups. */
+/** One card renderer for actors, elements, other repos' elements, and groups. */
 export function Card({ data }: NodeProps<CardNode>) {
   const classes = [
     "card",
+    `shape-${data.shape}`,
     `family-${data.family}`,
-    `kind-${data.kind}`,
+    data.dashed ? "is-dashed" : "",
     data.isGroup ? "is-group" : "",
     data.status && data.status !== "active" ? `status-${data.status}` : "",
     data.suggested ? "is-suggested" : "",
@@ -86,14 +91,28 @@ export function Card({ data }: NodeProps<CardNode>) {
     e.stopPropagation();
     data.onToggle?.();
   };
+  const notes = data.status && data.status !== "active" ? [data.status] : [];
 
   return (
-    <div className={classes}>
+    <div
+      className={classes}
+      title={`${data.label} · ${data.kind}${data.suggested ? " · suggested, waiting for review" : ""}${data.detail ? `\n${data.detail}` : ""}`}
+    >
       <Handle type="target" position={Position.Left} className="handle" />
-      <div className="card-head">
-        <Icon kind={data.kind} />
-        <span className="card-kind">{data.kind}</span>
-        {data.version ? <span className="card-version">{data.version}</span> : null}
+      <div className="card-main">
+        <div className="card-label">
+          {data.family === "actor" ? <Icon kind={data.kind} /> : null}
+          <span>{data.label}</span>
+        </div>
+        {data.detail && !data.isGroup ? <div className="card-detail">{data.detail}</div> : null}
+      </div>
+      <div className="card-tools">
+        {data.version ? <span className="card-note">{data.version}</span> : null}
+        {notes.map((n) => (
+          <span key={n} className="card-note">
+            {n}
+          </span>
+        ))}
         {data.change ? (
           <span
             className={`card-change change-${data.change}`}
@@ -105,9 +124,6 @@ export function Card({ data }: NodeProps<CardNode>) {
           >
             {data.change}
           </span>
-        ) : null}
-        {data.status && data.status !== "active" ? (
-          <span className="card-status">{data.status}</span>
         ) : null}
         {data.onStoreView ? (
           <fieldset className="store-view nodrag" aria-label="Show the schema or the rows">
@@ -151,24 +167,13 @@ export function Card({ data }: NodeProps<CardNode>) {
             type="button"
             className="card-toggle nodrag"
             onClick={toggle}
-            title={data.isGroup ? "Collapse" : "Expand"}
-            aria-label={data.isGroup ? `Collapse ${data.label}` : `Expand ${data.label}`}
+            title={data.isGroup ? "Close" : `Open: ${data.hiddenChildren} inside`}
+            aria-label={data.isGroup ? `Close ${data.label}` : `Open ${data.label}`}
           >
             {data.isGroup ? "−" : `+${data.hiddenChildren}`}
           </button>
         ) : null}
       </div>
-      <div
-        className="card-label"
-        title={data.detail && data.isGroup ? `${data.label}: ${data.detail}` : data.label}
-      >
-        {data.label}
-      </div>
-      {data.detail && !data.isGroup ? (
-        <div className="card-detail" title={data.detail}>
-          {data.detail}
-        </div>
-      ) : null}
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );

@@ -26,7 +26,7 @@ export interface Layout {
 }
 
 export const NODE_WIDTH = 220;
-export const NODE_HEIGHT = 76;
+export const NODE_HEIGHT = 64;
 export const GROUP_HEADER = 62;
 
 const elk = new ELK();

@@ -1,4 +1,4 @@
-import { DataRegistry } from "../data/registry.js";
+import { journeyBranches } from "../data/branches.js";
 import type { ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
 import { type Model, nodeKey, type Target } from "../model.js";
 
@@ -394,8 +394,8 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
   // Steps that run only for one outcome of an earlier decision are drawn as
   // alt / else blocks, labeled with the decision's conditions, so branches
   // don't read as steps that all happen.
-  const items = branchItems([input.model, input.from], j.steps);
-  const branched = items.some((it) => it.kind === "alt");
+  const items = journeyBranches(input.model, input.journeyId, input.from);
+  const branched = items.some((it) => it.kind === "branches");
   const line = (i: number, indent: string) => {
     const s = j.steps[i];
     if (!s) return "";
@@ -431,11 +431,13 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
       continue;
     }
     flush();
-    it.outcomes.forEach((o, k) => {
-      const head = `${o.name}${o.condition ? `: ${o.condition}` : ""}`;
-      body.push(`  ${k === 0 ? "alt" : "else"} ${message(head)}`);
-      body.push(...steps(o.steps, "    "));
-    });
+    it.outcomes
+      .filter((o) => o.steps.length > 0)
+      .forEach((o, k) => {
+        const head = `${o.name}${o.condition ? `: ${readable(o.condition)}` : ""}`;
+        body.push(`  ${k === 0 ? "alt" : "else"} ${message(head)}`);
+        body.push(...steps(o.steps, "    "));
+      });
     body.push("  end");
   }
   flush();
@@ -454,64 +456,6 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
   return [...lines, ...body].join("\n");
 }
 
-type BranchItem =
-  | { kind: "step"; index: number }
-  | {
-      kind: "alt";
-      outcomes: { name: string; condition?: string | undefined; steps: number[] }[];
-    };
-
-/**
- * A journey's steps in drawing order: plain steps, and for each run of steps
- * with `when:`, one block per outcome of the decision before them, in the
- * order the decision's rules list them.
- */
-function branchItems(
-  models: (Model | undefined)[],
-  steps: { spec: { when?: string | undefined; decides?: string | undefined } }[],
-): BranchItem[] {
-  const items: BranchItem[] = [];
-  const registries = models.filter((m): m is Model => !!m).map((m) => new DataRegistry(m));
-  const logic = (ref: string) => {
-    for (const r of registries) {
-      const found = r.logic(ref);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  let decision: string | undefined;
-  for (let i = 0; i < steps.length; i++) {
-    const spec = steps[i]?.spec;
-    if (!spec?.when) {
-      items.push({ kind: "step", index: i });
-      if (spec?.decides) decision = spec.decides;
-      continue;
-    }
-    const run: number[] = [];
-    while (i < steps.length && steps[i]?.spec.when) run.push(i++);
-    i--;
-    const rules = decision ? (logic(decision)?.node.spec.rules ?? []) : [];
-    const order = rules.map((r) => ("then" in r ? r.then : r.else));
-    const conditionOf = (name: string) => {
-      const rule = rules.find((r) => ("then" in r ? r.then : r.else) === name);
-      if (!rule) return undefined;
-      return "when" in rule ? readable(rule.when) : "otherwise";
-    };
-    const names = [...new Set(run.map((k) => steps[k]?.spec.when ?? ""))].sort(
-      (a, b) => rank(order, a) - rank(order, b),
-    );
-    items.push({
-      kind: "alt",
-      outcomes: names.map((name) => ({
-        name,
-        condition: conditionOf(name),
-        steps: run.filter((k) => steps[k]?.spec.when === name),
-      })),
-    });
-  }
-  return items;
-}
-
 /** A CEL condition with comparison operators Mermaid can show. */
 function readable(cel: string): string {
   return cel
@@ -520,11 +464,6 @@ function readable(cel: string): string {
     .replace(/!=/g, "≠")
     .replace(/</g, "＜")
     .replace(/>/g, "＞");
-}
-
-function rank(order: string[], name: string): number {
-  const i = order.indexOf(name);
-  return i < 0 ? order.length : i;
 }
 
 function boxKey(t: Target, shown: (id: string) => string): string {
