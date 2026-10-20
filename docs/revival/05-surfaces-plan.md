@@ -24,9 +24,9 @@ The PR report said data changed when it didn't, blamed old warnings on the PR, a
 
 ## 3. Agents: a starting point, measured
 
-- [~] **Symbols and paths in search.** Index exported symbols per file (deterministic, from the TS analyzer) and search file paths and symbol names, not only descriptions. `archdoc_check`-style names split on `_`.
-- [~] **`archdoc context <task or paths>`.** One brief: files and symbols to start in (ranked), other callers of the same functions ("does the same job elsewhere"), data, rules, the narrowest affected journeys (those whose step `code:` names the file), tests to run, owners. MCP `archdoc_context`.
-- [~] **`archdoc eval`.** Replays recent commits: query each subject through `context` and report how many changed files the brief named (recall) and how many it pointed at. `--min-recall` fails CI.
+- [x] **Symbols and paths in search.** Index exported symbols per file (deterministic, from the TS analyzer) and search file paths and symbol names, not only descriptions. `archdoc_check`-style names split on `_`.
+- [x] **`archdoc context <task or paths>`.** One brief: files and symbols to start in (ranked), other callers of the same functions ("does the same job elsewhere"), data, rules, the narrowest affected journeys (those whose step `code:` names the file), tests to run, owners. MCP `archdoc_context`.
+- [x] **`archdoc eval`.** Over the 50 commits before this work: 64% recall against 43% for search. Replays recent commits: query each subject through `context` and report how many changed files the brief named (recall) and how many it pointed at. `--min-recall` fails CI.
 
 ## 4. Newcomers: an explorer that starts from what people do
 
@@ -38,9 +38,9 @@ The PR report said data changed when it didn't, blamed old warnings on the PR, a
 
 ## 5. Debugging: traces
 
-- [~] **Spec.** A trace document (`.archdoc/traces/*.yaml`, never part of the model): `trace`, `title`, `symptom`, `reproduce`, `expands: <journey>#<step>`, steps in journey step syntax plus `role` (ok, cause, spreads, symptom), `evidence` (reproduced, read, inferred), `observed`/`expected`, `missing`; `works-in`; `fix`.
-- [~] **Core.** `checkTrace` (elements, hops, code references, hops the model doesn't declare) and `anchorError(text)` (paths and frames → elements → journey steps, ranked). Deterministic.
-- [~] **CLI and MCP.** `archdoc trace check|anchor`, `archdoc_anchor`, `archdoc_trace_check`; the agent skill says when to write one. The PR comment links traces a PR adds.
+- [x] **Spec.** A trace document (`.archdoc/traces/*.yaml`, never part of the model): `trace`, `title`, `symptom`, `reproduce`, `expands: <journey>#<step>`, steps in journey step syntax plus `role` (ok, cause, spreads, symptom), `evidence` (reproduced, read, inferred), `observed`/`expected`, `missing`; `works-in`; `fix`.
+- [x] **Core.** `checkTrace` (elements, hops, code references, hops the model doesn't declare) and `anchorError(text)` (paths and frames → elements → journey steps, ranked). Deterministic.
+- [x] **CLI and MCP.** `archdoc trace check|anchor`, `archdoc_anchor`, `archdoc_trace_check`; the agent skill says when to write one. The PR comment says which traced bug a PR fixes. MCP `archdoc_report` gives agents the comment's verdict before they open a PR.
 - [ ] **Explorer.** A trace view: the log, the diagnosis, the modeled step with its real hops beneath, cause and missing hops marked, evidence on every claim.
 
 ## 6. Polish
