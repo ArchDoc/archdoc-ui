@@ -1458,6 +1458,533 @@
       },
       "required": ["journey", "actor", "goal", "steps"],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "archdoc": {
+          "type": "string",
+          "pattern": "^2(\\.\\d+)?$"
+        },
+        "trace": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "description": "The trace's ID, usually its file name"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The bug in one line, as a user would say it"
+        },
+        "symptom": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the user saw: the log line, error, or wrong output"
+        },
+        "reproduce": {
+          "description": "How to see it again: a command, a request, a test",
+          "type": "string"
+        },
+        "expands": {
+          "description": "The journey step this run opens up, as <journey>#<step> (1-based). A journey in another repo is named by namespace, such as payments.month-end#2.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*#[1-9]\\d*$"
+        },
+        "diagnosis": {
+          "description": "Why it happens, in a sentence or two",
+          "type": "string"
+        },
+        "actor": {
+          "description": "For a trace no journey covers: whose request it was",
+          "type": "string",
+          "minLength": 1
+        },
+        "goal": {
+          "description": "For a trace no journey covers: what they were doing",
+          "type": "string"
+        },
+        "steps": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "action": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "code": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A file, directory, or glob relative to the repo root"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "lines": {
+                            "description": "A snippet of a file: one line, or a range such as 40-88",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^\\d+(-\\d+)?$"
+                              }
+                            ]
+                          },
+                          "symbol": {
+                            "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["path"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A file, directory, or glob relative to the repo root"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "lines": {
+                              "description": "A snippet of a file: one line, or a range such as 40-88",
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^\\d+(-\\d+)?$"
+                                }
+                              ]
+                            },
+                            "symbol": {
+                              "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["path"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "description": "The code this happens in: path, path:line, path:40-88, or { path, lines, symbol }, relative to the repo root"
+              },
+              "sends": {
+                "description": "Data entries this step sends, such as RefundRequest",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              },
+              "creates": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": ["string", "number", "boolean", "null"]
+                      }
+                    }
+                  }
+                ],
+                "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+              },
+              "changes": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "->"
+                },
+                "description": "Fields this step changes, such as Charge.status: captured -> refunded"
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": ["declared", "inferred", "suggested"],
+                    "description": "declared: written by a person (the default). inferred: produced by an analyzer. suggested: proposed by an AI agent and not yet accepted."
+                  },
+                  "by": {
+                    "description": "Who produced it: analyzer:ts-imports, agent:claude-code, human:@handle",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["source"],
+                "additionalProperties": false,
+                "description": "Where a fact came from. Absent means declared by a person."
+              },
+              "decides": {
+                "description": "A logic block that decides where this step goes, such as payments.refund-approval",
+                "type": "string"
+              },
+              "branches": {
+                "description": "What happens for each outcome of `decides`",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "creates": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": ["string", "number", "boolean", "null"]
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Records this step creates, such as Refund or { Refund: { status: pending } }"
+                    },
+                    "changes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "pattern": "->"
+                      },
+                      "description": "Fields this step changes, such as Charge.status: captured -> refunded"
+                    },
+                    "next": {
+                      "description": "Another journey this outcome continues as",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "when": {
+                "description": "Run this step only when an earlier decision had this outcome",
+                "type": "string"
+              },
+              "via": {
+                "description": "A mapping that produces the record this step writes, such as refund-to-ledger",
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": ["ok", "cause", "spreads", "symptom"],
+                "description": "ok: worked as designed (the default). cause: where it went wrong. spreads: carries the wrong value on. symptom: where the error shows."
+              },
+              "evidence": {
+                "type": "string",
+                "enum": ["reproduced", "read", "inferred"],
+                "description": "reproduced: seen in a run (a log, a test, a debugger). read: followed in the code. inferred: reasoned from the model or the symptom (the default)."
+              },
+              "observed": {
+                "description": "What the run had at this step",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "expected": {
+                "description": "What it should have had",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "missing": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "description": "Who should have made it. Defaults to the step's from.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "to": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The element it should have gone to"
+                  },
+                  "call": {
+                    "description": "The function or endpoint, such as applySchemas",
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": ["to"],
+                "additionalProperties": false,
+                "description": "A call that should have happened and didn't"
+              }
+            },
+            "required": ["from", "to"],
+            "additionalProperties": false
+          }
+        },
+        "works-in": {
+          "type": "object",
+          "properties": {
+            "element": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The element that does it right"
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A file, directory, or glob relative to the repo root"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "lines": {
+                          "description": "A snippet of a file: one line, or a range such as 40-88",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^\\d+(-\\d+)?$"
+                            }
+                          ]
+                        },
+                        "symbol": {
+                          "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["path"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A file, directory, or glob relative to the repo root"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "lines": {
+                            "description": "A snippet of a file: one line, or a range such as 40-88",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^\\d+(-\\d+)?$"
+                              }
+                            ]
+                          },
+                          "symbol": {
+                            "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["path"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              ],
+              "description": "The code this happens in: path, path:line, path:40-88, or { path, lines, symbol }, relative to the repo root"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": ["element"],
+          "additionalProperties": false,
+          "description": "Where the same job is done right, for comparison"
+        },
+        "fix": {
+          "description": "What fixes it",
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["declared", "inferred", "suggested"],
+              "description": "declared: written by a person (the default). inferred: produced by an analyzer. suggested: proposed by an AI agent and not yet accepted."
+            },
+            "by": {
+              "description": "Who produced it: analyzer:ts-imports, agent:claude-code, human:@handle",
+              "type": "string"
+            },
+            "evidence": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "required": ["source"],
+          "additionalProperties": false,
+          "description": "Where a fact came from. Absent means declared by a person."
+        }
+      },
+      "required": ["trace", "title", "symptom", "steps"],
+      "additionalProperties": false
     }
   ],
   "$defs": {
