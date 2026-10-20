@@ -58,9 +58,12 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
-            description: Element, actor, and overview queries, search by words, and impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos).
+            description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, and eval scoring.
             code: [{ path: packages/core/src/query/** }]
             uses:
+              data:
+                description: Lists the data the elements of a context brief send and store
+                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Adds consumers and journeys in other repos to impact
                 provenance: { source: suggested, by: agent:claude-code }
@@ -144,7 +147,7 @@ elements:
       analyzers:
         kind: container
         technology: TypeScript (ts.preProcessFile), yaml
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf.
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), a symbol index (exported declarations and named imports per TS/JS file) for search and context, and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files
@@ -171,7 +174,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, context, search, show, locate, impact, map, check, diff, report, eval, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -183,7 +186,7 @@ elements:
             sends: ExplorerPayload
           mcp: Starts the MCP server for `archdoc mcp`
           analyzers:
-            description: Runs analyzers for `archdoc check`
+            description: Runs analyzers for `archdoc check`, and builds the code index for `context`, `search`, and `eval`
             provenance: { source: suggested, by: agent:claude-code }
           federation:
             description: Runs `archdoc sync` and `archdoc publish`
@@ -207,7 +210,7 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate), plus propose, which adds suggested facts to the model.
+        description: MCP tools for agents. Read-only (context, search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
           core:
@@ -215,7 +218,7 @@ elements:
             sends: ModelSources
           model-files: Writes suggested additions and proposal notes for archdoc_propose
           analyzers:
-            description: Runs analyzers for archdoc_check
+            description: Runs analyzers for archdoc_check, and builds the code index for archdoc_context and archdoc_search
             provenance:
               source: suggested
               by: agent:claude-code
@@ -264,7 +267,7 @@ elements:
       agent-skills:
         kind: container
         technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflow. At the start of a task, search the model and check impact; afterwards, update the model with suggested facts and validate.
+        description: Teaches coding agents the workflow. At the start of a task, get a context brief and check impact; afterwards, update the model with suggested facts and validate.
         code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools
