@@ -82,7 +82,9 @@ describe("diffModels", () => {
 
   it("renders text, markdown, mermaid, and json", () => {
     const text = formatDiff(d, "text", "a → b");
-    expect(text).toMatch(/^Model changes \(a → b\): elements 1 added, 1 changed, 1 moved;/);
+    expect(text).toMatch(
+      /^Model changes \(a → b\): 1 element added, 1 changed, 1 moved; 1 use added, 1 changed;/,
+    );
     expect(text).toContain("→ old (component) moved from platform.old");
     expect(text).toContain("~ platform.api (container): status planned → active");
     expect(text).toContain("+ step 2: app → worker (Queues)");

@@ -227,6 +227,7 @@ export {
   formatTraceChecks,
   formatTraceList,
 } from "./report/trace-report.js";
+export { counted, TERMS, type Term } from "./report/words.js";
 export {
   type AnchorCandidate,
   type AnchorElement,
