@@ -33,11 +33,13 @@ import {
   loadTraces,
   locate,
   propose,
+  prReport,
   readTraceSources,
   resolveRef,
   search,
   simulate,
   traceSkeleton,
+  tracesInChange,
 } from "@archdoc/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -63,7 +65,7 @@ When a change touches data (what a component sends or stores, how a record is ma
 
 When you're asked to explain or fix a bug, call archdoc_anchor with the error (a log line, a stack trace, or the wrong output). It names the journey step it showed up in and the elements involved, and starts a trace for you. Follow the code from there, write the path the failing request took to .archdoc/traces/<id>.yaml with evidence on every step, and call archdoc_trace_check on it. Commit it with the fix.
 
-After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Use archdoc_diff to describe your model changes in the PR.`;
+After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Before you open a PR, call archdoc_report with the same base: it gives the verdict the PR comment will give, with what blocks the merge and how to fix it. Use it, and archdoc_diff for model changes, in the PR description.`;
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 
@@ -432,6 +434,39 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
         return text(
           formatDiff(diffModels(before, after), format ?? "text", `${ref} → working tree`),
         );
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_report",
+    {
+      title: "Architectural impact of your change",
+      description:
+        'The verdict the pull request comment will give your change since base (such as "main"): what blocks the merge and how to fix it, what to check, who to involve, the journeys and other repos it affects, and drift it introduced. Call it before you open a PR, fix what blocks, and use it for the PR description.',
+      inputSchema: {
+        base: z.string().describe("Branch or commit the change is compared with, such as main"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ base }) => {
+      try {
+        const checked = await checkRepository({ model: options.model, cwd, base });
+        if (!checked.base) return error(`Couldn't read the model at ${base}.`);
+        const { traces } = loadTraces(await readTraceSources(options.model ?? ".", { cwd }));
+        const r = prReport({
+          model: checked.model,
+          base: checked.base.model,
+          changedFiles: checked.base.changedFiles,
+          diff: diffModels(checked.base.model, checked.model),
+          findings: checked.findings,
+          diagrams: false,
+          fixes: tracesInChange(checked.base.changedFiles, traces),
+          label: `${base}...working tree`,
+        });
+        return text(r.markdown.replace(/^<!--.*-->\n?/gm, ""));
       } catch (err) {
         return error(err instanceof Error ? err.message : String(err));
       }

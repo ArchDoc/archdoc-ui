@@ -47,6 +47,7 @@ describe("archdoc MCP server", () => {
       "archdoc_locate",
       "archdoc_overview",
       "archdoc_propose",
+      "archdoc_report",
       "archdoc_search",
       "archdoc_simulate",
       "archdoc_trace_check",
@@ -84,7 +85,7 @@ describe("archdoc MCP server", () => {
     );
     // Other callers of what it uses from core: the bug class where surfaces load revisions differently.
     expect(byPath.text).toMatch(
-      /diffModels \(toolchain\.core\.differ\) is also called from .*packages\/mcp\/src\/server\.ts:\d+/,
+      /\(toolchain\.core\.[a-z]+\) is also called from .*packages\/mcp\/src\/server\.ts:\d+/,
     );
     expect(byPath.text).toContain("Next: after editing, run archdoc check --base main");
 
@@ -162,6 +163,13 @@ describe("archdoc MCP server", () => {
     const all = await call("archdoc_trace_check");
     expect(all.text).toMatch(/\d+ traces?: 0 errors/);
     expect(all.text).not.toContain("What happened:");
+  });
+
+  it("gives the verdict the PR comment will give", async () => {
+    const r = await call("archdoc_report", { base: "HEAD" });
+    expect(r.isError).toBe(false);
+    expect(r.text).toMatch(/^(⛔|⚠️|ℹ️|✅) \*\*ArchDoc:\*\* /);
+    expect(r.text).not.toContain("<!--");
   });
 
   it("returns errors as tool errors", async () => {
