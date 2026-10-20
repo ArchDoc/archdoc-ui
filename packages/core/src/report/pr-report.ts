@@ -52,6 +52,7 @@ export interface Concern {
   /** file:line, when there is one. */
   where?: string | undefined;
   element?: string | undefined;
+  rule?: string | undefined;
 }
 
 /** Someone to involve before merging: owners approve, other repos know, critical journeys still work. */
@@ -532,6 +533,7 @@ function concernOf(f: MarkedFinding): Concern {
     fix: FIX.find(([re]) => re.test(f.code))?.[1],
     where,
     element: f.element,
+    rule: f.rule,
   };
 }
 

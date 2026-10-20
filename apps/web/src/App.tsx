@@ -63,13 +63,15 @@ export function App() {
   const branch = tab === "changes" && compared.status === "ready" ? compared.head : undefined;
   const shown = branch ?? (state.status === "ready" ? state : undefined);
   const samples = useMemo(() => (shown ? samplesFor(shown.model, shown.samples) : []), [shown]);
-  const sources = compared.status === "ready" ? (compared.head ?? shown)?.sources : undefined;
+  const headModel =
+    compared.status === "ready"
+      ? (compared.head ?? (state.status === "ready" ? state : undefined))?.model
+      : undefined;
   const compare = useMemo<Compare | undefined>(() => {
-    if (!pair || compared.status !== "ready" || !sources?.sources.length) return undefined;
-    // The model's files alone, as the base was built, so only what they change shows.
-    const head = buildModel(sources.sources, { root: sources.root });
-    return compareModels(pair.base, compared.base, pair.head, head);
-  }, [pair, compared, sources]);
+    if (!pair || compared.status !== "ready" || !headModel) return undefined;
+    // Both revisions read the same way, with what the server found in the code.
+    return compareModels(pair.base, compared.base, pair.head, headModel, compared.change);
+  }, [pair, compared, headModel]);
   useEffect(() => writeHash(tab, chosen), [tab, chosen]);
 
   if (state.status === "loading") return <Splash>Loading the model…</Splash>;

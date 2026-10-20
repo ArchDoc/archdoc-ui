@@ -1386,6 +1386,15 @@ kbd {
   gap: 4px;
 }
 
+.changes-summary .verdict {
+  margin: 0;
+  font-weight: 600;
+}
+
+.verdict-blocking {
+  color: var(--chg-removed);
+}
+
 .change-note {
   margin: 0;
   font-size: 0.86rem;

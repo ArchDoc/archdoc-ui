@@ -161,9 +161,8 @@ describe("the landscape", () => {
     );
     const r = await run("payments", "report", "--base", "main");
     expect(r.code).toBe(0);
-    expect(r.out).toContain(
-      "> [!WARNING]\n> This change breaks 1 consumer in another repo (rides).",
-    );
+    expect(r.out).toContain("> [!CAUTION]\n> **Breaks rides.api-gateway in rides**");
+    expect(r.out).toContain("- [ ] **rides** knows · rides.api-gateway breaks: charges");
     expect(r.out).toContain(
       "| `rides.api-gateway` (rides@1.0.0) | `charges` via `proto/charges.proto`: Asks for a refund | **breaks**: proto/charges.proto is removed |",
     );

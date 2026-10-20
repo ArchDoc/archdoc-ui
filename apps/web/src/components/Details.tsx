@@ -69,10 +69,10 @@ export function Details(props: DetailsProps) {
       {props.compare ? (
         <div className="changes-summary">
           <p className="eyebrow">Changes since {props.compare.ref}</p>
-          <p>{diffSummary(props.compare.diff) || "The model didn't change."}</p>
-          {props.compare.journeys.size ? (
-            <p className="muted">Journeys affected: {[...props.compare.journeys].join(", ")}</p>
-          ) : null}
+          <p className={`verdict verdict-${props.compare.summary.verdict}`}>
+            {props.compare.summary.headline.join(" · ")}
+          </p>
+          <p className="muted">{diffSummary(props.compare.diff) || "The model didn't change."}</p>
         </div>
       ) : null}
       <dl className="stats">

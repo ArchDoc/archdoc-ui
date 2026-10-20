@@ -1,5 +1,6 @@
 import { buildModel, type Model, type ModelSource } from "@archdoc/core/browser";
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeFindings } from "./compare.js";
 import { type ModelPayload, modelOf, type RepoLinks } from "./useModel.js";
 
 /** The branches `archdoc view` can compare. Undefined on a static host, which has no git. */
@@ -37,21 +38,25 @@ export type Compared =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; base: Model; head?: Head | undefined };
+  | {
+      status: "ready";
+      base: Model;
+      head?: Head | undefined;
+      /** What the server found comparing them with the code. */
+      change?: ChangeFindings | undefined;
+    };
 
 /** A branch as the Changes tab shows it: its model, and the files and samples at its commit. */
 export interface Head {
   ref: string;
   model: Model;
-  /** The model's files alone, to diff as the base is diffed. */
-  sources: { root: string; sources: ModelSource[] };
   files: string[];
   snippets: NonNullable<ModelPayload["snippets"]>;
   repo: RepoLinks;
   samples: { path: string; text: string }[];
 }
 
-interface Sources {
+interface Sources extends Partial<ModelPayload> {
   ref: string;
   root: string;
   sources: ModelSource[];
@@ -60,7 +65,7 @@ interface Sources {
 /** The model at each side of the pair, read from git by the view server. */
 export function useCompared(
   pair: Pair | undefined,
-  preset: { ref: string; model: Model } | undefined,
+  preset: { ref: string; model: Model; change?: ChangeFindings | undefined } | undefined,
 ): Compared {
   const [state, setState] = useState<Compared>(IDLE);
   // What the page loaded with needs no request, so it also works on a static host.
@@ -78,11 +83,16 @@ export function useCompared(
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
           base?: Sources;
-          head?: Sources & Partial<ModelPayload>;
+          head?: Sources;
+          change?: ChangeFindings;
         };
         if (!res.ok || !body.base)
           throw new Error(body.error ?? `The server answered ${res.status}.`);
-        return { base: build(body.base), head: body.head && head(body.head) };
+        return {
+          base: build(body.base),
+          head: body.head && head(body.head),
+          change: body.change,
+        };
       })
       .then(
         (models) => !cancelled && setState({ status: "ready", ...models }),
@@ -94,9 +104,9 @@ export function useCompared(
       cancelled = true;
     };
   }, [pair, fromPreset]);
-  const presetModel = fromPreset ? preset?.model : undefined;
+  const presetModel = fromPreset ? preset : undefined;
   const ready = useMemo<Compared | undefined>(
-    () => presetModel && { status: "ready", base: presetModel },
+    () => presetModel && { status: "ready", base: presetModel.model, change: presetModel.change },
     [presetModel],
   );
   if (!pair) return IDLE;
@@ -105,11 +115,10 @@ export function useCompared(
 
 const IDLE: Compared = { status: "idle" };
 
-function head(p: Sources & Partial<ModelPayload>): Head {
+function head(p: Sources): Head {
   return {
     ref: p.ref,
     model: modelOf(p),
-    sources: { root: p.root, sources: p.sources },
     files: p.files ?? [],
     snippets: p.snippets ?? {},
     repo: p.repo ?? {},
@@ -118,7 +127,7 @@ function head(p: Sources & Partial<ModelPayload>): Head {
 }
 
 function build(s: Sources): Model {
-  return s.sources.length ? buildModel(s.sources, { root: s.root }) : buildModel([]);
+  return s.sources.length ? modelOf(s) : buildModel([]);
 }
 
 /** The pair in the address, such as #changes=main...feature, so a link opens the same comparison. */

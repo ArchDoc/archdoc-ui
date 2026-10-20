@@ -1,12 +1,13 @@
 import {
+  type ChangeSummary,
   check,
   diffModels,
   type Finding,
+  type MarkedFinding,
   type Model,
   type ModelDiff,
-  type PrReport,
-  prReport,
   type RelationshipView,
+  summarizeChange,
 } from "@archdoc/core/browser";
 
 /** What the Changes tab shows: the model at one ref against another. */
@@ -20,8 +21,16 @@ export interface Compare {
   /** IDs of journeys the changes affect. */
   journeys: Set<string>;
   groups: ChangeGroups;
+  /** The same summary the PR comment renders: verdict, headline, concerns, people to ask. */
+  summary: ChangeSummary;
   /** How many things changed, for the tab's badge. */
   count: number;
+}
+
+/** What the server found comparing the two revisions with their code, as `archdoc report` does. */
+export interface ChangeFindings {
+  findings: MarkedFinding[];
+  changedFiles: string[];
 }
 
 export interface ChangeItem {
@@ -44,38 +53,51 @@ export interface ChangeGroups {
 }
 
 /**
- * Compares two models built straight from their files. Both sides leave out
- * imported schemas and other repos, which only one side has, so the diff shows
- * what the model files changed and nothing else.
+ * Compares two revisions the way `archdoc report` does, from the same
+ * summary. With what the server found in the code (`change`), its findings
+ * and changed files; without (a static site, two model files), the findings
+ * the models alone have.
  */
 export function compareModels(
   ref: string,
   base: Model,
   head: string | undefined,
   after: Model,
+  change?: ChangeFindings | undefined,
 ): Compare {
   const diff = diffModels(base, after);
-  const key = (f: Finding) => `${f.code} ${f.message}`;
-  const before = new Set(check(base).findings.map(key));
-  const introduced = check(after).findings.filter((f) => !before.has(key(f)));
-  const report = prReport({
+  let findings: MarkedFinding[];
+  if (change) {
+    findings = change.findings;
+  } else {
+    const key = (f: Finding) => `${f.code} ${f.message}`;
+    const before = new Set(check(base).findings.map(key));
+    findings = check(after).findings.map((f) => ({ ...f, introduced: !before.has(key(f)) }));
+  }
+  const summary = summarizeChange({
     model: after,
     base,
-    changedFiles: [],
+    changedFiles: change?.changedFiles ?? [],
     diff,
-    findings: introduced.map((f) => ({ ...f, introduced: true })),
+    findings,
     diagrams: false,
   });
+  const concern = (kind: "error" | "warning") => (c: ChangeSummary["blocking"][number]) => ({
+    key: c.element ? `element:${c.element}` : "",
+    kind,
+    label: c.detail,
+    hint: c.rule ? `rule ${c.rule}` : (c.code.split("/").pop() ?? c.code),
+  });
   const groups: ChangeGroups = {
-    breaks: introduced.map((f) => ({
-      key: f.element ? `element:${f.element}` : "",
-      kind: f.severity === "error" ? "error" : "warning",
-      label: f.message,
-      hint: f.rule ? `rule ${f.rule}` : (f.code.split("/").pop() ?? f.code),
-    })),
-    journeys: journeyItems(report, diff),
+    breaks: [
+      ...summary.blocking.map(concern("error")),
+      ...summary.attention
+        .filter((c) => c.code !== "data/sensitive" && c.code !== "model/suggested")
+        .map(concern("warning")),
+    ],
+    journeys: journeyItems(summary, diff),
     elements: elementItems(diff),
-    data: dataItems(after, report, diff),
+    data: dataItems(after, summary, diff),
     suggested: suggestedItems(diff),
   };
   return {
@@ -83,14 +105,15 @@ export function compareModels(
     head,
     base,
     diff,
-    journeys: new Set(report.journeys.filter((j) => !j.namespace).map((j) => j.id)),
+    journeys: new Set(summary.journeys.filter((j) => !j.namespace).map((j) => j.id)),
     groups,
+    summary,
     count:
       groups.breaks.length + groups.journeys.length + groups.elements.length + groups.data.length,
   };
 }
 
-function journeyItems(report: PrReport, diff: ModelDiff): ChangeItem[] {
+function journeyItems(report: ChangeSummary, diff: ModelDiff): ChangeItem[] {
   const own = report.journeys.filter((j) => !j.namespace);
   const items: ChangeItem[] = own.map((j) => {
     const change = diff.journeys.find((c) => c.id === j.id);
@@ -145,7 +168,7 @@ function elementItems(diff: ModelDiff): ChangeItem[] {
   ];
 }
 
-function dataItems(model: Model, report: PrReport, diff: ModelDiff): ChangeItem[] {
+function dataItems(model: Model, report: ChangeSummary, diff: ModelDiff): ChangeItem[] {
   const items: ChangeItem[] = diff.data.map((c) => ({
     key: c.kind === "removed" ? "" : `data:${model.namespace}.${c.id}`,
     kind: c.kind,

@@ -4,21 +4,22 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AnalyzerContext, importSchemas } from "@archdoc/analyzers";
+import {
+  checkRepository,
+  contextOf,
+  importSchemas,
+  type Snapshot,
+  snapshot,
+} from "@archdoc/analyzers";
 import {
   buildModel,
-  federationDir,
   isSnippet,
   listBranches,
-  listFilesAtRef,
-  listRepoFiles,
-  type ModelSource,
   type RepoInfo,
   readFederationInput,
-  readFileAtRef,
   readModelSources,
-  readModelSourcesAtRef,
   repoInfo,
+  resolveGitRef,
   resolveSnippets,
   type SourcesAtRef,
 } from "@archdoc/core";
@@ -70,39 +71,14 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
   const watching = options.watch === true;
   const clients = new Set<ServerResponse>();
   const initial = await readModelSources(options.target, { cwd: options.cwd });
-  // The base doesn't change while the server runs, so read it once.
-  const base: SourcesAtRef | undefined = options.base
-    ? isModelPath(options.cwd ?? process.cwd(), options.base)
-      ? await sourcesOfFile(options.base, options.cwd)
-      : await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
-    : undefined;
-
-  /** The model at a branch, as /api/model sends the working tree's, read from git. */
-  const payloadAtRef = async (at: SourcesAtRef) => {
-    const read = await readModelSources(options.target, { cwd: options.cwd });
-    if (!read || !at.commit) return { ...at };
-    const repo = await repoInfo(read.baseDir);
-    return {
-      ref: at.ref,
-      commit: at.commit,
-      ...(await modelPayload({
-        root: at.root,
-        sources: at.sources,
-        baseDir: read.baseDir,
-        files: await listFilesAtRef(read.baseDir, at.commit),
-        // Code links go to the files at this commit; there's no local copy to open.
-        repo: { webUrl: repo.webUrl, commit: at.commit },
-        fedDir: await federationDir(read.source),
-        cwd: options.cwd,
-        read: (path) => {
-          const rel = relative(read.baseDir, path).replace(/\\/g, "/");
-          return rel.startsWith("..")
-            ? Promise.resolve(undefined)
-            : readFileAtRef(read.baseDir, at.commit, rel);
-        },
-      })),
-    };
-  };
+  const cwd = options.cwd;
+  if (
+    options.base &&
+    !isModelPath(cwd, options.base) &&
+    !(await resolveGitRef(cwd, options.base))
+  ) {
+    throw new Error(`"${options.base}" is not a commit, branch, or tag in this repository.`);
+  }
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -112,29 +88,13 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
         return json(res, 200, await landscapePayload(model, composed, watching));
       }
       if (url.pathname === "/api/model") {
-        const read = await readModelSources(options.target, { cwd: options.cwd });
-        if (!read) {
+        const body = await modelResponse({ target: options.target, cwd, base: options.base });
+        if (!body) {
           return json(res, 404, {
             error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml.`,
           });
         }
-        return json(res, 200, {
-          ...(await modelPayload({
-            ...read,
-            files: await listRepoFiles(read.baseDir),
-            repo: { ...(await repoInfo(read.baseDir)), root: read.baseDir },
-            fedDir: await federationDir(read.source),
-            cwd: options.cwd,
-            read: (path) => readFile(path, "utf8").catch(() => undefined),
-          })),
-          watch: watching,
-          base: base && {
-            ref: base.ref,
-            commit: base.commit,
-            root: base.root,
-            sources: base.sources,
-          },
-        });
+        return json(res, 200, { ...body, watch: watching });
       }
       if (url.pathname === "/api/refs") {
         const { current, branches } = await listBranches(options.cwd);
@@ -142,24 +102,24 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
       }
       if (url.pathname === "/api/compare") {
         // Only branches (and the --base the server started with), never arbitrary git arguments.
-        const allowed = new Set((await listBranches(options.cwd)).branches);
-        if (base) allowed.add(base.ref);
-        const at = async (ref: string | null) => {
-          if (ref === null || ref === "") return undefined;
-          if (!allowed.has(ref))
-            throw new RangeError(`"${ref}" is not a branch in this repository.`);
-          if (ref === base?.ref) return base;
-          return readModelSourcesAtRef(options.target, ref, { cwd: options.cwd });
+        const allowed = new Set((await listBranches(cwd)).branches);
+        if (options.base) allowed.add(options.base);
+        const ref = (name: string) => {
+          const value = url.searchParams.get(name);
+          if (value === null || value === "") return undefined;
+          if (!allowed.has(value))
+            throw new RangeError(`"${value}" is not a branch in this repository.`);
+          return value;
         };
         try {
-          const [from, to] = await Promise.all([
-            at(url.searchParams.get("base")),
-            at(url.searchParams.get("head")),
-          ]);
-          if (!from) return json(res, 400, { error: "Pick a base branch to compare with." });
-          // No head means the working tree, which /api/model already sends. A branch
-          // comes with what the working tree does: schemas, other repos, files, and samples.
-          return json(res, 200, { base: from, head: to && (await payloadAtRef(to)) });
+          const base = ref("base");
+          if (!base) return json(res, 400, { error: "Pick a base branch to compare with." });
+          const head = ref("head");
+          // Both sides as the PR comment reads them: the merge base and the head, with
+          // schemas, other repos, files, and samples, and the findings the head introduced.
+          const compared = await comparison(options.target, cwd, base, head);
+          if (!compared) return json(res, 404, { error: "No ArchDoc model here." });
+          return json(res, 200, compared);
         } catch (err) {
           if (err instanceof RangeError) return json(res, 400, { error: err.message });
           throw err;
@@ -270,27 +230,73 @@ export function findWebDir(): string | undefined {
   return candidates.find((d): d is string => !!d && existsSync(join(d, "index.html")));
 }
 
-/** One version of the model and its repository: the working tree, or a commit. */
-interface Snapshot {
-  root: string;
-  sources: ModelSource[];
-  /** Directory the files are relative to. */
-  baseDir: string;
-  files: string[];
-  repo: RepoInfo & { root?: string | undefined };
-  /** Where archdoc.lock and vendor/ are. */
-  fedDir: string;
+/**
+ * What /api/model sends, and what `archdoc site` writes: the working tree's
+ * model, and with `base`, the model at the merge base with it and the findings
+ * the change introduced, so the Changes tab shows what the PR comment says.
+ */
+export async function modelResponse(options: {
+  target: string;
   cwd: string;
-  /** Reads a file by its absolute path. */
-  read: (path: string) => Promise<string | undefined>;
+  base?: string | undefined;
+}) {
+  const snap = await snapshot(options.target, { cwd: options.cwd });
+  if (!snap) return undefined;
+  const repo = { ...(await repoInfo(snap.baseDir)), root: snap.baseDir };
+  const body = await payloadOf(snap, repo, options.cwd);
+  if (!options.base) return body;
+  if (isModelPath(options.cwd, options.base)) {
+    // Another model file: only its files, compared with this one's.
+    return { ...body, base: await sourcesOfFile(options.base, options.cwd) };
+  }
+  const compared = await comparison(options.target, options.cwd, options.base, undefined);
+  return compared ? { ...body, base: compared.base, change: compared.change } : body;
+}
+
+/** The merge base of `base` and `head` (or the working tree), as a payload, and the findings the head introduced. */
+async function comparison(target: string, cwd: string, base: string, head: string | undefined) {
+  const checked = await checkRepository({ model: target, cwd, base, head });
+  if (!checked.base) return undefined;
+  const merged = await snapshot(target, { cwd, ref: checked.base.commit });
+  if (!merged) return undefined;
+  // Named after the branch it's the merge base with, as the comparison is.
+  const relabel = (p: string) =>
+    p.startsWith(`${checked.base?.commit}:`) ? `${base}:${p.slice(p.indexOf(":") + 1)}` : p;
+  const at: Snapshot = {
+    ...merged,
+    root: relabel(merged.root),
+    sources: merged.sources.map((x) => ({ ...x, path: relabel(x.path) })),
+  };
+  const linksAt = async (s: Snapshot) => ({
+    webUrl: (await repoInfo(s.baseDir)).webUrl,
+    commit: s.commit,
+  });
+  const headSnap = head ? await snapshot(target, { cwd, ref: head }) : undefined;
+  return {
+    base: { ref: base, ...(await payloadOf(at, await linksAt(at), cwd)) },
+    head: headSnap && { ref: head, ...(await payloadOf(headSnap, await linksAt(headSnap), cwd)) },
+    change: {
+      base,
+      head,
+      commit: checked.base.commit,
+      findings: checked.findings,
+      changedFiles: checked.base.changedFiles,
+    },
+  };
 }
 
 /** What the explorer needs to build and show one version of the model. */
-async function modelPayload(snap: Snapshot) {
-  const model = buildModel(snap.sources, { root: snap.root });
+async function payloadOf(
+  snap: Snapshot,
+  repo: RepoInfo & { root?: string | undefined },
+  cwd: string,
+) {
+  const model = snap.sources.length
+    ? buildModel(snap.sources, { root: snap.root })
+    : buildModel([]);
   const inRepo = new Set(snap.files);
   const readRel = (path: string) =>
-    inRepo.has(path) ? snap.read(join(snap.baseDir, path)) : Promise.resolve(undefined);
+    inRepo.has(path) ? snap.read(path) : Promise.resolve(undefined);
   // Snippets are found synchronously, so read the files they're in first.
   const snippetFiles = new Map<string, string | undefined>();
   for (const e of model.elements.values()) {
@@ -300,17 +306,12 @@ async function modelPayload(snap: Snapshot) {
       }
     }
   }
-  const federation = await readFederationInput(snap.fedDir, snap.cwd, snap.read);
-  const ctx: AnalyzerContext = {
-    baseDir: snap.baseDir,
-    files: snap.files,
-    read: async (path) => {
-      const text = await readRel(path);
-      if (text === undefined) throw new Error(`Can't read ${path}.`);
-      return text;
-    },
-  };
+  const federation = await readFederationInput(snap.fedDir, cwd, (file) => {
+    const rel = relative(snap.baseDir, file).replace(/\\/g, "/");
+    return rel.startsWith("..") ? Promise.resolve(undefined) : snap.read(rel);
+  });
   return {
+    ...(snap.commit ? { commit: snap.commit } : {}),
     root: snap.root,
     sources: snap.sources,
     files: snap.files,
@@ -325,8 +326,8 @@ async function modelPayload(snap: Snapshot) {
     },
     samples: await readSamples(snap.files, readRel),
     // What data entries' schema sources say (types, values, foreign keys), as check reads them.
-    schemas: (await importSchemas(ctx, model)).filter((s) => !s.error),
-    repo: snap.repo,
+    schemas: (await importSchemas(contextOf(snap), model)).filter((s) => !s.error),
+    repo,
   };
 }
 
