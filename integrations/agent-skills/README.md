@@ -4,7 +4,7 @@ ArchDoc is most useful when your coding agent starts each task with the architec
 
 | File | What it's for |
 |---|---|
-| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: search, check impact, edit, check drift, propose model changes |
+| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: get a context brief, check impact, edit, check drift, propose model changes |
 | [`AGENTS.md`](./AGENTS.md) | The same workflow as a snippet for `AGENTS.md`, read by Codex, Cursor, Copilot, and others |
 | [`mcp/claude-code.mcp.json`](./mcp/claude-code.mcp.json) | MCP server config for Claude Code (`.mcp.json` at the repository root) |
 | [`mcp/cursor.mcp.json`](./mcp/cursor.mcp.json) | MCP server config for Cursor (`.cursor/mcp.json`) |
@@ -26,7 +26,8 @@ Every tool reloads the model on every call. All of them are read-only except `ar
 
 | Tool | Answers |
 |---|---|
-| `archdoc_search` | Where does this live? Elements, actors, and journeys for a few words, with code paths |
+| `archdoc_context` | Where do I start? For a task in words or the files to change: files and functions to open first, other callers of the same functions, data, rules, the journeys whose steps name the files, tests, owners |
+| `archdoc_search` | Where does this live? Elements, actors, journeys, and files (by path and exported names) for a few words, with code paths |
 | `archdoc_overview` | What is this system? Actors, elements, journeys |
 | `archdoc_locate` | Which element owns these files? |
 | `archdoc_impact` | What does changing this affect? Consumers, actors, journeys, owners, rules |

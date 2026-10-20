@@ -1,5 +1,5 @@
 import { checkRepository } from "@archdoc/analyzers";
-import { formatFindings, type MarkedFinding } from "@archdoc/core";
+import { formatAnnotations, formatFindings, type MarkedFinding } from "@archdoc/core";
 import type { Io } from "../io.js";
 
 export interface CheckOptions {
@@ -19,8 +19,8 @@ export function runCheck(options: CheckOptions, cwd: string) {
 
 export async function check(options: CheckOptions, io: Io): Promise<number> {
   const format = options.format ?? "text";
-  if (!["text", "markdown", "json"].includes(format)) {
-    io.err("--format must be text, markdown, or json.");
+  if (!["text", "markdown", "json", "github"].includes(format)) {
+    io.err("--format must be text, markdown, json, or github.");
     return 2;
   }
   const failOn = options.failOn ?? "error";
@@ -36,11 +36,18 @@ export async function check(options: CheckOptions, io: Io): Promise<number> {
     return 2;
   }
 
-  io.out(
-    format === "json"
-      ? JSON.stringify(findings, null, 2)
-      : formatFindings(findings, format as "text" | "markdown"),
-  );
+  if (format === "github") {
+    // Workflow commands put the findings on the diff; the text keeps the log readable.
+    const annotations = formatAnnotations(findings);
+    if (annotations) io.out(annotations);
+    io.out(formatFindings(findings, "text"));
+  } else {
+    io.out(
+      format === "json"
+        ? JSON.stringify(findings, null, 2)
+        : formatFindings(findings, format as "text" | "markdown"),
+    );
+  }
   const counted = options.base ? findings.filter((f) => f.introduced) : findings;
   const failing = counted.filter(
     (f) => f.severity === "error" || (failOn === "warning" && f.severity === "warning"),

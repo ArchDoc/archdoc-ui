@@ -159,7 +159,7 @@ export function impact(model: Model, target: string, maxDepth = 3): ImpactResult
   const owners = [...new Set(chain.flatMap((id) => model.elements.get(id)?.spec.owners ?? []))];
   const names = new Set(chain.flatMap((id) => [id, id.split(".").pop() as string]));
   if (t.type === "actor") names.add(t.id);
-  const rules = model.rules.filter((r) => mentions(r, names));
+  const rules = rulesMentioning(model, names);
 
   return {
     ok: true,
@@ -214,6 +214,11 @@ function isInside(model: Model, node: Target, ancestorKey: string): boolean {
 
 function describe(t: Target): string {
   return t.type === "external" ? t.ref : t.id;
+}
+
+/** Rules with a string (other than a description) that names one of the IDs or keys. */
+export function rulesMentioning(model: Model, names: ReadonlySet<string>): RuleSpec[] {
+  return model.rules.filter((r) => mentions(r, names));
 }
 
 /** True when any string in the rule names one of the IDs. */

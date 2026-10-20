@@ -103,11 +103,13 @@ describe("against a git history", () => {
   it("report names the touched elements, the critical journey, and the drift", async () => {
     const r = await run("report", "--base", "main");
     expect(r.code).toBe(0);
-    expect(r.out.startsWith("<!-- archdoc-report -->\n## Architectural impact")).toBe(true);
-    expect(r.out).toContain("**Touches:** `web` (1 file), `search`");
+    expect(r.out.startsWith("<!-- archdoc-report -->\n⛔ **ArchDoc:** 2 blocking issues")).toBe(
+      true,
+    );
+    expect(r.out).toContain("Touches `web` (1 file), `search`");
     expect(r.out).toContain("| checkout: Buy something | **critical** | buyer | 1, 2 |");
-    expect(r.out).toContain("This change introduces 2 errors");
-    expect(r.out).toContain("### Suggested facts to review (1)");
+    expect(r.out).toContain("Drift and rules (2 errors");
+    expect(r.out).toContain("<summary>Suggested facts to review (1)</summary>");
     const sha = git("rev-parse", "main").trim();
     expect((await run("report", "--base", sha)).out).toContain(`for ${sha.slice(0, 7)}...HEAD.`);
     expect(r.out).toContain("```mermaid\nflowchart TB");

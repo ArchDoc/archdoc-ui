@@ -1,16 +1,18 @@
 import {
+  DataRegistry,
   fieldReferences,
   type JourneyNode,
   type Model,
   type ModelDiff,
   type Simulation,
 } from "@archdoc/core/browser";
-import { Background, Controls, MarkerType, MiniMap, ReactFlow, useReactFlow } from "@xyflow/react";
+import { Background, Controls, MarkerType, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type DataFocus,
   dataFocus,
   type Interaction,
+  journeyInteractions,
   lineageFocus,
   type StepData,
   stepData,
@@ -18,7 +20,13 @@ import {
 import { buildDiffGraph, type DiffGraph } from "../graph/diff.js";
 import { buildGraph, type Graph, journeyEdges, type ViewState } from "../graph/graph.js";
 import { boundaryKey, crossingOf, type Grouping } from "../graph/groups.js";
-import { layoutGraph, type Point, type UntangledLayout } from "../graph/layout.js";
+import {
+  layoutGraph,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  type Point,
+  type UntangledLayout,
+} from "../graph/layout.js";
 import { edgeTypes, type RoutedEdge } from "./edges.js";
 import {
   type CardNode,
@@ -26,6 +34,7 @@ import {
   nodeTypes,
   type OthersNode,
   type RowTableNode,
+  type Shape,
   type TableNode,
 } from "./nodes.js";
 
@@ -57,10 +66,17 @@ export interface CanvasProps {
   onShowAll: (elementId: string) => void;
   /** Show changes against a base model. */
   compare?: { base: Model; diff: ModelDiff } | undefined;
+  /**
+   * A journey to light up without opening it, such as the one hovered on the
+   * Overview: its boxes and the uses between them; the rest fades.
+   */
+  preview?: string | undefined;
+  /** How the layout runs: left to right (the default), or top to bottom. */
+  direction?: "RIGHT" | "DOWN" | undefined;
 }
 
 export function Canvas(props: CanvasProps) {
-  const { model, view, journey, interactions, at, centerOn, compare, grouping } = props;
+  const { model, view, journey, interactions, at, centerOn, compare, grouping, preview } = props;
   const interaction = journey ? interactions[at] : undefined;
   // A domain is selected from the sidebar; on the canvas it's its box.
   const selected = props.selected?.startsWith("domain:")
@@ -70,22 +86,44 @@ export function Canvas(props: CanvasProps) {
     () => (compare ? buildDiffGraph(model, compare.base, compare.diff, view) : undefined),
     [model, view, compare],
   );
-  const graph = useMemo(() => overlay?.graph ?? buildGraph(model, view), [overlay, model, view]);
+  const graph = useMemo(
+    () => fitActors(model, overlay?.graph ?? buildGraph(model, view)),
+    [overlay, model, view],
+  );
   // `source` is the graph asked for; `graph` is it as laid out, rows possibly reordered.
   const [layout, setLayout] = useState<{ source: Graph } & UntangledLayout>();
   const flow = useReactFlow();
   const [hoverEdge, setHoverEdge] = useState<string>();
+  const [hoverNode, setHoverNode] = useState<string>();
   const firstFit = useRef(true);
+  const pane_ = useRef<HTMLDivElement>(null);
+  const direction = props.direction ?? "RIGHT";
 
   useEffect(() => {
     let cancelled = false;
-    void layoutGraph(graph).then((result) => {
+    // Top to bottom, as the Overview lays out, rows sit closer: more of the map fits, still readable.
+    const options: Record<string, string> =
+      direction === "DOWN"
+        ? {
+            "elk.direction": "DOWN",
+            "elk.layered.spacing.nodeNodeBetweenLayers": "64",
+            "elk.spacing.nodeNode": "24",
+          }
+        : { "elk.direction": direction };
+    void layoutGraph(graph, options).then((result) => {
       if (!cancelled) setLayout({ source: graph, ...result });
     });
     return () => {
       cancelled = true;
     };
-  }, [graph]);
+  }, [graph, direction]);
+
+  // A journey shown without opening it: the boxes its steps go between, as drawn now.
+  const previewSteps = useMemo(() => {
+    const j = preview ? model.journeys.get(preview) : undefined;
+    if (!j || journey) return undefined;
+    return journeyEdges(model, view, j.id, journeyInteractions(model, j));
+  }, [model, view, preview, journey]);
 
   const steps = useMemo(
     () => (journey ? journeyEdges(model, view, journey.id, interactions) : []),
@@ -187,6 +225,13 @@ export function Canvas(props: CanvasProps) {
       for (const [k, e] of focusTables) map.set(k, e);
       return map;
     }
+    if (previewSteps) {
+      for (const s of previewSteps) {
+        map.set(s.source, "highlight");
+        map.set(s.target, "highlight");
+      }
+      return map;
+    }
     if (journey) {
       // Tables the current step writes to are current, and the camera goes to them; tables
       // that only store what its message carries are lit, and the camera stays on the arrow.
@@ -227,8 +272,8 @@ export function Canvas(props: CanvasProps) {
       }
     }
     return map;
-  }, [journey, steps, at, selected, graph, focus, focusTables, current, lines]);
-  const dimming = journey !== undefined || selected !== undefined;
+  }, [journey, steps, at, selected, graph, focus, focusTables, current, lines, previewSteps]);
+  const dimming = journey !== undefined || selected !== undefined || previewSteps !== undefined;
 
   const nodes = useMemo<(CardNode | TableNode | RowTableNode | OthersNode)[]>(() => {
     if (!layout) return [];
@@ -425,6 +470,10 @@ export function Canvas(props: CanvasProps) {
       const pair = [s.source, s.target].sort().join("|");
       sharing.set(pair, [...(sharing.get(pair) ?? []), s.at]);
     }
+    // A previewed journey lights the uses its steps go along, either way.
+    const previewPairs = new Set(
+      (previewSteps ?? []).flatMap((s) => [`${s.source}|${s.target}`, `${s.target}|${s.source}`]),
+    );
     const regular: RoutedEdge[] = layout.graph.edges.map((e) => {
       if (e.reference) {
         // Between rows: lit when either row is one the current step wrote.
@@ -449,9 +498,13 @@ export function Canvas(props: CanvasProps) {
           zIndex: 3,
         };
       }
+      const touches = (k: string | undefined) =>
+        k !== undefined && (e.source === k || e.target === k);
       const lit = focus
         ? focus.edges.has(e.id)
-        : !journey && selected !== undefined && (e.source === selected || e.target === selected);
+        : previewSteps
+          ? previewPairs.has(`${e.source}|${e.target}`)
+          : !journey && (touches(selected) || touches(hoverNode));
       // A subscription names its channel and how it travels.
       const channel = e.subscription
         ? `${e.subscription.channel}${e.subscription.transport ? ` (${e.subscription.transport})` : ""}`
@@ -485,6 +538,7 @@ export function Canvas(props: CanvasProps) {
         markerEnd: arrowHead(16, className),
         className,
         label: e.id === hoverEdge && label ? truncate(label, 60) : undefined,
+        interactionWidth: 14,
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 4,
         zIndex: lit || e.id === hoverEdge ? 5 : 2,
@@ -526,8 +580,35 @@ export function Canvas(props: CanvasProps) {
           zIndex: s.at === at ? 10 : 6,
         };
       });
-    return [...regular, ...journeyOverlay];
+    // A previewed step with no use drawn between its boxes gets a line of its own.
+    const previewOverlay: RoutedEdge[] = (previewSteps ?? [])
+      .filter((s, i, all) => {
+        if (s.source === s.target) return false;
+        // One line per pair of boxes.
+        return all.findIndex((x) => x.source === s.source && x.target === s.target) === i;
+      })
+      .filter(
+        (s) =>
+          !layout.graph.edges.some(
+            (e) =>
+              (e.source === s.source && e.target === s.target) ||
+              (e.source === s.target && e.target === s.source),
+          ),
+      )
+      .map((s) => ({
+        id: `preview:${s.id}`,
+        type: "routed" as const,
+        source: s.source,
+        target: s.target,
+        data: { points: routeBetween.get(`${s.source}->${s.target}`) },
+        markerEnd: arrowHead(14, "rel is-lit"),
+        className: "rel is-lit is-preview",
+        zIndex: 5,
+      }));
+    return [...regular, ...journeyOverlay, ...previewOverlay];
   }, [
+    previewSteps,
+    hoverNode,
     layout,
     journey,
     steps,
@@ -550,7 +631,20 @@ export function Canvas(props: CanvasProps) {
     if (!layout || nodes.length === 0) return;
     if (firstFit.current) {
       firstFit.current = false;
-      requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 0 }));
+      // Fit what fits; a big map stays readable and pans instead of shrinking its labels away.
+      requestAnimationFrame(() => {
+        void flow
+          .fitView({ padding: 0.08, duration: 0, minZoom: READABLE, maxZoom: 1 })
+          .then(() => {
+            // Still too wide at a readable zoom: start from the left edge, where the map begins.
+            const pane = pane_.current?.getBoundingClientRect();
+            const bounds = flow.getNodesBounds(flow.getNodes());
+            const { y, zoom } = flow.getViewport();
+            if (pane && bounds.width * zoom > pane.width) {
+              void flow.setViewport({ x: 16 - bounds.x * zoom, y, zoom });
+            }
+          });
+      });
     }
   }, [layout, nodes.length, flow]);
 
@@ -575,7 +669,9 @@ export function Canvas(props: CanvasProps) {
   useEffect(() => {
     if (!layout || layout.source !== graph || lastFocus.current === view.focus) return;
     lastFocus.current = view.focus;
-    requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 450, maxZoom: 1.15 }));
+    requestAnimationFrame(
+      () => void flow.fitView({ padding: 0.15, duration: 450, minZoom: READABLE, maxZoom: 1.15 }),
+    );
   }, [layout, graph, view.focus, flow]);
 
   // Regrouping moves everything: show all of it.
@@ -584,7 +680,9 @@ export function Canvas(props: CanvasProps) {
     if (!layout || layout.source !== graph || lastBy.current === grouping?.by) return;
     lastBy.current = grouping?.by;
     if (centerOn) return;
-    requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 450 }));
+    requestAnimationFrame(
+      () => void flow.fitView({ padding: 0.08, duration: 450, minZoom: READABLE, maxZoom: 1 }),
+    );
   }, [layout, graph, grouping?.by, centerOn, flow]);
 
   // Move to a selected entry's (or field's) stores, tables, and arrows, once they're laid out.
@@ -641,6 +739,7 @@ export function Canvas(props: CanvasProps) {
 
   return (
     <ReactFlow
+      ref={pane_}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -665,6 +764,8 @@ export function Canvas(props: CanvasProps) {
       onPaneClick={() => props.onSelect(undefined)}
       onEdgeMouseEnter={(_, edge) => setHoverEdge(edge.id)}
       onEdgeMouseLeave={() => setHoverEdge(undefined)}
+      onNodeMouseEnter={(_, node) => setHoverNode(node.id)}
+      onNodeMouseLeave={() => setHoverNode(undefined)}
       nodesConnectable={false}
       elementsSelectable={false}
       colorMode="system"
@@ -673,17 +774,21 @@ export function Canvas(props: CanvasProps) {
     >
       <Background gap={24} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
-      <MiniMap pannable zoomable position="bottom-right" className="minimap" />
     </ReactFlow>
   );
 }
 
-/** Label, kind, and secondary line for a node key. */
+/**
+ * How a box reads on the map: its name, one line under it, and its shape. Kind
+ * is the shape (actors are pills, datastores have a lid, what lives elsewhere
+ * is dashed), not a label or a color; the kind itself is in the tooltip.
+ */
 export function describe(model: Model, key: string, grouping?: Grouping) {
   if (key.startsWith("group:")) {
     const g = grouping?.groups.get(key);
     return {
       family: "group" as const,
+      shape: "frame" as Shape,
       label: g?.label ?? key,
       kind: g?.id
         ? g.by === "team"
@@ -700,9 +805,10 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
     const a = model.actors.get(key.slice(6));
     return {
       family: "actor" as const,
+      shape: "pill" as Shape,
       label: a?.spec.name ?? a?.id ?? key,
       kind: a?.spec.kind ?? "actor",
-      detail: a?.spec.segment ?? a?.spec.description,
+      detail: a?.spec.segment,
       status: a?.spec.status,
       suggested: a?.spec.provenance?.source === "suggested",
     };
@@ -713,6 +819,7 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
     if (repo) {
       return {
         family: "element" as const,
+        shape: "box" as Shape,
         label: e?.spec.name ?? repo.namespace,
         kind: "repo",
         detail: e?.spec.description,
@@ -720,24 +827,49 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
         version: repo.version ?? repo.commit?.slice(0, 7),
       };
     }
+    const kind = e?.spec.kind ?? "element";
     return {
       family: "element" as const,
+      shape: (kind === "datastore" ? "store" : kind === "external" ? "dashed" : "box") as Shape,
       label: e?.spec.name ?? e?.key ?? key,
-      kind: e?.spec.kind ?? "element",
-      detail: e?.spec.technology ?? e?.spec.description,
+      kind,
+      detail: e?.spec.technology,
       status: e?.spec.status,
       suggested: e?.spec.provenance?.source === "suggested",
     };
   }
+  // Another repo's element: its name there, and the repo it's in.
   const ref = key.slice("external:".length);
+  const ns = ref.split(".")[0] ?? ref;
+  const other = new DataRegistry(model).models.get(ns);
+  const there = other?.elements.get(ref.slice(ns.length + 1));
   return {
     family: "external" as const,
-    label: ref,
-    kind: "external",
-    detail: "In another repo",
+    shape: (there?.spec.kind === "datastore" ? "store" : "dashed") as Shape,
+    dashed: true,
+    label: there?.spec.name ?? ref.slice(ns.length + 1),
+    kind: there?.spec.kind ?? "element",
+    detail: other?.name ?? ns,
     status: undefined,
   };
 }
+
+/** Actors are pills as wide as their names, so a row of them takes less room. */
+function fitActors(model: Model, graph: Graph): Graph {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n) => {
+      if (n.kind !== "actor" || n.size) return n;
+      const a = model.actors.get(n.id.slice(6));
+      const label = a?.spec.name ?? a?.id ?? n.id;
+      const width = Math.round(Math.min(NODE_WIDTH + 20, Math.max(130, label.length * 10.5 + 72)));
+      return { ...n, size: { width, height: NODE_HEIGHT } };
+    }),
+  };
+}
+
+/** The smallest zoom the map opens at, so a box's name is still at least 13px tall. */
+const READABLE = 0.75;
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
@@ -751,21 +883,21 @@ function truncate(s: string, n: number): string {
 function arrowHead(size: number, className: string) {
   const has = new Set(className.split(" "));
   const color = has.has("fk")
-    ? "var(--k-data)"
+    ? "var(--line-strong)"
     : has.has("journey")
       ? has.has("is-current")
-        ? "var(--brand)"
-        : "var(--brand-2)"
+        ? "var(--accent)"
+        : "var(--muted)"
       : has.has("is-flow")
-        ? "var(--k-data)"
+        ? "var(--accent)"
         : has.has("change-removed")
-          ? "var(--chg-removed)"
+          ? "var(--removed)"
           : has.has("change-changed")
-            ? "var(--chg-changed)"
+            ? "var(--changed)"
             : has.has("change-added")
-              ? "var(--chg-added)"
+              ? "var(--added)"
               : has.has("is-lit")
-                ? "var(--brand)"
-                : "var(--line-strong)";
+                ? "var(--accent)"
+                : "var(--edge)";
   return { type: MarkerType.ArrowClosed, width: size, height: size, color };
 }

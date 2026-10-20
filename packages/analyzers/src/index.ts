@@ -5,6 +5,16 @@ export {
   checkRepository,
 } from "./check.js";
 export { manifests } from "./manifests.js";
+export {
+  contextOf,
+  type LoadRevisionOptions,
+  loadRevision,
+  type Revision,
+  revisionOf,
+  type Snapshot,
+  type SnapshotOptions,
+  snapshot,
+} from "./revision.js";
 export { analyze, builtinAnalyzers } from "./run.js";
 export {
   builtinImporters,
@@ -17,5 +27,6 @@ export {
   type SchemaImporter,
   sql,
 } from "./schemas/index.js";
-export { tsImports } from "./ts-imports.js";
+export { indexCode, indexRepository, indexSource } from "./symbols.js";
+export { resolveSpecifier, tsImports } from "./ts-imports.js";
 export { packageNameOf, type WorkspacePackage, workspacePackages } from "./workspace.js";

@@ -1,3 +1,4 @@
+import { journeyBranches } from "../data/branches.js";
 import type { ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
 import { type Model, nodeKey, type Target } from "../model.js";
 
@@ -33,6 +34,8 @@ export interface ChangeDiagramInput {
   maxBoxes?: number;
   /** Consumers in other repos, drawn in a frame per repo. At most 8, breaking ones first. */
   remote?: RemoteUse[] | undefined;
+  /** False draws only what changed, without unchanged neighbors. Default true. */
+  context?: boolean | undefined;
 }
 
 /** A consumer in another repo, and what the change does to it. */
@@ -62,6 +65,10 @@ const LINK = {
   changed: "stroke:#9a6700,stroke-width:2px",
   context: "stroke:#afb8c1,stroke-width:1px",
 };
+
+/** For a diagram of only what changed. */
+export const CHANGE_LEGEND_SHORT =
+  "🟩 added · 🟨 changed · 🟥 removed · dotted arrow: suggested by an agent · red arrow: a consumer this change breaks";
 
 export const CHANGE_LEGEND =
   "🟩 added · 🟨 changed · 🟥 removed · ⬜ unchanged, for context · dotted arrow: suggested by an agent, waiting for review";
@@ -207,7 +214,9 @@ export function changeDiagram(input: ChangeDiagramInput): string | undefined {
     .filter(({ from, to }) => from !== to && (focus.has(from) || focus.has(to)));
   const neighborRank = (c: { from: string; to: string }) =>
     focus.has(c.from) && focus.has(c.to) ? 0 : c.from.startsWith("actor:") ? 1 : 2;
-  for (const c of context.sort((a, b) => neighborRank(a) - neighborRank(b))) {
+  for (const c of input.context === false
+    ? []
+    : context.sort((a, b) => neighborRank(a) - neighborRank(b))) {
     if (neighborRank(c) > 0 && boxes.size >= maxBoxes && !(boxes.has(c.from) && boxes.has(c.to)))
       continue;
     const { r } = c;
@@ -344,6 +353,8 @@ export interface JourneyDiagramInput {
   steps: number[];
   /** Steps the change added or removed, from the model diff. */
   changes?: StepChange[] | undefined;
+  /** For another repo's journey: the model it was found from, which may know its logic. */
+  from?: Model | undefined;
 }
 
 /**
@@ -380,23 +391,56 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
     return p.id;
   };
 
-  const body: string[] = [];
-  let inside = false;
-  j.steps.forEach((s, i) => {
+  // Steps that run only for one outcome of an earlier decision are drawn as
+  // alt / else blocks, labeled with the decision's conditions, so branches
+  // don't read as steps that all happen.
+  const items = journeyBranches(input.model, input.journeyId, input.from);
+  const branched = items.some((it) => it.kind === "branches");
+  const line = (i: number, indent: string) => {
+    const s = j.steps[i];
+    if (!s) return "";
     const n = i + 1;
     const from = participant(s.from, s.spec.from);
     const to = participant(s.to, s.spec.to);
-    if (affected.has(n) && !inside) {
-      body.push("  rect rgba(212, 167, 44, 0.18)");
-      inside = true;
-    } else if (!affected.has(n) && inside) {
-      body.push("  end");
-      inside = false;
+    const text = `${branched ? `${n}. ` : ""}${added.has(n) ? "🆕 " : ""}${message(s.spec.action ?? "")}`;
+    return `${indent}${from}->>${to}: ${wrap(text) || " "}`;
+  };
+  // Runs of steps the change passes through are highlighted.
+  const steps = (list: number[], indent: string): string[] => {
+    const out: string[] = [];
+    let inside = false;
+    for (const i of list) {
+      const hit = affected.has(i + 1);
+      if (hit && !inside) out.push(`${indent}rect rgba(212, 167, 44, 0.18)`);
+      else if (!hit && inside) out.push(`${indent}end`);
+      inside = hit;
+      out.push(line(i, inside ? `${indent}  ` : indent));
     }
-    const text = `${added.has(n) ? "🆕 " : ""}${message(s.spec.action ?? "")}`;
-    body.push(`  ${inside ? "  " : ""}${from}->>${to}: ${wrap(text) || " "}`);
-  });
-  if (inside) body.push("  end");
+    if (inside) out.push(`${indent}end`);
+    return out;
+  };
+  const body: string[] = [];
+  let plain: number[] = [];
+  const flush = () => {
+    body.push(...steps(plain, "  "));
+    plain = [];
+  };
+  for (const it of items) {
+    if (it.kind === "step") {
+      plain.push(it.index);
+      continue;
+    }
+    flush();
+    it.outcomes
+      .filter((o) => o.steps.length > 0)
+      .forEach((o, k) => {
+        const head = `${o.name}${o.condition ? `: ${readable(o.condition)}` : ""}`;
+        body.push(`  ${k === 0 ? "alt" : "else"} ${message(head)}`);
+        body.push(...steps(o.steps, "    "));
+      });
+    body.push("  end");
+  }
+  flush();
   for (const r of removed) {
     const from = participant(undefined, r.from);
     const to = participant(undefined, r.to);
@@ -405,11 +449,21 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
     );
   }
 
-  const lines = ["sequenceDiagram", "  autonumber"];
+  const lines = branched ? ["sequenceDiagram"] : ["sequenceDiagram", "  autonumber"];
   for (const p of participants.values()) {
     lines.push(`  ${p.actor ? "actor" : "participant"} ${p.id} as ${message(p.label)}`);
   }
   return [...lines, ...body].join("\n");
+}
+
+/** A CEL condition with comparison operators Mermaid can show. */
+function readable(cel: string): string {
+  return cel
+    .replace(/<=/g, "≤")
+    .replace(/>=/g, "≥")
+    .replace(/!=/g, "≠")
+    .replace(/</g, "＜")
+    .replace(/>/g, "＞");
 }
 
 function boxKey(t: Target, shown: (id: string) => string): string {

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { posix, relative, resolve } from "node:path";
 import { promisify } from "node:util";
+import { TRACES_DIR } from "@archdoc/spec";
 import type { Model } from "../model.js";
 import { buildModel, type ModelSource } from "./build.js";
 import { type LoadOptions, readModelSources } from "./fs.js";
@@ -122,6 +123,8 @@ export async function readModelSourcesAtRef(
   const files = listing
     .split("\0")
     .filter((f) => /\.ya?ml$/.test(f) && !/(^|\/)archdoc\.lock$/.test(f))
+    // Traces are evidence of one run, never part of the model.
+    .filter((f) => !f.startsWith(`${rel ? `${rel}/` : ""}${TRACES_DIR}/`))
     .filter(
       (f) =>
         !f

@@ -2,6 +2,7 @@ import type { ProvideSpec } from "@archdoc/spec";
 import type { Change, ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
 import { contractName } from "../load/build.js";
 import type { Target } from "../model.js";
+import { counted, TERMS } from "./words.js";
 
 export type DiffFormat = "text" | "markdown" | "mermaid" | "json";
 
@@ -50,11 +51,12 @@ export function summary(diff: ModelDiff): string {
   for (const section of SECTIONS) {
     const list = diff[section] as Change<unknown>[];
     if (list.length === 0) continue;
+    // "2 elements added, 1 changed": the noun goes with the first count.
     const counts = (["added", "changed", "moved", "removed"] as const)
       .map((k) => [k, list.filter((c) => c.kind === k).length] as const)
       .filter(([, n]) => n > 0)
-      .map(([k, n]) => `${n} ${k}`);
-    parts.push(`${section} ${counts.join(", ")}`);
+      .map(([k, n], i) => (i === 0 ? `${counted(section, n)} ${k}` : `${n} ${k}`));
+    parts.push(counts.join(", "));
   }
   return parts.join("; ");
 }
@@ -276,8 +278,8 @@ function ref(t: Target): string {
   return t.type === "external" ? t.ref : t.id;
 }
 
-function title(section: string): string {
-  return section.charAt(0).toUpperCase() + section.slice(1);
+function title(section: (typeof SECTIONS)[number]): string {
+  return TERMS[section].title;
 }
 
 function markdownSymbol(kind: Change<unknown>["kind"]): string {

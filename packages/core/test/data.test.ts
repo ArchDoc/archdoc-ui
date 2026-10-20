@@ -528,10 +528,16 @@ describe("data in diffs and the PR report", () => {
       "accepts app → charges RefundRequest: phone",
       "returns charges → app Refund: card_last4",
     ]);
-    expect(r.markdown).toContain("### Data");
+    expect(r.markdown).toContain("<details><summary>Data</summary>");
     expect(r.markdown).toContain(
       "> [!CAUTION]\n> This change sends sensitive data to an external element",
     );
+    expect(r.attention.filter((c) => c.code === "data/sensitive").map((c) => c.title)).toEqual([
+      "Sends sensitive data outside the system",
+      "Sends sensitive data outside the system",
+      "Sends sensitive data somewhere new",
+      "Sends sensitive data somewhere new",
+    ]);
     expect(r.markdown).toContain(
       "| `RefundRequest` | rider_email (pii), phone (pii) | `app` → `analytics` (external) | sends |",
     );

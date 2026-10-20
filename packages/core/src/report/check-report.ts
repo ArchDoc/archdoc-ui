@@ -54,3 +54,36 @@ export function formatFindings(
   );
   return out.join("\n");
 }
+
+/**
+ * GitHub Actions workflow commands that put findings on the diff, at the line
+ * they're about: the code line for a dependency the model doesn't declare,
+ * the model line for the rest. With `introducedOnly`, only what the change
+ * introduced.
+ */
+export function formatAnnotations(findings: MarkedFinding[], introducedOnly = true): string {
+  const esc = (s: string) => s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  const prop = (s: string) => esc(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
+  const lines: string[] = [];
+  for (const f of findings) {
+    if (introducedOnly && f.introduced === false) continue;
+    if (f.severity === "info") continue;
+    // Evidence reads like packages/web/src/x.ts:12 (@archdoc/cli).
+    const evidence = f.evidence[0]?.match(/^([^\s:]+):(\d+)/);
+    const [file, line] =
+      f.code === "drift/undeclared-dependency" && evidence
+        ? [evidence[1], Number(evidence[2])]
+        : f.location
+          ? [f.location.file, f.location.line]
+          : evidence
+            ? [evidence[1], Number(evidence[2])]
+            : [f.files[0], undefined];
+    const props = [
+      file ? `file=${prop(file)}` : "",
+      line ? `line=${line}` : "",
+      `title=${prop(`ArchDoc ${f.rule ? `rule ${f.rule}` : f.code}`)}`,
+    ].filter(Boolean);
+    lines.push(`::${f.severity} ${props.join(",")}::${esc(f.message)}`);
+  }
+  return lines.join("\n");
+}

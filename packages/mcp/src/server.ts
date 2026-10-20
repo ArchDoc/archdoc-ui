@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import { checkRepository } from "@archdoc/analyzers";
+import { checkRepository, indexRepository, loadRevision } from "@archdoc/analyzers";
 import {
+  anchorError,
+  checkTrace,
+  context,
   diffModels,
   formatActor,
+  formatAnchors,
   formatCode,
+  formatContext,
   formatData,
   formatDiagnostics,
   formatDiff,
@@ -17,17 +22,24 @@ import {
   formatOverview,
   formatSearch,
   formatSimulation,
+  formatTrace,
+  formatTraceChecks,
   getElement,
   impact,
   type LoadedModel,
   lineage,
+  listRepoFiles,
   loadModel,
-  loadModelAtRef,
+  loadTraces,
   locate,
   propose,
+  prReport,
+  readTraceSources,
   resolveRef,
   search,
   simulate,
+  traceSkeleton,
+  tracesInChange,
 } from "@archdoc/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -43,15 +55,17 @@ export interface ArchdocServerOptions {
 export const INSTRUCTIONS = `This repository has an ArchDoc architecture model in .archdoc/: who uses the system (actors), what it's made of (elements, each mapped to code paths), and how people use it (journeys). People own it. It's the fastest way to find where code lives and what a change affects.
 
 Start every coding task here, before you grep or read files:
-1. Call archdoc_search with a few words for the area you're changing (for example "cli command"). It returns the elements involved and their code paths, so you know where to look.
-2. Call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules.
+1. Call archdoc_context with the task in a few words, or the files you plan to change (or both). It returns the files and functions to open first, other code that does the same job (other callers of the same functions, which a fix usually needs too), the data, rules, and journeys involved, the tests to run, and owners.
+2. For the wider blast radius, call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules. archdoc_search finds elements, journeys, and files by words when you only need where something lives.
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
 archdoc_locate tells you which element owns a file. archdoc_code returns the code a component points at, with the text of its snippets, so read it before searching the files yourself.
 
 When a change touches data (what a component sends or stores, how a record is mapped, or a decision such as an approval rule), call archdoc_data on the entry to see its fields, classifications, and where it's stored and sent; archdoc_lineage on a field to see every place its value is copied or derived, across repos; and archdoc_simulate to see which branch a journey takes for a sample request and which records it writes.
 
-After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Use archdoc_diff to describe your model changes in the PR.`;
+When you're asked to explain or fix a bug, call archdoc_anchor with the error (a log line, a stack trace, or the wrong output). It names the journey step it showed up in and the elements involved, and starts a trace for you. Follow the code from there, write the path the failing request took to .archdoc/traces/<id>.yaml with evidence on every step, and call archdoc_trace_check on it. Commit it with the fix.
+
+After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Before you open a PR, call archdoc_report with the same base: it gives the verdict the PR comment will give, with what blocks the merge and how to fix it. Use it, and archdoc_diff for model changes, in the PR description.`;
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 
@@ -63,7 +77,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     { instructions: INSTRUCTIONS },
   );
 
-  const withModel = async (fn: (model: LoadedModel) => string) => {
+  const withModel = async (fn: (model: LoadedModel) => string | Promise<string>) => {
     const model = await loadModel(options.model ?? ".", { cwd });
     if (model.diagnostics.some((d) => d.code === "model/not-found")) {
       return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
@@ -73,7 +87,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       ? `\n\nNote: the model has ${errors} error(s), so this may be incomplete. Call archdoc_validate for details.`
       : "";
     try {
-      return text(fn(model) + note);
+      return text((await fn(model)) + note);
     } catch (err) {
       return error(err instanceof Error ? err.message : String(err));
     }
@@ -116,7 +130,42 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       },
       annotations: READ_ONLY,
     },
-    ({ query }) => withModel((m) => formatSearch(query, search(m, query, 8))),
+    ({ query }) =>
+      withModel(async (m) =>
+        formatSearch(query, search(m, query, 8, await indexRepository(m.baseDir))),
+      ),
+  );
+
+  server.registerTool(
+    "archdoc_context",
+    {
+      title: "Where to start a task",
+      description:
+        "A short brief for starting a task, before you grep: the files and functions to open first (ranked, with line numbers), other code that does the same job (other callers of the functions the start files use), data, rules, the narrowest journeys (those whose steps name the files), tests to run, and owners. Pass the task in a few words, the files you plan to change, or both.",
+      inputSchema: {
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'The task in a few words, such as "pr report shows type undefined for data fields"',
+          ),
+        paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Files or directories you plan to change, relative to the repository root or absolute",
+          ),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ query, paths }) =>
+      withModel(async (m) => {
+        if (!query?.trim() && !paths?.length) throw new Error("Pass a query, paths, or both.");
+        const index = await indexRepository(m.baseDir);
+        return formatContext(
+          context(m, query ?? "", { index, paths: paths?.map((p) => repoPath(m, p)) }),
+        );
+      }),
   );
 
   server.registerTool(
@@ -197,15 +246,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       withModel((m) => {
         const e = getElement(m, id)?.element;
         if (!e) throw new Error(notFound(m, id, "element"));
-        return formatCode(e.id, e.code, (path) => {
-          const absolute = resolve(m.baseDir, path);
-          if (relative(m.baseDir, absolute).startsWith("..")) return undefined;
-          try {
-            return readFileSync(absolute, "utf8");
-          } catch {
-            return undefined;
-          }
-        });
+        return formatCode(e.id, e.code, (path) => readRepoFile(m.baseDir, path));
       }),
   );
 
@@ -384,13 +425,48 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     async ({ base, format }) => {
       try {
         const ref = base ?? "HEAD";
-        const [before, after] = await Promise.all([
-          loadModelAtRef(options.model ?? ".", ref, { cwd }),
-          loadModel(options.model ?? ".", { cwd }),
-        ]);
+        const at = async (r: string | undefined) => {
+          const rev = await loadRevision(options.model ?? ".", { cwd, ref: r });
+          if (!rev) throw new Error("No ArchDoc model here. Expected .archdoc/archdoc.yaml.");
+          return rev.model;
+        };
+        const [before, after] = await Promise.all([at(ref), at(undefined)]);
         return text(
           formatDiff(diffModels(before, after), format ?? "text", `${ref} → working tree`),
         );
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_report",
+    {
+      title: "Architectural impact of your change",
+      description:
+        'The verdict the pull request comment will give your change since base (such as "main"): what blocks the merge and how to fix it, what to check, who to involve, the journeys and other repos it affects, and drift it introduced. Call it before you open a PR, fix what blocks, and use it for the PR description.',
+      inputSchema: {
+        base: z.string().describe("Branch or commit the change is compared with, such as main"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ base }) => {
+      try {
+        const checked = await checkRepository({ model: options.model, cwd, base });
+        if (!checked.base) return error(`Couldn't read the model at ${base}.`);
+        const { traces } = loadTraces(await readTraceSources(options.model ?? ".", { cwd }));
+        const r = prReport({
+          model: checked.model,
+          base: checked.base.model,
+          changedFiles: checked.base.changedFiles,
+          diff: diffModels(checked.base.model, checked.model),
+          findings: checked.findings,
+          diagrams: false,
+          fixes: tracesInChange(checked.base.changedFiles, traces),
+          label: `${base}...working tree`,
+        });
+        return text(r.markdown.replace(/^<!--.*-->\n?/gm, ""));
       } catch (err) {
         return error(err instanceof Error ? err.message : String(err));
       }
@@ -480,6 +556,88 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
   );
 
   server.registerTool(
+    "archdoc_anchor",
+    {
+      title: "Where an error belongs",
+      description:
+        "Map an error (a log line, a stack trace, or wrong output) onto the model: the elements its stack frames and paths point at, the journey steps it most likely showed up in (best first, with why), and a trace to start from. Call it first when you're asked to explain or fix a bug.",
+      inputSchema: {
+        text: z
+          .string()
+          .min(1)
+          .describe("The error, log lines, or stack trace, as the user gave it"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .optional()
+          .describe("Journey steps to list (default 5)"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ text: errorText, limit }) => {
+      const model = await loadModel(options.model ?? ".", { cwd });
+      if (model.diagnostics.some((d) => d.code === "model/not-found")) {
+        return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
+      }
+      const files = await listRepoFiles(model.baseDir);
+      const result = anchorError(model, errorText, { files, root: model.baseDir, limit });
+      return text(formatAnchors(result, traceSkeleton(result, errorText)));
+    },
+  );
+
+  server.registerTool(
+    "archdoc_trace_check",
+    {
+      title: "Check a trace",
+      description:
+        "Check a trace (the path a failing request took, in .archdoc/traces/<id>.yaml) against the model and the code: its elements, the journey step it expands, code references, and hops the model doesn't declare. Returns the findings and the trace resolved against the model. Pass the YAML you're writing, a path, or nothing to check every trace.",
+      inputSchema: {
+        trace: z.string().optional().describe("A trace's YAML, to check before you save it"),
+        path: z
+          .string()
+          .optional()
+          .describe("A trace file, relative to the repository root or absolute"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ trace, path }) => {
+      try {
+        const model = await loadModel(options.model ?? ".", { cwd });
+        if (model.diagnostics.some((d) => d.code === "model/not-found")) {
+          return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
+        }
+        const sources =
+          trace !== undefined
+            ? [{ path: "trace.yaml", text: trace }]
+            : path
+              ? [
+                  {
+                    path: repoPath(model, path),
+                    text: readFileSync(resolve(model.baseDir, repoPath(model, path)), "utf8"),
+                  },
+                ]
+              : await readTraceSources(options.model ?? ".", { cwd });
+        const { traces, diagnostics } = loadTraces(sources);
+        const files = await listRepoFiles(model.baseDir);
+        const inRepo = new Set(files);
+        const checks = traces.map((t) =>
+          checkTrace(model, t, {
+            files,
+            read: (p) => (inRepo.has(p) ? readRepoFile(model.baseDir, p) : undefined),
+          }),
+        );
+        const out = [formatTraceChecks(checks, diagnostics)];
+        if (trace !== undefined || path) for (const c of checks) out.push("", formatTrace(c.view));
+        return text(out.join("\n"));
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
     "archdoc_validate",
     {
       title: "Validate the model",
@@ -495,6 +653,17 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
   );
 
   return server;
+}
+
+/** A file in the repository, or undefined when there's none (or it's outside it). */
+function readRepoFile(baseDir: string, path: string): string | undefined {
+  const absolute = resolve(baseDir, path);
+  if (relative(baseDir, absolute).startsWith("..")) return undefined;
+  try {
+    return readFileSync(absolute, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 function notFound(model: LoadedModel, id: string, what: string): string {

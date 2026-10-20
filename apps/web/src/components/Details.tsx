@@ -1,48 +1,38 @@
 import {
-  describeTarget,
-  diffSummary,
+  DataRegistry,
   filesUnder,
   getActor,
   getElement,
   type JourneyNode,
   type Model,
   nodeKey,
-  overview,
   type Relationship,
-  type Simulation,
   type Target,
 } from "@archdoc/core/browser";
-import { type ReactNode, useEffect, useRef } from "react";
-import { hasData } from "../graph/data.js";
+import type { ReactNode } from "react";
 import type { Compare } from "../model/compare.js";
+import { targetLabel } from "../model/stories.js";
 import type { LandscapeInfo } from "../model/useModel.js";
-import { type CodeContext, CodeSection, StepCode } from "./code.js";
-import { DataDetails, FieldDetails, SimulatePanel, StepMessagePanel } from "./DataPanels.js";
+import { type CodeContext, CodeSection } from "./code.js";
+import { DataDetails, FieldDetails } from "./DataPanels.js";
 
 export interface DetailsProps {
   model: Model;
   selected?: string | undefined;
-  journey?: JourneyNode | undefined;
-  step: number;
   focused: boolean;
   expanded: ReadonlySet<string>;
   onSelect: (key: string) => void;
   onJourney: (id: string) => void;
-  onStep: (step: number) => void;
   onFocus: (on: boolean) => void;
   onToggle: (elementId: string) => void;
   code: CodeContext;
   compare?: Compare | undefined;
   landscape?: LandscapeInfo | undefined;
-  samples?: { path: string; text: string }[];
-  simulation?: Simulation | undefined;
-  /** Run the journey on a sample, named by `label`; undefined runs example data. */
-  onSimulate?: (sample: Record<string, unknown> | undefined, label: string) => void;
 }
 
+/** What's selected: an element, actor, other repo's element, domain, data entry, or field. */
 export function Details(props: DetailsProps) {
-  const { model, selected, journey } = props;
-  if (journey) return <JourneyDetails {...props} journey={journey} />;
+  const { model, selected } = props;
   if (selected?.startsWith("element:") && !model.elements.has(selected.slice(8)) && props.compare) {
     return <RemovedDetails {...props} compare={props.compare} id={selected} />;
   }
@@ -56,40 +46,7 @@ export function Details(props: DetailsProps) {
   if (selected?.startsWith("field:"))
     return <FieldDetails model={model} field={selected.slice(6)} onSelect={props.onSelect} />;
 
-  const o = overview(model);
-  return (
-    <div className="details">
-      <p className="eyebrow">
-        {props.landscape
-          ? `Landscape · ${props.landscape.repos.length} repos`
-          : `Model · ${model.namespace}`}
-      </p>
-      <h1>{model.name ?? model.namespace}</h1>
-      {model.description ? <p className="lede">{model.description}</p> : null}
-      {props.compare ? (
-        <div className="changes-summary">
-          <p className="eyebrow">Changes since {props.compare.ref}</p>
-          <p>{diffSummary(props.compare.diff) || "The model didn't change."}</p>
-          {props.compare.journeys.size ? (
-            <p className="muted">Journeys affected: {[...props.compare.journeys].join(", ")}</p>
-          ) : null}
-        </div>
-      ) : null}
-      <dl className="stats">
-        <Stat n={o.counts.actors} label="actors" />
-        <Stat n={o.counts.elements} label="elements" />
-        <Stat n={o.counts.relationships} label="relationships" />
-        <Stat n={o.counts.journeys} label="journeys" />
-      </dl>
-      <div className="hint">
-        <p>
-          Click a box to see what it is, what it uses, and who uses it. Double-click (or use the{" "}
-          <kbd>+</kbd> badge) to open a box and see what's inside.
-        </p>
-        <p>Pick a journey on the left to follow how an actor reaches a goal, step by step.</p>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 function ElementDetails(props: DetailsProps & { id: string }) {
@@ -253,75 +210,25 @@ function ExternalDetails(props: DetailsProps & { ref_: string }) {
     (r) => r.to.type === "external" && r.to.ref === props.ref_,
   );
   const ns = props.ref_.split(".")[0] ?? "";
+  const other = new DataRegistry(props.model).models.get(ns);
+  const there = other?.elements.get(props.ref_.slice(ns.length + 1));
   const source = props.model.imports[ns];
   return (
     <div className="details">
-      <p className="eyebrow">In another repo · {ns}</p>
-      <h1>{props.ref_}</h1>
-      {source ? <Chips items={[Object.values(source).join(" @ ")]} /> : null}
-      <p className="lede">
-        This lives in the <code>{ns}</code> namespace, which this model imports. Its details will
-        appear here once models can be federated across repos.
+      <p className="eyebrow">
+        {there?.spec.kind ?? "Element"} in {other?.name ?? ns}
       </p>
-      <RelList title="Used by" rels={usedBy} side="from" {...props} />
-    </div>
-  );
-}
-
-function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
-  const { journey, step } = props;
-  // Keep the current step in view as the journey plays.
-  const list = useRef<HTMLOListElement>(null);
-  useEffect(() => {
-    list.current?.children[step]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [step]);
-  return (
-    <div className="details">
-      <p className="eyebrow">Journey · {journey.spec.importance ?? "normal"}</p>
-      <h1>{journey.spec.name ?? journey.id}</h1>
-      <Chips items={[statusLabel(journey.spec.status)]} />
-      <p className="lede">{journey.spec.goal}</p>
-      {journey.spec.description ? <p>{journey.spec.description}</p> : null}
-      <Block title="Actor">
-        <Links
-          items={[{ key: `actor:${journey.spec.actor}`, label: journey.spec.actor }]}
-          onSelect={props.onSelect}
-        />
-      </Block>
-      <Block title="Steps">
-        <ol className="steps" ref={list}>
-          {journey.steps.map((s) => (
-            <li key={s.index} className={s.index === step ? "is-current" : ""}>
-              <button type="button" onClick={() => props.onStep(s.index)}>
-                <span className="step-path">
-                  {s.from ? describeTarget(s.from) : s.spec.from} →{" "}
-                  {s.to ? describeTarget(s.to) : s.spec.to}
-                </span>
-                {s.spec.action ? <span className="step-action">{s.spec.action}</span> : null}
-                {s.spec.code ? <StepCode step={s} ctx={props.code} /> : null}
-              </button>
-              <StepMessagePanel
-                model={props.model}
-                journey={journey}
-                index={s.index}
-                current={s.index === step}
-                simulation={props.simulation}
-                onSelect={props.onSelect}
-              />
-            </li>
-          ))}
-        </ol>
-      </Block>
-      {hasData(journey) && props.onSimulate ? (
-        <SimulatePanel
-          model={props.model}
-          journey={journey}
-          samples={props.samples ?? []}
-          simulation={props.simulation}
-          onSimulate={props.onSimulate}
-          onStep={props.onStep}
-        />
+      <h1>{targetLabel(props.model, { type: "external", namespace: ns, ref: props.ref_ })}</h1>
+      <Chips
+        items={[there?.spec.technology, source ? Object.values(source).join(" @ ") : undefined]}
+      />
+      {there?.spec.description ? <p className="lede">{there.spec.description}</p> : null}
+      {there?.spec.owners?.length ? (
+        <Block title="Owners">
+          <p>{there.spec.owners.join(", ")}</p>
+        </Block>
       ) : null}
+      <RelList title="Used by" rels={usedBy} side="from" {...props} />
     </div>
   );
 }
@@ -515,15 +422,6 @@ function Actions({ children }: { children: ReactNode }) {
   return <div className="actions">{children}</div>;
 }
 
-function Stat({ n, label }: { n: number; label: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{n}</dd>
-    </div>
-  );
-}
-
 function Missing() {
   return (
     <div className="details">
@@ -533,9 +431,7 @@ function Missing() {
 }
 
 function labelOf(model: Model, t: Target): string {
-  if (t.type === "external") return t.ref;
-  if (t.type === "actor") return model.actors.get(t.id)?.spec.name ?? t.id;
-  return model.elements.get(t.id)?.spec.name ?? t.id;
+  return targetLabel(model, t);
 }
 
 function statusLabel(status: string | undefined) {

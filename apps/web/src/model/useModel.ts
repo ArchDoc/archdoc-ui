@@ -10,6 +10,7 @@ import {
   type SnippetPlace,
 } from "@archdoc/core/browser";
 import { useCallback, useEffect, useState } from "react";
+import type { ChangeFindings } from "./compare.js";
 
 /** What `archdoc view` serves at /api/model. */
 export interface ModelPayload {
@@ -22,8 +23,12 @@ export interface ModelPayload {
   /** Where each code snippet is, by snippetKey, so a symbol links to its lines. */
   snippets?: Record<string, SnippetPlace>;
   repo?: RepoLinks;
-  /** With `archdoc view --base <ref>`: the model's files at that ref. */
-  base?: { ref: string; commit: string; root: string; sources: ModelSource[] };
+  /** With `archdoc view --base <ref>`: the model at the merge base with that ref, read like this one. */
+  base?: { ref: string; commit?: string; root: string; sources: ModelSource[] } & Partial<
+    Pick<ModelPayload, "schemas" | "federation">
+  >;
+  /** With a base: what the change introduced, found with the code, as `archdoc report` finds it. */
+  change?: ChangeFindings;
   /** A composed landscape (`archdoc view --landscape`, `archdoc landscape build`): its repos and domains. */
   landscape?: LandscapeInfo;
   /** Other repos' models, as archdoc.lock pins them. */
@@ -40,6 +45,8 @@ export interface ModelPayload {
   };
   /** Sample records for simulating journeys. */
   samples?: { path: string; text: string }[];
+  /** Bug traces beside the model (.archdoc/traces/*.yaml), for the trace view. Never part of the model. */
+  traces?: { path: string; text: string }[];
   /** What data entries' schema sources say, to fill in what the model leaves out. */
   schemas?: ImportedSchema[];
 }
@@ -74,10 +81,11 @@ export type ModelState =
       snippets: Record<string, SnippetPlace>;
       repo: RepoLinks;
       /** The model at the base ref, for the before/after view. */
-      base?: { ref: string; model: Model } | undefined;
+      base?: { ref: string; model: Model; change?: ChangeFindings | undefined } | undefined;
       /** Set when the model is a composed landscape. */
       landscape?: LandscapeInfo | undefined;
       samples: { path: string; text: string }[];
+      traces: { path: string; text: string }[];
       loadedAt: number;
       reloads: number;
     };
@@ -134,12 +142,12 @@ export function useModel(): ModelState {
         repo: payload.repo ?? {},
         base: payload.base && {
           ref: payload.base.ref,
-          model: payload.base.sources.length
-            ? buildModel(payload.base.sources, { root: payload.base.root })
-            : buildModel([]),
+          model: payload.base.sources.length ? modelOf(payload.base) : buildModel([]),
+          change: payload.change,
         },
         landscape: payload.landscape,
         samples: payload.samples ?? [],
+        traces: payload.traces ?? [],
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

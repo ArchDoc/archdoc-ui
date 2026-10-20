@@ -1,5 +1,6 @@
 import { buildModel, type Model, type ModelSource } from "@archdoc/core/browser";
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeFindings } from "./compare.js";
 import { type ModelPayload, modelOf, type RepoLinks } from "./useModel.js";
 
 /** The branches `archdoc view` can compare. Undefined on a static host, which has no git. */
@@ -37,21 +38,26 @@ export type Compared =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; base: Model; head?: Head | undefined };
+  | {
+      status: "ready";
+      base: Model;
+      head?: Head | undefined;
+      /** What the server found comparing them with the code. */
+      change?: ChangeFindings | undefined;
+    };
 
 /** A branch as the Changes tab shows it: its model, and the files and samples at its commit. */
 export interface Head {
   ref: string;
   model: Model;
-  /** The model's files alone, to diff as the base is diffed. */
-  sources: { root: string; sources: ModelSource[] };
   files: string[];
   snippets: NonNullable<ModelPayload["snippets"]>;
   repo: RepoLinks;
   samples: { path: string; text: string }[];
+  traces: { path: string; text: string }[];
 }
 
-interface Sources {
+interface Sources extends Partial<ModelPayload> {
   ref: string;
   root: string;
   sources: ModelSource[];
@@ -60,7 +66,7 @@ interface Sources {
 /** The model at each side of the pair, read from git by the view server. */
 export function useCompared(
   pair: Pair | undefined,
-  preset: { ref: string; model: Model } | undefined,
+  preset: { ref: string; model: Model; change?: ChangeFindings | undefined } | undefined,
 ): Compared {
   const [state, setState] = useState<Compared>(IDLE);
   // What the page loaded with needs no request, so it also works on a static host.
@@ -78,11 +84,16 @@ export function useCompared(
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
           base?: Sources;
-          head?: Sources & Partial<ModelPayload>;
+          head?: Sources;
+          change?: ChangeFindings;
         };
         if (!res.ok || !body.base)
           throw new Error(body.error ?? `The server answered ${res.status}.`);
-        return { base: build(body.base), head: body.head && head(body.head) };
+        return {
+          base: build(body.base),
+          head: body.head && head(body.head),
+          change: body.change,
+        };
       })
       .then(
         (models) => !cancelled && setState({ status: "ready", ...models }),
@@ -94,9 +105,9 @@ export function useCompared(
       cancelled = true;
     };
   }, [pair, fromPreset]);
-  const presetModel = fromPreset ? preset?.model : undefined;
+  const presetModel = fromPreset ? preset : undefined;
   const ready = useMemo<Compared | undefined>(
-    () => presetModel && { status: "ready", base: presetModel },
+    () => presetModel && { status: "ready", base: presetModel.model, change: presetModel.change },
     [presetModel],
   );
   if (!pair) return IDLE;
@@ -105,35 +116,87 @@ export function useCompared(
 
 const IDLE: Compared = { status: "idle" };
 
-function head(p: Sources & Partial<ModelPayload>): Head {
+function head(p: Sources): Head {
   return {
     ref: p.ref,
     model: modelOf(p),
-    sources: { root: p.root, sources: p.sources },
     files: p.files ?? [],
     snippets: p.snippets ?? {},
     repo: p.repo ?? {},
     samples: p.samples ?? [],
+    traces: p.traces ?? [],
   };
 }
 
 function build(s: Sources): Model {
-  return s.sources.length ? buildModel(s.sources, { root: s.root }) : buildModel([]);
+  return s.sources.length ? modelOf(s) : buildModel([]);
 }
 
-/** The pair in the address, such as #changes=main...feature, so a link opens the same comparison. */
-export function readHash(): { tab?: "changes"; pair?: Pair } {
-  const match = /(?:^#|&)changes(?:=([^&]*))?/.exec(window.location.hash);
-  if (!match) return {};
-  const [base, head] = decodeURIComponent(match[1] ?? "").split("...");
-  return { tab: "changes", pair: base ? { base, head: head || undefined } : undefined };
+/** The explorer's tabs. */
+export type Tab = "overview" | "journeys" | "traces" | "data" | "changes";
+
+/** What the address says to open. */
+export interface HashState {
+  tab?: Tab | undefined;
+  pair?: Pair | undefined;
+  /** The open journey on the Journeys tab. */
+  journey?: string | undefined;
+  /** The selected entry or field on the Data tab, as data:<entry> or field:<entry.field>. */
+  data?: string | undefined;
+  /** The open trace on the Traces tab. */
+  trace?: string | undefined;
 }
 
-export function writeHash(tab: "explore" | "changes", pair: Pair | undefined) {
-  const hash =
-    tab === "changes"
-      ? `#changes${pair ? `=${encodeURIComponent(pair.base)}${pair.head ? `...${encodeURIComponent(pair.head)}` : ""}` : ""}`
-      : "";
+/**
+ * What the address opens, such as #changes=main...feature (so a link opens the
+ * same comparison), #journeys=request-refund, or #data=payments.Refund.
+ */
+export function readHash(hash = window.location.hash): HashState {
+  const parts = hash.replace(/^#/, "").split("&").filter(Boolean);
+  for (const part of parts) {
+    const eq = part.indexOf("=");
+    const name = eq < 0 ? part : part.slice(0, eq);
+    const value = eq < 0 ? "" : decodeURIComponent(part.slice(eq + 1));
+    if (name === "changes") {
+      const [base, head] = value.split("...");
+      return { tab: "changes", pair: base ? { base, head: head || undefined } : undefined };
+    }
+    if (name === "journeys") return { tab: "journeys", journey: value || undefined };
+    if (name === "traces") return { tab: "traces", trace: value || undefined };
+    if (name === "data") {
+      const data = value
+        ? value.split(".").length > 2
+          ? `field:${value}`
+          : `data:${value}`
+        : undefined;
+      return { tab: "data", data };
+    }
+    if (name === "overview") return { tab: "overview" };
+  }
+  return {};
+}
+
+/** The address for what's open; the Overview has none. */
+export function hashOf(state: HashState): string {
+  const pair = state.pair;
+  switch (state.tab) {
+    case "changes":
+      return `#changes${pair ? `=${encodeURIComponent(pair.base)}${pair.head ? `...${encodeURIComponent(pair.head)}` : ""}` : ""}`;
+    case "traces":
+      return `#traces${state.trace ? `=${encodeURIComponent(state.trace)}` : ""}`;
+    case "journeys":
+      return `#journeys${state.journey ? `=${encodeURIComponent(state.journey)}` : ""}`;
+    case "data": {
+      const entry = state.data?.replace(/^(data|field):/, "");
+      return `#data${entry ? `=${encodeURIComponent(entry)}` : ""}`;
+    }
+    default:
+      return "";
+  }
+}
+
+export function writeHash(state: HashState) {
+  const hash = hashOf(state);
   if (window.location.hash === hash) return;
   window.history.replaceState(
     null,

@@ -37,6 +37,7 @@ export {
   snippetKey,
   snippetLabel,
 } from "./codemap/snippet.js";
+export { type BranchOutcome, type JourneyItem, journeyBranches } from "./data/branches.js";
 export {
   compile as compileCel,
   evaluate as evaluateCel,
@@ -117,6 +118,7 @@ export {
 } from "./diff/diff.js";
 export {
   type BundleMeta,
+  bundleSchemas,
   createBundle,
   modelFromBundle,
   parseBundle,
@@ -154,15 +156,48 @@ export * from "./model.js";
 export { insertIntoMap } from "./propose/insert.js";
 export { type ProposalEdit, type ProposalPlan, planProposal } from "./propose/propose.js";
 export {
+  type CodeIndex,
+  fileStem,
+  filesNamed,
+  type IndexedImport,
+  type IndexedSource,
+  type IndexedSymbol,
+  isTestFile,
+  pointAt,
+  type RankedFile,
+  rankFiles,
+  type SymbolKind,
+} from "./query/code-index.js";
+export {
+  type ContextBrief,
+  type ContextCallSite,
+  type ContextInputs,
+  type ContextJourney,
+  type ContextSameJob,
+  type ContextStart,
+  context,
+} from "./query/context.js";
+export {
+  type EvalCase,
+  type EvalCommit,
+  type EvalReport,
+  evaluate,
+  isEvalSource,
+  subjectQuery,
+} from "./query/eval.js";
+export {
   type AffectedJourney,
   type Impact,
   type ImpactConsumer,
   type ImpactResult,
   impact,
+  rulesMentioning,
 } from "./query/impact.js";
 export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
-export { formatFindings, type MarkedFinding } from "./report/check-report.js";
+export { queryTerms, sameWord, splitIdentifier } from "./query/terms.js";
+export { formatAnnotations, formatFindings, type MarkedFinding } from "./report/check-report.js";
+export { formatContext, formatEval } from "./report/context-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
 export {
   CHANGE_LEGEND,
@@ -171,5 +206,67 @@ export {
   type JourneyDiagramInput,
   journeyDiagram,
 } from "./report/mermaid.js";
-export { type PrReport, type PrReportInput, prReport, REPORT_MARKER } from "./report/pr-report.js";
+export {
+  type Ask,
+  type ChangeSummary,
+  type Concern,
+  type PrReport,
+  type PrReportInput,
+  prReport,
+  REPORT_MARKER,
+  renderPrComment,
+  stepRange,
+  summarizeChange,
+  VERDICT_MARKER,
+  type Verdict,
+} from "./report/pr-report.js";
 export * from "./report/report.js";
+export {
+  formatAnchors,
+  formatTrace,
+  formatTraceChecks,
+  formatTraceList,
+} from "./report/trace-report.js";
+export { counted, TERMS, type Term } from "./report/words.js";
+export {
+  type AnchorCandidate,
+  type AnchorElement,
+  type AnchorOptions,
+  type AnchorResult,
+  anchorError,
+  describeEvidence,
+  type ErrorEvidence,
+  traceSkeleton,
+} from "./trace/anchor.js";
+export { type TraceInChange, tracesInChange } from "./trace/change.js";
+export {
+  type CheckTraceOptions,
+  checkTrace,
+  resolveAnchor,
+  type TraceAnchorView,
+  type TraceCheck,
+  type TraceCodeView,
+  type TraceFinding,
+  type TraceStepView,
+  type TraceView,
+} from "./trace/check.js";
+export {
+  classifyHop,
+  type HopKind,
+  resolveTraceEnd,
+  type TraceEnd,
+  type TraceHop,
+} from "./trace/hops.js";
+export {
+  loadTraces,
+  type ParsedTraces,
+  parseExpands,
+  parseTrace,
+  type Trace,
+  type TraceCodeRef,
+  type TraceSpec,
+  traceCodeLabel,
+  traceCodeRefs,
+  traceEvidenceOf,
+  traceRoleOf,
+} from "./trace/trace.js";

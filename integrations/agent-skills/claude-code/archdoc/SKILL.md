@@ -1,6 +1,6 @@
 ---
 name: archdoc
-description: Use at the start of every coding task in a repository that has an .archdoc/ directory, before searching or reading code. Finds where the change belongs in the architecture model and what it affects (consumers, actors, journeys, owners, rules). Also use when adding, moving, or connecting components, to keep the model up to date.
+description: Use at the start of every coding task in a repository that has an .archdoc/ directory, before searching or reading code. Finds where the change belongs in the architecture model and what it affects (consumers, actors, journeys, owners, rules). Also use when adding, moving, or connecting components, to keep the model up to date, and when asked to explain or fix a bug, to anchor the error and write a trace.
 ---
 
 # Working in a repository with an ArchDoc model
@@ -9,8 +9,8 @@ description: Use at the start of every coding task in a repository that has an .
 
 ## Start here, before you search the code
 
-1. **Find where the change belongs.** Call `archdoc_search` with a few words for the area, such as `cli command` or `refund approval`. Without MCP, run `archdoc search <words>`. You get the elements involved and their code paths, so you know which files to read.
-2. **Check the impact.** Call `archdoc_impact` on the element, or on the files you plan to change or create. Without MCP, run `archdoc impact <element-or-path> --json`. You get what depends on it, the affected journeys and actors (critical first), owners, and the rules that mention it. With a landscape synced, it also lists who uses it from other repos and their journeys: don't remove or rename anything they use without asking the user first.
+1. **Find where to start.** Call `archdoc_context` with the task in a few words, the files you plan to change, or both, such as `pr report shows type undefined for data fields`. Without MCP, run `archdoc context <words or paths>`. You get the files and functions to open first (with line numbers), other code that does the same job (other callers of the functions those files use: a fix in one place usually needs them too), the data and rules involved, the narrowest journeys (those whose steps name the files), the tests to run, and owners. Read those files before you grep.
+2. **Check the impact.** Call `archdoc_impact` on the element, or on the files you plan to change or create. Without MCP, run `archdoc impact <element-or-path> --json`. You get what depends on it, the affected journeys and actors (critical first), owners, and the rules that mention it. With a landscape synced, it also lists who uses it from other repos and their journeys: don't remove or rename anything they use without asking the user first. `archdoc_search` (or `archdoc search <words>`) finds elements, journeys, and files by words when you only need to know where something lives.
 3. **Say what it affects.** Name the affected journeys and actors when you share your plan. Ask the user first if a critical journey is involved or the change would break a rule.
 
 `archdoc_locate` tells you which element owns any file, including files that don't exist yet.
@@ -20,6 +20,36 @@ description: Use at the start of every coding task in a repository that has an .
 - Stay inside the element boundaries you found. If the change needs code in one element to depend on another element and the model doesn't declare that relationship (`uses`), say so. Don't add the dependency silently.
 - If the change makes a component send, accept, or store different data, update `data:` and the `sends`, `accepts`, `returns`, or `stores` that name it, and classify sensitive fields (`classification: pii`). Before changing a field, a mapping, or a decision, `archdoc_lineage` and `archdoc_simulate` show where its value goes and which path a request takes. `check` flags data rules, such as personal data sent to an external service.
 - Elements in other repos are referenced by namespace, such as `payments.charges`. To depend on a repo the model doesn't import yet, add it to `imports` in `archdoc.yaml` and run `archdoc sync`. Never edit `.archdoc/archdoc.lock` or `.archdoc/vendor/` by hand.
+
+## When you're asked to explain or fix a bug
+
+1. **Anchor the error.** Call `archdoc_anchor` with the error as the user gave it: a log line, a stack trace, or the wrong output. Without MCP, run `archdoc trace anchor --file log.txt` (or `-` to read stdin). You get the journey steps it most likely showed up in (best first, with why), the elements its stack frames and paths map to, and a trace to start from.
+2. **Follow the code** from the top anchor, and write the path the failing request actually took to `.archdoc/traces/<id>.yaml`:
+
+```yaml
+trace: refund-waits-for-finance
+title: A $4 refund waits for finance instead of going through
+symptom: |
+  refund ref-ch-81: status pending_approval (expected approved)
+reproduce: archdoc simulate request-refund --sample samples/refund-overcharge.json
+expands: request-refund#4          # the journey step where it showed up (1-based)
+diagnosis: The gateway converts the amount to cents a second time.
+steps:
+  - { from: app, to: api-gateway, action: Sends the refund request, evidence: read }
+  - from: api-gateway
+    to: payments.charges
+    action: Forwards the request, multiplying the amount by 100
+    code: services/gateway/src/refunds.ts:42
+    role: cause                    # ok (default), cause, spreads, symptom
+    evidence: reproduced           # reproduced, read, or inferred (default)
+    observed: { RefundRequest.amount_cents: 40000 }
+    expected: { RefundRequest.amount_cents: 400 }
+fix: Pass amount_cents through unchanged.
+```
+
+   Give every step evidence, and be honest about it: `reproduced` only for what you saw run, `read` for what you followed in the code, `inferred` for the rest. `missing: { to, call }` marks a call that should have happened and didn't, and `works-in: { element, code, note }` points at code that does the same job right. A trace is evidence of one run, not the design, so it's never part of the model.
+3. **Check it.** Call `archdoc_trace_check` with the YAML or the path, or run `archdoc trace check`. Fix unknown elements, journeys, and stale code references. A hop the model doesn't declare is drift you found while debugging: say so, and propose it if the code is right.
+4. **Commit the trace with the fix.** The PR comment then says which bug the change fixes.
 
 ## After you edit
 

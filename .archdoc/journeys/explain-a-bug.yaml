@@ -1,0 +1,32 @@
+journey: explain-a-bug
+actor: coding-agent
+goal: Explain or fix a bug from an error, with evidence a person can check
+importance: high
+steps:
+  - from: coding-agent
+    to: agent-skills
+    action: Reads when to write a trace
+    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+  - from: coding-agent
+    to: mcp
+    action: Calls archdoc_anchor with the error
+    code: packages/mcp/src/server.ts
+  - from: mcp
+    to: core
+    action: Maps the stack frames and paths to elements and ranks the journey steps
+    code: packages/core/src/trace/anchor.ts
+  - from: mcp
+    to: coding-agent
+    action: Returns the anchors and a trace to start from, which the agent follows into the code
+    sends: ToolResult
+  - from: coding-agent
+    to: mcp
+    action: Writes .archdoc/traces/<id>.yaml and calls archdoc_trace_check on it
+  - from: mcp
+    to: core
+    action: Checks the trace's elements, journey step, code references, and hops
+    code: packages/core/src/trace/check.ts
+  - from: developer
+    to: cli
+    action: Reads the trace with the fix (archdoc trace show) and checks it in CI (archdoc trace check)
+    code: packages/cli/src/commands/trace.ts

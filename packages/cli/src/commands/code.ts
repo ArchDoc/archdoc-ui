@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
+import { indexRepository } from "@archdoc/analyzers";
 import {
   filesUnder,
   formatActor,
@@ -10,6 +11,7 @@ import {
   formatJourney,
   formatLocate,
   formatSearch,
+  formatTrace,
   getElement,
   hasErrors,
   impact as impactOf,
@@ -24,6 +26,7 @@ import {
   search as searchModel,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
+import { findTrace } from "./trace.js";
 
 export interface ModelOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -31,7 +34,7 @@ export interface ModelOptions {
   json?: boolean;
 }
 
-async function load(options: ModelOptions, io: Io): Promise<LoadedModel | undefined> {
+export async function load(options: ModelOptions, io: Io): Promise<LoadedModel | undefined> {
   const model = await loadModel(options.model ?? ".", { cwd: io.cwd });
   if (model.diagnostics.some((d) => d.code === "model/not-found")) {
     io.err(model.diagnostics[0]?.message ?? "No model found.");
@@ -53,7 +56,8 @@ export async function search(words: string[], options: ModelOptions, io: Io): Pr
   const model = await load(options, io);
   if (!model) return 1;
   const query = words.join(" ");
-  const hits = searchModel(model, query, 10);
+  // File paths and the names files export count too.
+  const hits = searchModel(model, query, 10, await indexRepository(model.baseDir));
   io.out(options.json ? JSON.stringify(hits, null, 2) : formatSearch(query, hits));
   return hits.length ? 0 : 1;
 }
@@ -177,11 +181,17 @@ export async function show(
   ].filter((s): s is string => s !== undefined);
 
   if (sections.length === 0) {
+    // Traces aren't part of the model, but they have IDs too.
+    const trace = await findTrace(model, id, options, io).catch(() => undefined);
+    if (trace) {
+      io.out(formatTrace(trace.view));
+      return 0;
+    }
     const r = resolveRef(model, id);
     if (r.status === "ambiguous") {
       io.err(`"${id}" is ambiguous: ${r.candidates.join(", ")}.`);
     } else {
-      io.err(`No element, actor, journey, or data entry "${id}".`);
+      io.err(`No element, actor, journey, data entry, or trace "${id}".`);
       if (r.status === "unresolved" && r.hint) io.err(r.hint);
       const near = searchModel(model, id.replace(/[._-]+/g, " "), 5);
       if (near.length) io.err(`Did you mean: ${near.map((h) => h.id).join(", ")}?`);

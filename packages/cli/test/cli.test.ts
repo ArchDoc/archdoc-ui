@@ -60,7 +60,7 @@ describe("comparing two model files", () => {
     const r = await run("diff", "examples/quickstart.yaml", "examples/quickstart.add-reviews.yaml");
     expect(r.code).toBe(0);
     expect(r.out).toContain(
-      "Model changes (examples/quickstart.yaml → examples/quickstart.add-reviews.yaml): elements 2 added",
+      "Model changes (examples/quickstart.yaml → examples/quickstart.add-reviews.yaml): 2 elements added",
     );
     expect(r.out).toContain("+ shop.reviews (container)");
   });

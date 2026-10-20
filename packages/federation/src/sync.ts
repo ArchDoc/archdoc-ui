@@ -1,11 +1,14 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { contextFor, importSchemas } from "@archdoc/analyzers";
 import {
   buildModel,
+  bundleSchemas,
   createBundle,
   federationDir,
   integrityOf,
   LANDSCAPE,
+  listRepoFiles,
   parseBundle,
   readFederationInput,
   readModelSources,
@@ -245,6 +248,7 @@ async function fetchImport(
       version: at.version,
       commit: remote.commit,
       source,
+      schemas: remote.schemas,
       imports: lockedVersions(remote.lock),
       includes: includes ? vendoredBundles(source, remote.lock, remote.vendored) : undefined,
     });
@@ -292,8 +296,15 @@ async function fetchImport(
     }
     vendored = vendoredBundles(source, lockText, files);
   }
+  const schemas = bundleSchemas(
+    await importSchemas(
+      contextFor(local.baseDir, await listRepoFiles(local.baseDir)),
+      buildModel(local.sources, { root: local.root }),
+    ),
+  );
   const { bundle, model } = createBundle(local.sources, local.root, {
     source,
+    schemas,
     imports: lockedVersions(
       await readFile(join(await federationDir(local.source), LOCK_FILE), "utf8").catch(
         () => undefined,

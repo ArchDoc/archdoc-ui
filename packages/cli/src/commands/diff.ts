@@ -1,10 +1,10 @@
+import { loadRevision } from "@archdoc/analyzers";
 import {
   type DiffFormat,
   diffModels,
   formatDiff,
   isEmptyDiff,
   loadModel,
-  loadModelAtRef,
   type Model,
   mergeBase,
 } from "@archdoc/core";
@@ -58,12 +58,13 @@ export async function diff(
       return 2;
     }
     const sides = await resolveRange(range ?? "HEAD", io.cwd);
-    const [base, head] = await Promise.all([
-      loadModelAtRef(target, sides.base, { cwd: io.cwd }),
-      sides.head
-        ? loadModelAtRef(target, sides.head, { cwd: io.cwd })
-        : loadModel(target, { cwd: io.cwd }),
-    ]);
+    // Both sides as every surface reads them: schema sources and other repos' models included.
+    const at = async (ref: string | undefined) => {
+      const rev = await loadRevision(target, { cwd: io.cwd, ref });
+      if (!rev) throw new Error(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml.`);
+      return rev.model;
+    };
+    const [base, head] = await Promise.all([at(sides.base), at(sides.head)]);
     warnOnErrors(base, `${sides.base}`, io);
     warnOnErrors(head, sides.head ?? "working tree", io);
     const d = diffModels(base, head);

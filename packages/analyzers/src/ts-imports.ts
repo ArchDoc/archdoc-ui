@@ -28,7 +28,7 @@ export const tsImports: Analyzer = {
       const info = ts.preProcessFile(text, true, true);
       for (const imp of info.importedFiles) {
         const spec = imp.fileName;
-        const to = resolve(file, spec, files, packages);
+        const to = resolveSpecifier(file, spec, files, packages);
         if (!to) continue;
         const line = text.slice(0, imp.pos).split("\n").length;
         out.push({
@@ -45,7 +45,12 @@ export const tsImports: Analyzer = {
   },
 };
 
-function resolve(
+/**
+ * Where an import specifier points: a repository file for a relative import,
+ * a workspace package's directory for a package import, or undefined for
+ * built-ins and third-party packages.
+ */
+export function resolveSpecifier(
   from: string,
   spec: string,
   files: ReadonlySet<string>,

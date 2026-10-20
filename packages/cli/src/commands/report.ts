@@ -1,13 +1,13 @@
 import {
-  changedFiles,
   check,
   diffModels,
   type Finding,
   loadModel,
-  loadModelAtRef,
+  loadTraces,
   type MarkedFinding,
-  mergeBase,
   prReport,
+  readTraceSources,
+  tracesInChange,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
 import { isModelPath } from "../model-path.js";
@@ -19,6 +19,8 @@ export interface ReportOptions {
   format?: string;
   /** False leaves out the Mermaid diagrams. */
   diagrams?: boolean;
+  /** A page that shows the change in the explorer, linked from the comment. */
+  explorerUrl?: string;
 }
 
 /**
@@ -33,23 +35,24 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
   const format = options.format ?? "markdown";
   try {
     if (isModelPath(io.cwd, options.base)) return await reportFiles(options.base, options, io);
-    const { model, findings } = await runCheck(
+    const { model, findings, base } = await runCheck(
       { model: options.model, base: options.base },
       io.cwd,
     );
-    const base = (await mergeBase(model.baseDir, options.base, "HEAD")) ?? options.base;
-    const [baseModel, changed] = await Promise.all([
-      loadModelAtRef(options.model ?? ".", base, { cwd: io.cwd }),
-      changedFiles(model.baseDir, base),
-    ]);
-    const marked = findings.map((f) => f);
+    if (!base) throw new Error(`Couldn't read the model at ${options.base}.`);
+    const baseModel = base.model;
+    const changed = base.changedFiles;
+    // Bug traces the change adds or edits: the comment says which bug it fixes.
+    const { traces } = loadTraces(await readTraceSources(options.model ?? ".", { cwd: io.cwd }));
     const r = prReport({
       model,
       base: baseModel,
       changedFiles: changed,
       diff: diffModels(baseModel, model),
-      findings: marked,
+      findings,
       diagrams: options.diagrams !== false,
+      explorerUrl: options.explorerUrl,
+      fixes: tracesInChange(changed, traces),
       // A commit hash, as the Action passes, reads better short.
       label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });
