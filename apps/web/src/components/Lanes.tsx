@@ -35,12 +35,14 @@ export function Lanes({ data, at, onAt, simulation }: LanesProps) {
     const self = r.from === r.to;
     return (
       <button
-        key={`s${r.at}`}
+        key={r.key ?? `s${r.at}`}
         type="button"
         className={[
           "lane-row lane-step",
           r.at === at ? "is-current" : "",
           r.stores ? "is-store" : "",
+          r.tone ? `tone-${r.tone}` : "",
+          r.dashed ? "is-dashed" : "",
           ran(r.step) ? "" : "is-skipped",
         ]
           .filter(Boolean)
@@ -53,7 +55,14 @@ export function Lanes({ data, at, onAt, simulation }: LanesProps) {
           className={`lane-arrow${r.to < r.from ? " is-back" : ""}${self ? " is-self" : ""}`}
           style={{ gridColumn: `${lo + 2} / ${hi + 3}` }}
         >
-          <span className="lane-action">{r.action}</span>
+          <span className="lane-action">
+            {r.action}
+            {r.tags?.map((t) => (
+              <span key={t.label} className={`lane-tag tag-${t.kind}`}>
+                {t.label}
+              </span>
+            ))}
+          </span>
           <span className="lane-line" aria-hidden="true" />
           {r.data.length ? (
             <span className="lane-data">
@@ -97,6 +106,27 @@ export function Lanes({ data, at, onAt, simulation }: LanesProps) {
 
   const row = (r: LaneRow, i: number) => {
     if (r.kind === "step") return stepRow(r);
+    if (r.kind === "band") {
+      const span =
+        r.from !== undefined && r.to !== undefined
+          ? { lo: Math.min(r.from, r.to), hi: Math.max(r.from, r.to) }
+          : undefined;
+      return (
+        <div key={r.key} className={`lane-row lane-band band-${r.tone}`}>
+          <span className="lane-num" />
+          {span && span.lo !== span.hi ? (
+            <span
+              className={`lane-arrow band-arrow${r.to !== undefined && r.from !== undefined && r.to < r.from ? " is-back" : ""}`}
+              style={{ gridColumn: `${span.lo + 2} / ${span.hi + 3}`, gridRow: 1 }}
+              aria-hidden="true"
+            >
+              <span className="lane-line" />
+            </span>
+          ) : null}
+          <p className="band-text">{r.text}</p>
+        </div>
+      );
+    }
     if (r.kind === "decision") {
       const outcome = simulation?.steps[r.step]?.decision?.outcome;
       return (

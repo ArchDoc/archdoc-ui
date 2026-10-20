@@ -171,6 +171,25 @@ export interface LaneStep {
   data: { entry: string; label: string; marks: string[] }[];
   /** Its writer storing what the step wrote. */
   stores: boolean;
+  /** A key of its own, when several rows draw the same interaction. */
+  key?: string | undefined;
+  /** How it reads in a trace: where it goes wrong, where that spreads, where it shows. */
+  tone?: "cause" | "spreads" | "symptom" | "missing" | undefined;
+  /** Short notes on the row, such as "cause" or "not in the model". */
+  tags?: { label: string; kind: "cause" | "spreads" | "symptom" | "undeclared" | "missing" }[];
+  /** Drawn dashed: a hop the model doesn't declare, or a call that didn't happen. */
+  dashed?: boolean | undefined;
+}
+
+/** A band across every lane, such as the modeled step a trace opens up. */
+export interface LaneBand {
+  kind: "band";
+  key: string;
+  tone: "modeled" | "works";
+  text: string;
+  /** Lanes to draw a faint arrow between, when the band is about a hop. */
+  from?: number | undefined;
+  to?: number | undefined;
 }
 
 export interface LaneDecision {
@@ -198,7 +217,7 @@ export interface LaneBranches {
   branches: LaneBranch[];
 }
 
-export type LaneRow = LaneStep | LaneDecision | LaneBranches;
+export type LaneRow = LaneStep | LaneDecision | LaneBranches | LaneBand;
 
 export interface Lanes {
   lanes: Lane[];

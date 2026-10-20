@@ -45,6 +45,8 @@ export interface ModelPayload {
   };
   /** Sample records for simulating journeys. */
   samples?: { path: string; text: string }[];
+  /** Bug traces beside the model (.archdoc/traces/*.yaml), for the trace view. Never part of the model. */
+  traces?: { path: string; text: string }[];
   /** What data entries' schema sources say, to fill in what the model leaves out. */
   schemas?: ImportedSchema[];
 }
@@ -83,6 +85,7 @@ export type ModelState =
       /** Set when the model is a composed landscape. */
       landscape?: LandscapeInfo | undefined;
       samples: { path: string; text: string }[];
+      traces: { path: string; text: string }[];
       loadedAt: number;
       reloads: number;
     };
@@ -144,6 +147,7 @@ export function useModel(): ModelState {
         },
         landscape: payload.landscape,
         samples: payload.samples ?? [],
+        traces: payload.traces ?? [],
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

@@ -54,6 +54,7 @@ export interface Head {
   snippets: NonNullable<ModelPayload["snippets"]>;
   repo: RepoLinks;
   samples: { path: string; text: string }[];
+  traces: { path: string; text: string }[];
 }
 
 interface Sources extends Partial<ModelPayload> {
@@ -123,6 +124,7 @@ function head(p: Sources): Head {
     snippets: p.snippets ?? {},
     repo: p.repo ?? {},
     samples: p.samples ?? [],
+    traces: p.traces ?? [],
   };
 }
 
@@ -131,7 +133,7 @@ function build(s: Sources): Model {
 }
 
 /** The explorer's tabs. */
-export type Tab = "overview" | "journeys" | "data" | "changes";
+export type Tab = "overview" | "journeys" | "traces" | "data" | "changes";
 
 /** What the address says to open. */
 export interface HashState {
@@ -141,6 +143,8 @@ export interface HashState {
   journey?: string | undefined;
   /** The selected entry or field on the Data tab, as data:<entry> or field:<entry.field>. */
   data?: string | undefined;
+  /** The open trace on the Traces tab. */
+  trace?: string | undefined;
 }
 
 /**
@@ -158,6 +162,7 @@ export function readHash(hash = window.location.hash): HashState {
       return { tab: "changes", pair: base ? { base, head: head || undefined } : undefined };
     }
     if (name === "journeys") return { tab: "journeys", journey: value || undefined };
+    if (name === "traces") return { tab: "traces", trace: value || undefined };
     if (name === "data") {
       const data = value
         ? value.split(".").length > 2
@@ -177,6 +182,8 @@ export function hashOf(state: HashState): string {
   switch (state.tab) {
     case "changes":
       return `#changes${pair ? `=${encodeURIComponent(pair.base)}${pair.head ? `...${encodeURIComponent(pair.head)}` : ""}` : ""}`;
+    case "traces":
+      return `#traces${state.trace ? `=${encodeURIComponent(state.trace)}` : ""}`;
     case "journeys":
       return `#journeys${state.journey ? `=${encodeURIComponent(state.journey)}` : ""}`;
     case "data": {

@@ -18,6 +18,7 @@ import { Overview } from "./components/Overview.js";
 import type { PayloadEntry } from "./components/Payload.js";
 import { ChangesList, DataList, dataGroups, JourneyList, SearchBox } from "./components/Sidebar.js";
 import { type SampleChoice, StepPanel } from "./components/StepPanel.js";
+import { TraceList, TraceStepPanel, TraceStory } from "./components/Traces.js";
 import {
   dataPlaces,
   type Interaction,
@@ -33,6 +34,7 @@ import { type GroupBy, type Grouping, groupLandscape } from "./graph/groups.js";
 import { type Compare, compareModels } from "./model/compare.js";
 import { matchingSample, parseSample, sampleName, samplesFor } from "./model/samples.js";
 import { journeyLanes, journeysByImportance } from "./model/stories.js";
+import { firstCause, readTraces } from "./model/traces.js";
 import {
   type HashState,
   type Pair,
@@ -109,13 +111,18 @@ export function App() {
         files={shown.files}
         snippets={shown.snippets}
         repo={shown.repo}
-        tab={tab === "changes" && !changes ? "overview" : tab}
+        tab={
+          (tab === "changes" && !changes) || (tab === "traces" && !shown.traces.length)
+            ? "overview"
+            : tab
+        }
         onTab={setTab}
         initial={initial}
         pair={chosen}
         changes={changes}
         landscape={state.landscape}
         samples={samples}
+        traces={shown.traces}
       />
     </ReactFlowProvider>
   );
@@ -148,6 +155,8 @@ interface ExplorerProps {
   changes?: ChangesControl | undefined;
   landscape?: LandscapeInfo | undefined;
   samples: { path: string; text: string }[];
+  /** Trace files beside the model. */
+  traces: { path: string; text: string }[];
 }
 
 const EXAMPLE = "";
@@ -166,6 +175,7 @@ function Explorer({
   changes,
   landscape,
   samples,
+  traces,
 }: ExplorerProps) {
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   // What the open journey runs on: example data ("") or a sample's path, so it reruns when the model reloads.
@@ -191,6 +201,23 @@ function Explorer({
   const [centerOn, setCenterOn] = useState<string>();
   const [panelWidth, setPanelWidth] = usePanelWidth();
   const search = useRef<HTMLInputElement>(null);
+  // The open trace, and the hop selected in it.
+  const [traceId, setTraceId] = useState<string | undefined>(initial.trace);
+  const [traceAt, setTraceAt] = useState<number>();
+  const traceState = useMemo(() => readTraces(model, traces, files), [model, traces, files]);
+  const traceCheck = traceState.checks.find((c) => c.view.id === traceId) ?? traceState.checks[0];
+  const traceStep = traceCheck
+    ? Math.min(traceAt ?? firstCause(traceCheck.view), traceCheck.view.steps.length - 1)
+    : 0;
+  const openTrace = useCallback(
+    (id: string) => {
+      onTab("traces");
+      setSelected(undefined);
+      setTraceId(id);
+      setTraceAt(undefined);
+    },
+    [onTab],
+  );
 
   const journey = journeyId ? model.journeys.get(journeyId) : undefined;
   const interactions = useMemo(
@@ -226,12 +253,13 @@ function Explorer({
         tab,
         pair,
         journey: tab === "journeys" ? journeyId : undefined,
+        trace: tab === "traces" ? traceCheck?.view.id : undefined,
         data:
           tab === "data" && (selected?.startsWith("data:") || selected?.startsWith("field:"))
             ? selected
             : undefined,
       }),
-    [tab, pair, journeyId, selected],
+    [tab, pair, journeyId, selected, traceCheck],
   );
 
   // After a live reload, drop references to things that no longer exist.
@@ -410,7 +438,8 @@ function Explorer({
   const pick = useCallback(
     (key: string) => {
       // Search: a box on the Journeys tab is shown on the Overview's map.
-      if (tab === "journeys" && /^(element|actor|domain):/.test(key)) onTab("overview");
+      if ((tab === "journeys" || tab === "traces") && /^(element|actor|domain):/.test(key))
+        onTab("overview");
       select(key);
     },
     [tab, onTab, select],
@@ -480,11 +509,14 @@ function Explorer({
         go(at + 1);
       } else if (!typing && tab === "journeys" && journey && e.key === "ArrowLeft") {
         go(at - 1);
+      } else if (!typing && tab === "traces" && traceCheck && /^Arrow(Right|Left)$/.test(e.key)) {
+        const last = traceCheck.view.steps.length - 1;
+        setTraceAt(Math.max(0, Math.min(last, traceStep + (e.key === "ArrowRight" ? 1 : -1))));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, journey, at, go, select]);
+  }, [tab, journey, at, go, select, traceCheck, traceStep]);
 
   const lanes = useMemo(
     () => (journey ? journeyLanes(model, journey, interactions, landscape) : undefined),
@@ -657,6 +689,43 @@ function Explorer({
           }}
         />
       ) : null;
+  } else if (tab === "traces") {
+    side = (
+      <TraceList
+        checks={traceState.checks}
+        problems={traceState.problems}
+        traceId={traceCheck?.view.id}
+        onTrace={openTrace}
+      />
+    );
+    main = traceCheck ? (
+      <TraceStory
+        model={model}
+        check={traceCheck}
+        at={traceStep}
+        onAt={setTraceAt}
+        landscape={landscape}
+      />
+    ) : (
+      <p className="empty-main">The traces here couldn't be read.</p>
+    );
+    panel =
+      details && selected ? (
+        <>
+          <button type="button" className="link back" onClick={() => select(undefined)}>
+            ← Back to the trace
+          </button>
+          {details}
+        </>
+      ) : traceCheck ? (
+        <TraceStepPanel
+          model={model}
+          check={traceCheck}
+          at={traceStep}
+          onAt={setTraceAt}
+          code={code}
+        />
+      ) : null;
   } else if (tab === "data") {
     side = <DataList model={model} selected={selected} onSelect={select} />;
     panel = details ?? (
@@ -683,6 +752,15 @@ function Explorer({
   const tabs: { id: Tab; label: string; title?: string }[] = [
     { id: "overview", label: "Overview" },
     { id: "journeys", label: "Journeys" },
+    ...(traces.length
+      ? [
+          {
+            id: "traces" as const,
+            label: "Traces",
+            title: "Bugs followed through the system: the path a failing request took",
+          },
+        ]
+      : []),
     ...(hasData ? [{ id: "data" as const, label: "Data" }] : []),
     ...(changes
       ? [
@@ -793,7 +871,7 @@ function Explorer({
       {panel ? (
         <aside className="panel" aria-label="Details">
           <ResizeHandle width={panelWidth} onResize={setPanelWidth} />
-          {selected && tab !== "journeys" ? (
+          {selected && tab !== "journeys" && tab !== "traces" ? (
             <button
               type="button"
               className="panel-close"

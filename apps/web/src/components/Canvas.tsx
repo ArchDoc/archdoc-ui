@@ -96,6 +96,7 @@ export function Canvas(props: CanvasProps) {
   const [hoverEdge, setHoverEdge] = useState<string>();
   const [hoverNode, setHoverNode] = useState<string>();
   const firstFit = useRef(true);
+  const pane_ = useRef<HTMLDivElement>(null);
   const direction = props.direction ?? "RIGHT";
 
   useEffect(() => {
@@ -631,9 +632,19 @@ export function Canvas(props: CanvasProps) {
     if (firstFit.current) {
       firstFit.current = false;
       // Fit what fits; a big map stays readable and pans instead of shrinking its labels away.
-      requestAnimationFrame(
-        () => void flow.fitView({ padding: 0.08, duration: 0, minZoom: READABLE, maxZoom: 1 }),
-      );
+      requestAnimationFrame(() => {
+        void flow
+          .fitView({ padding: 0.08, duration: 0, minZoom: READABLE, maxZoom: 1 })
+          .then(() => {
+            // Still too wide at a readable zoom: start from the left edge, where the map begins.
+            const pane = pane_.current?.getBoundingClientRect();
+            const bounds = flow.getNodesBounds(flow.getNodes());
+            const { y, zoom } = flow.getViewport();
+            if (pane && bounds.width * zoom > pane.width) {
+              void flow.setViewport({ x: 16 - bounds.x * zoom, y, zoom });
+            }
+          });
+      });
     }
   }, [layout, nodes.length, flow]);
 
@@ -728,6 +739,7 @@ export function Canvas(props: CanvasProps) {
 
   return (
     <ReactFlow
+      ref={pane_}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -850,7 +862,7 @@ function fitActors(model: Model, graph: Graph): Graph {
       if (n.kind !== "actor" || n.size) return n;
       const a = model.actors.get(n.id.slice(6));
       const label = a?.spec.name ?? a?.id ?? n.id;
-      const width = Math.round(Math.min(NODE_WIDTH + 20, Math.max(130, label.length * 11 + 90)));
+      const width = Math.round(Math.min(NODE_WIDTH + 20, Math.max(130, label.length * 10.5 + 72)));
       return { ...n, size: { width, height: NODE_HEIGHT } };
     }),
   };
