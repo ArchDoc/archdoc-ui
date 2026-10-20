@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
+import { indexRepository } from "@archdoc/analyzers";
 import {
   filesUnder,
   formatActor,
@@ -53,7 +54,8 @@ export async function search(words: string[], options: ModelOptions, io: Io): Pr
   const model = await load(options, io);
   if (!model) return 1;
   const query = words.join(" ");
-  const hits = searchModel(model, query, 10);
+  // File paths and the names files export count too.
+  const hits = searchModel(model, query, 10, await indexRepository(model.baseDir));
   io.out(options.json ? JSON.stringify(hits, null, 2) : formatSearch(query, hits));
   return hits.length ? 0 : 1;
 }

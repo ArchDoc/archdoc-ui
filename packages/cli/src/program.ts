@@ -3,6 +3,7 @@ import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
 import { check } from "./commands/check.js";
 import { impact, locate, map, search, show } from "./commands/code.js";
+import { context, evalCommand } from "./commands/context.js";
 import { lineageCommand, simulateCommand } from "./commands/data.js";
 import { diff } from "./commands/diff.js";
 import { publish, sync } from "./commands/federation.js";
@@ -83,6 +84,43 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .option("--json", "print the result as JSON")
     .action((words: string[], opts: { model?: string; json?: boolean }) =>
       run(search(words, opts, io)),
+    );
+
+  program
+    .command("context")
+    .description(
+      "Where to start a task: files and symbols to open first, other code that does the same job, data, rules, journeys, tests, and owners",
+    )
+    .argument("<words-or-paths...>", "the task in a few words, files you plan to change, or both")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-f, --format <format>", "text or json", "text")
+    .option("--json", "print the result as JSON")
+    .action((args: string[], opts: { model?: string; format?: string; json?: boolean }) =>
+      run(context(args, opts, io)),
+    );
+
+  program
+    .command("eval")
+    .description(
+      "Replay recent commits through archdoc context: how many of the files each changed the brief pointed at",
+    )
+    .argument("[ref]", "the branch or commit whose history to replay", "HEAD")
+    .option("-n, --commits <n>", "how many non-merge commits to replay", "50")
+    .option("--min-recall <ratio>", "exit 1 when recall is below this, from 0 to 1")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-f, --format <format>", "text or json", "text")
+    .option("-v, --verbose", "list the changed files each brief missed")
+    .action(
+      (
+        ref: string | undefined,
+        opts: {
+          model?: string;
+          format?: string;
+          commits?: string;
+          minRecall?: string;
+          verbose?: boolean;
+        },
+      ) => run(evalCommand(ref, opts, io)),
     );
 
   program
