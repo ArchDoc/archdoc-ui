@@ -117,6 +117,7 @@ export {
 } from "./diff/diff.js";
 export {
   type BundleMeta,
+  bundleSchemas,
   createBundle,
   modelFromBundle,
   parseBundle,

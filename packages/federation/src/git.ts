@@ -3,7 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { type ModelSource, readModelSourcesAtRef } from "@archdoc/core";
+import { importSchemas } from "@archdoc/analyzers";
+import {
+  buildModel,
+  bundleSchemas,
+  listFilesAtRef,
+  type ModelSource,
+  readModelSourcesAtRef,
+} from "@archdoc/core";
+import type { Bundle } from "@archdoc/spec";
 import semver from "semver";
 
 const run = promisify(execFile);
@@ -112,6 +120,8 @@ export interface RemoteModel {
   lock?: string | undefined;
   /** The bundles that lock points to, by path relative to the model directory. */
   vendored: Map<string, string>;
+  /** What the model's schema sources say at that ref. */
+  schemas?: Bundle["schemas"];
 }
 
 /** The model files of a repository at a ref, read without checking it out. */
@@ -152,8 +162,22 @@ export async function readRemoteModel(
     for (const file of listing.split("\n").filter((f) => f.endsWith(".json"))) {
       vendored.set(file.slice(dir.length), await git(tmp, "show", `${commit}:${file}`));
     }
+    // The whole commit is here, so read the schema sources the model points at.
+    const files = await listFilesAtRef(tmp, commit);
+    const model = buildModel(at.sources, { root: at.root });
+    const schemas = bundleSchemas(
+      await importSchemas(
+        {
+          baseDir: tmp,
+          files,
+          read: (file) => git(tmp, "show", `${commit}:${file}`),
+        },
+        model,
+      ),
+    );
     return {
       vendored,
+      schemas,
       sources: at.sources.map((s) => ({ path: strip(s.path), text: s.text })),
       root: strip(at.root),
       commit,

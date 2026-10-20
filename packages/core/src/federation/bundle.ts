@@ -1,4 +1,5 @@
 import { type Bundle, BundleSchema } from "@archdoc/spec";
+import { applySchemas, type ImportedSchema } from "../data/schemas.js";
 import { buildModel, type ModelSource } from "../load/build.js";
 import type { Model } from "../model.js";
 
@@ -10,6 +11,8 @@ export interface BundleMeta {
   imports?: Record<string, string> | undefined;
   /** Other repos' models to carry along, for a landscape. */
   includes?: Bundle["includes"] | undefined;
+  /** What the data entries' schema sources say, read by the caller. */
+  schemas?: Bundle["schemas"] | undefined;
 }
 
 /**
@@ -33,6 +36,7 @@ export function createBundle(
     ...(meta.imports && Object.keys(meta.imports).length ? { imports: meta.imports } : {}),
     root,
     sources: sources.map(({ path, text }) => ({ path, text })),
+    ...(meta.schemas?.length ? { schemas: meta.schemas } : {}),
     ...(meta.includes?.length ? { includes: meta.includes } : {}),
   };
   return { bundle, model };
@@ -61,8 +65,22 @@ export function parseBundle(text: string): { bundle: Bundle } | { error: string 
 /** Builds the model inside a bundle. File paths read like payments@5.2.0:model.yaml. */
 export function modelFromBundle(bundle: Bundle): Model {
   const prefix = `${bundle.namespace}@${bundle.version ?? bundle.commit?.slice(0, 7) ?? "local"}:`;
-  return buildModel(
+  const model = buildModel(
     bundle.sources.map((s) => ({ path: prefix + s.path, text: s.text })),
     { root: prefix + bundle.root },
   );
+  // Field types its schema sources gave it, as the repo that published it read them.
+  applySchemas(
+    model,
+    (bundle.schemas ?? []).map((s) => ({ ...s, files: [] })),
+  );
+  return model;
+}
+
+/** Schemas as a bundle carries them: the ones that read, without the files they came from. */
+export function bundleSchemas(schemas: readonly ImportedSchema[]): Bundle["schemas"] {
+  const out = schemas.flatMap((s) =>
+    s.fields && !s.error ? [{ data: s.data, kind: s.kind, ref: s.ref, fields: s.fields }] : [],
+  );
+  return out.length ? out : undefined;
 }

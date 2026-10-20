@@ -183,7 +183,7 @@ describe("the landscape", () => {
     expect(show.out).toContain(
       "payments.RefundRequest (message) · in payments@5.0.0, another repo",
     );
-    expect(show.out).toContain("  rider_email · pii");
+    expect(show.out).toContain("  rider_email: string · pii");
     expect(show.out).toContain("  app → api-gateway (sends)");
     expect(show.out).toContain("  api-gateway → payments.charges (journey request-refund, step 4)");
   });

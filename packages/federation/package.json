@@ -22,6 +22,7 @@
     }
   },
   "dependencies": {
+    "@archdoc/analyzers": "workspace:*",
     "@archdoc/core": "workspace:*",
     "@archdoc/spec": "workspace:*",
     "semver": "^7.8.5",

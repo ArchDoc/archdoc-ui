@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import { loadRevision } from "@archdoc/analyzers";
 import {
+  bundleSchemas,
   createBundle,
   type Diagnostic,
   type LoadedModel,
@@ -63,7 +65,9 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
       return v ? [[d.namespace, v]] : [];
     }),
   );
-  const { bundle } = createBundle(read.sources, read.root, { version, commit, imports });
+  // Field types from schema sources, which a repo that imports this one can't read.
+  const schemas = bundleSchemas((await loadRevision(options.model ?? ".", { cwd }))?.schemas ?? []);
+  const { bundle } = createBundle(read.sources, read.root, { version, commit, imports, schemas });
   if (!bundle) throw new Error("The model doesn't build.");
   const text = serializeBundle(bundle);
   if (options.dryRun) return { model, errors: [], bundle, text };

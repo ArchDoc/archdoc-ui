@@ -23,6 +23,29 @@ const bundleShape = {
     .array(z.strictObject({ path: z.string(), text: z.string() }))
     .min(1)
     .describe("The model files, as written"),
+  schemas: z
+    .array(
+      z.strictObject({
+        data: z.string().describe("The data entry's ID"),
+        kind: z.string().describe("The importer, such as prisma"),
+        ref: z.string().describe("The source as written, such as prisma/schema.prisma#Charge"),
+        fields: z.record(
+          z.string(),
+          z.strictObject({
+            type: z.string(),
+            required: z.boolean().optional(),
+            values: z.array(z.string()).optional(),
+            references: z
+              .strictObject({ name: z.string(), field: z.string().optional() })
+              .optional(),
+          }),
+        ),
+      }),
+    )
+    .optional()
+    .describe(
+      "What data entries' schema sources said when it was bundled, since a repo that imports it can't read those files",
+    ),
 };
 
 /** A bundle without the models it includes. */
