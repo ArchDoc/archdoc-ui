@@ -34,6 +34,8 @@ export interface ChangeDiagramInput {
   maxBoxes?: number;
   /** Consumers in other repos, drawn in a frame per repo. At most 8, breaking ones first. */
   remote?: RemoteUse[] | undefined;
+  /** False draws only what changed, without unchanged neighbors. Default true. */
+  context?: boolean | undefined;
 }
 
 /** A consumer in another repo, and what the change does to it. */
@@ -63,6 +65,10 @@ const LINK = {
   changed: "stroke:#9a6700,stroke-width:2px",
   context: "stroke:#afb8c1,stroke-width:1px",
 };
+
+/** For a diagram of only what changed. */
+export const CHANGE_LEGEND_SHORT =
+  "🟩 added · 🟨 changed · 🟥 removed · dotted arrow: suggested by an agent · red arrow: a consumer this change breaks";
 
 export const CHANGE_LEGEND =
   "🟩 added · 🟨 changed · 🟥 removed · ⬜ unchanged, for context · dotted arrow: suggested by an agent, waiting for review";
@@ -208,7 +214,9 @@ export function changeDiagram(input: ChangeDiagramInput): string | undefined {
     .filter(({ from, to }) => from !== to && (focus.has(from) || focus.has(to)));
   const neighborRank = (c: { from: string; to: string }) =>
     focus.has(c.from) && focus.has(c.to) ? 0 : c.from.startsWith("actor:") ? 1 : 2;
-  for (const c of context.sort((a, b) => neighborRank(a) - neighborRank(b))) {
+  for (const c of input.context === false
+    ? []
+    : context.sort((a, b) => neighborRank(a) - neighborRank(b))) {
     if (neighborRank(c) > 0 && boxes.size >= maxBoxes && !(boxes.has(c.from) && boxes.has(c.to)))
       continue;
     const { r } = c;

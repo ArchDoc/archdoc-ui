@@ -8,12 +8,12 @@ import {
 import { countChanges, type ModelDiff, type RelationshipView } from "../diff/diff.js";
 import { consumersElsewhere, otherModels } from "../federation/consumers.js";
 import { contractName } from "../load/build.js";
-import type { Model } from "../model.js";
+import type { JourneyNode, Model } from "../model.js";
 import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
 import { blockChanges, describeChange, formatDiff, summary } from "./diff-report.js";
-import { CHANGE_LEGEND, changeDiagram, journeyDiagram, type RemoteUse } from "./mermaid.js";
+import { CHANGE_LEGEND_SHORT, changeDiagram, journeyDiagram, type RemoteUse } from "./mermaid.js";
 
 /** Marks the comment so the Action can find and update it. */
 export const REPORT_MARKER = "<!-- archdoc-report -->";
@@ -33,9 +33,59 @@ export interface PrReportInput {
   diagrams?: boolean;
   /** Most journeys to draw. Default 3. */
   maxJourneyDiagrams?: number;
+  /** A page that shows this change in the explorer, linked from the comment. */
+  explorerUrl?: string | undefined;
+  /** Bug traces the change adds, which the comment says it fixes. */
+  fixes?: { id: string; title?: string | undefined; anchor?: string | undefined }[] | undefined;
 }
 
-export interface PrReport {
+/** How much a change asks of its reviewers. */
+export type Verdict = "blocking" | "attention" | "info" | "none";
+
+/** One thing a reviewer should know: what's wrong, how to fix it, and where. */
+export interface Concern {
+  /** A finding's code, or consumer/breaks, data/sensitive, journey/critical, model/suggested, consumer/deprecated. */
+  code: string;
+  title: string;
+  detail: string;
+  fix?: string | undefined;
+  /** file:line, when there is one. */
+  where?: string | undefined;
+  element?: string | undefined;
+}
+
+/** Someone to involve before merging: owners approve, other repos know, critical journeys still work. */
+export interface Ask {
+  kind: "approve" | "inform" | "verify";
+  who: string;
+  why: string;
+}
+
+/**
+ * What a change does to the architecture, as every surface shows it: the PR
+ * comment, the explorer's Changes tab, and the agent tools render this, so
+ * their verdicts and counts agree.
+ */
+export interface ChangeSummary {
+  verdict: Verdict;
+  /** The verdict in a few parts, such as ["1 blocking issue", "2 critical journeys", "2 teams to ask"]. */
+  headline: string[];
+  /** What should stop the merge: errors the change introduced, consumers it breaks. */
+  blocking: Concern[];
+  /** What a reviewer should look at: new warnings, sensitive data going somewhere new, critical journeys, consumers elsewhere, suggested facts. */
+  attention: Concern[];
+  asks: Ask[];
+  findings: { introduced: MarkedFinding[]; existing: MarkedFinding[] };
+  /** How many things changed in the model itself. */
+  changes: number;
+  fixes: NonNullable<PrReportInput["fixes"]>;
+  /** Decisions (logic) the change made: where they run, what changed, and the journeys that decide with them. */
+  decisions: {
+    id: string;
+    element?: string | undefined;
+    change: string;
+    journeys: { id: string; importance: string; step: number }[];
+  }[];
   touched: { id: string; files: number; owners: string[] }[];
   journeys: {
     id: string;
@@ -60,18 +110,31 @@ export interface PrReport {
   data: { flows: NewSensitiveFlow[]; stores: NewSensitiveStore[] };
   suggested: string[];
   introduced: { errors: number; warnings: number };
+}
+
+export interface PrReport extends ChangeSummary {
   markdown: string;
 }
 
 const IMPORTANCE: Record<string, number> = { critical: 0, high: 1, normal: 2 };
 
 /**
- * The architectural impact of a change, for a pull request: which elements it
- * touches (from the changed files and the model diff), who owns them, which
- * journeys and actors it affects, what changed in the model, suggested facts
- * waiting for review, and drift the change introduced.
+ * The architectural impact of a change, for a pull request, as a comment that
+ * leads with its verdict. See {@link summarizeChange} for what goes in it.
  */
 export function prReport(input: PrReportInput): PrReport {
+  const summary = summarizeChange(input);
+  return { ...summary, markdown: renderPrComment(summary, input) };
+}
+
+/**
+ * The architectural impact of a change: which elements it touches (from the
+ * changed files and the model diff), who owns them, which journeys and actors
+ * it affects, consumers in other repos, sensitive data going somewhere new,
+ * suggested facts waiting for review, and drift the change introduced, with a
+ * verdict and the people to involve.
+ */
+export function summarizeChange(input: PrReportInput): ChangeSummary {
   const { model, diff } = input;
 
   const touchedFiles = new Map<string, number>();
@@ -89,6 +152,11 @@ export function prReport(input: PrReportInput): PrReport {
       ?.from;
     const id = from?.type === "element" ? from.id : undefined;
     if (id && model.elements.has(id) && !touchedFiles.has(id)) touchedFiles.set(id, 0);
+  }
+  // A decision that changed touches the element it runs in.
+  const decisions = decisionChanges(model, diff);
+  for (const d of decisions) {
+    if (d.element && !touchedFiles.has(d.element)) touchedFiles.set(d.element, 0);
   }
 
   const journeys = new Map<string, PrReport["journeys"][number]>();
@@ -115,6 +183,25 @@ export function prReport(input: PrReportInput): PrReport {
         importance: j.journey.spec.importance ?? "normal",
         status: j.journey.spec.status ?? "active",
         steps,
+      });
+    }
+  }
+  // Journeys that decide with a changed decision, here and in other repos, at the deciding step.
+  for (const d of decisions) {
+    for (const u of d.journeys) {
+      const key = u.namespace ? `${u.namespace}.${u.journey.id}` : u.journey.id;
+      const prev = journeys.get(key);
+      journeys.set(key, {
+        id: u.journey.id,
+        namespace: u.namespace,
+        goal: u.journey.spec.goal,
+        actor:
+          u.namespace && !u.journey.spec.actor.includes(".")
+            ? `${u.namespace}.${u.journey.spec.actor}`
+            : u.journey.spec.actor,
+        importance: u.journey.spec.importance ?? "normal",
+        status: u.journey.spec.status ?? "active",
+        steps: [...new Set([...(prev?.steps ?? []), ...u.steps])].sort((x, y) => x - y),
       });
     }
   }
@@ -175,6 +262,7 @@ export function prReport(input: PrReportInput): PrReport {
   for (const rj of remote.journeys) {
     const j = rj.journey;
     const qualify = (ref: string) => (ref.includes(".") ? ref : `${rj.namespace}.${ref}`);
+    const prev = journeys.get(`${rj.namespace}.${j.id}`);
     journeys.set(`${rj.namespace}.${j.id}`, {
       id: j.id,
       namespace: rj.namespace,
@@ -182,7 +270,7 @@ export function prReport(input: PrReportInput): PrReport {
       actor: qualify(j.spec.actor),
       importance: j.spec.importance ?? "normal",
       status: j.spec.status ?? "active",
-      steps: rj.steps,
+      steps: [...new Set([...(prev?.steps ?? []), ...rj.steps])].sort((x, y) => x - y),
     });
     const kind = others.get(rj.namespace)?.model.actors.get(j.spec.actor)?.spec.kind;
     if (kind && !actors.has(qualify(j.spec.actor))) {
@@ -231,155 +319,27 @@ export function prReport(input: PrReportInput): PrReport {
     warnings: introduced.filter((f) => f.severity === "warning").length,
   };
 
-  const md: string[] = [REPORT_MARKER, "## Architectural impact", ""];
-  if (touched.length === 0 && countChanges(diff) === 0) {
-    md.push("This change doesn't touch any modeled element or the model itself.");
-  } else {
-    const list = touched
-      .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id))
-      .map((t) => `\`${t.id}\`${t.files ? ` (${t.files} file${t.files === 1 ? "" : "s"})` : ""}`);
-    md.push(`**Touches:** ${list.join(", ") || "the model only"}`);
-    if (owners.size) md.push(`**Owners:** ${[...owners].join(", ")}`);
-    md.push("");
-    const breaks = elsewhere.filter((e) => e.effect === "breaks");
-    const diagram =
-      input.diagrams !== false &&
-      changeDiagram({
-        model,
-        diff,
-        touched: touchedFiles,
-        remote: elsewhere.filter((e) => e.reach === "direct"),
-      });
-    if (diagram) {
-      const legend = breaks.length
-        ? `${CHANGE_LEGEND} · red arrow: a consumer in another repo this change breaks`
-        : CHANGE_LEGEND;
-      md.push("```mermaid", diagram, "```", "", `<sub>${legend}</sub>`, "");
-    }
-    if (elsewhere.length) {
-      const consumers = new Set(elsewhere.map((e) => e.from)).size;
-      md.push(`### Used from other repos (${consumers})`, "");
-      if (breaks.length) {
-        const repos = new Set(breaks.map((b) => b.namespace));
-        md.push(
-          `> [!WARNING]\n> This change breaks ${breaks.length} consumer${breaks.length === 1 ? "" : "s"} in ${repos.size === 1 ? "another repo" : `${repos.size} other repos`} (${[...repos].join(", ")}). Coordinate with ${repos.size === 1 ? "its owners" : "their owners"} before merging, or keep the old ${breaks.some((b) => b.why?.endsWith("is removed") && b.via) ? "contract" : "element"} until they move.`,
-          "",
-        );
-      }
-      md.push("| Consumer | Uses | Effect |", "|---|---|---|");
-      const reachNote = {
-        direct: "",
-        parent: " (through a parent)",
-        indirect: " (uses something that uses it)",
-      };
-      for (const e of elsewhere.slice(0, 20)) {
-        const effect =
-          e.effect === "breaks"
-            ? `**breaks**: ${e.why}`
-            : e.effect === "deprecated"
-              ? `deprecated: ${e.why}`
-              : `may be affected${reachNote[e.reach]}`;
-        md.push(
-          `| \`${e.from}\` (${e.namespace}${e.version ? `@${e.version}` : ""}) | \`${e.target}\`${e.via ? ` via \`${e.via}\`` : ""}${e.description ? `: ${e.description}` : ""} | ${effect} |`,
-        );
-      }
-      if (elsewhere.length > 20) md.push("", `…and ${elsewhere.length - 20} more.`);
-      const from = model.landscape
-        ? `the landscape ${model.landscape.namespace}@${model.landscape.version ?? "?"}`
-        : "this repo's imports";
-      md.push("", `<sub>From ${from}, as synced in archdoc.lock.</sub>`, "");
-    }
-    if (journeyList.length) {
-      md.push(
-        `### Journeys affected (${journeyList.length})`,
-        "",
-        "| Journey | Importance | Actor | Steps |",
-        "|---|---|---|---|",
-      );
-      for (const j of journeyList) {
-        const imp = j.importance === "critical" ? "**critical**" : j.importance;
-        const status = j.status !== "active" ? ` (${j.status})` : "";
-        const name = j.namespace ? `${j.namespace}.${j.id} (another repo)` : j.id;
-        md.push(
-          `| ${name}${status}: ${j.goal} | ${imp} | ${j.actor} | ${j.steps.join(", ") || "changed"} |`,
-        );
-      }
-      md.push("");
-    } else {
-      md.push("No journeys pass through what this change touches.", "");
-    }
-    if (actors.size)
-      md.push(
-        `**Actors affected:** ${[...actors.values()].map((a) => `${a.id} (${a.kind})`).join(", ")}`,
-        "",
-      );
-    if (input.diagrams !== false) md.push(...journeyDiagrams(input, journeyList));
-  }
-
   const data = input.base ? sensitiveDataChanges(input.base, model) : { flows: [], stores: [] };
-  md.push(...dataSection(diff, data));
-
-  md.push("### Drift and rules", "");
-  if (counts.errors || counts.warnings) {
-    md.push(
-      `This change introduces ${counts.errors} error${counts.errors === 1 ? "" : "s"} and ${counts.warnings} warning${counts.warnings === 1 ? "" : "s"}.`,
-      "",
-    );
-    md.push(
-      formatFindings(introduced, "markdown").replace(
-        /^\*\*Introduced by this change\*\* \(\d+\)\n\n/,
-        "",
-      ),
-    );
-  } else {
-    md.push("No new drift or rule problems.");
-  }
   const existing = input.findings.filter((f) => !f.introduced);
-  if (existing.length) {
-    md.push(
-      "",
-      `<details><summary>${existing.length} finding${existing.length === 1 ? "" : "s"} that were already there</summary>`,
-      "",
-      formatFindings(
-        existing.map(({ introduced: _i, ...f }) => f),
-        "markdown",
-      ),
-      "",
-      "</details>",
-    );
-  }
-  md.push("");
-
-  md.push("### Model changes", "");
-  if (countChanges(diff) === 0) {
-    md.push("The model didn't change.");
-  } else {
-    md.push(
-      summary(diff),
-      "",
-      "<details><summary>Details</summary>",
-      "",
-      formatDiff(diff, "markdown").split("\n").slice(2).join("\n"),
-      "",
-      "</details>",
-    );
-  }
-  if (suggested.length) {
-    md.push(
-      "",
-      `### Suggested facts to review (${suggested.length})`,
-      "",
-      "An agent added these. Accept them by removing their `provenance` block, or reject them by deleting them.",
-      "",
-      ...suggested.map((s) => `- ${s}`),
-    );
-  }
-  md.push(
-    "",
-    `<sub>Generated by [ArchDoc](https://github.com/ArchDoc/archdoc)${input.label ? ` for ${input.label}` : ""}.</sub>`,
-  );
-
-  return {
+  const summary: ChangeSummary = {
+    verdict: "none",
+    headline: [],
+    blocking: [],
+    attention: [],
+    asks: [],
+    findings: { introduced, existing },
+    changes: countChanges(diff),
+    fixes: input.fixes ?? [],
+    decisions: decisions.map((d) => ({
+      id: d.id,
+      element: d.element,
+      change: d.change,
+      journeys: d.journeys.map((u) => ({
+        id: u.namespace ? `${u.namespace}.${u.journey.id}` : u.journey.id,
+        importance: u.journey.spec.importance ?? "normal",
+        step: u.steps[0] ?? 0,
+      })),
+    })),
     touched,
     journeys: journeyList,
     actors: [...actors.values()],
@@ -388,10 +348,9 @@ export function prReport(input: PrReportInput): PrReport {
     data,
     suggested,
     introduced: counts,
-    markdown: md.join("\n"),
   };
+  return judge(summary);
 }
-
 /** Sensitive data going somewhere new, and data entries that changed. */
 function dataSection(
   diff: ModelDiff,
@@ -535,4 +494,449 @@ function contractChanges(diff: ModelDiff): {
     }
   }
   return { removed, deprecated, deprecatedElements };
+}
+
+const FIX: [RegExp, string][] = [
+  [/^rule\//, "Change it so it follows the rule, or ask the rule's owners for an exception."],
+  [
+    /^drift\/undeclared-dependency$/,
+    "If the dependency is intended, add it to the model (archdoc_propose); if not, remove the import.",
+  ],
+  [/^drift\/stale-/, "Update the element's code paths or snippets."],
+  [/^journey\//, "Update the journey's steps to match the model."],
+  [/^import\//, "Run archdoc sync."],
+  [/^ref\//, "Fix the reference, or run archdoc sync if it's in another repo."],
+  [/^data\//, "Fix the data entry or what sends it."],
+];
+
+const TITLE: [RegExp, (f: MarkedFinding) => string][] = [
+  [/^rule\/violation$/, (f) => `Breaks rule ${f.rule ?? ""}`.trim()],
+  [/^drift\/undeclared-dependency$/, () => "A dependency the model doesn't declare"],
+  [/^drift\/stale-path$/, () => "A code path that matches nothing"],
+  [/^drift\/stale-snippet$/, () => "A code snippet that moved"],
+  [/^drift\/schema-/, () => "The model and a schema disagree"],
+  [/^journey\//, () => "A broken journey"],
+  [/^ref\//, () => "A reference that doesn't resolve"],
+  [/^import\//, () => "Another repo's model is out of sync"],
+  [/^model\/orphan-element$/, () => "An element nothing connects to"],
+  [/^data\//, () => "Invalid data"],
+];
+
+function concernOf(f: MarkedFinding): Concern {
+  const title = TITLE.find(([re]) => re.test(f.code))?.[1](f) ?? f.code;
+  const where = f.location ? `${f.location.file}:${f.location.line}` : f.evidence[0];
+  return {
+    code: f.code,
+    title,
+    detail: f.message,
+    fix: FIX.find(([re]) => re.test(f.code))?.[1],
+    where,
+    element: f.element,
+  };
+}
+
+/** Fills in the verdict, the concerns, and the people to ask. */
+function judge(s: ChangeSummary): ChangeSummary {
+  const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  // Blocking: errors the change introduced, and consumers elsewhere it breaks.
+  s.blocking.push(
+    ...s.findings.introduced.filter((f) => f.severity === "error").map((f) => concernOf(f)),
+  );
+  for (const e of s.elsewhere.filter((e) => e.effect === "breaks")) {
+    s.blocking.push({
+      code: "consumer/breaks",
+      title: `Breaks ${e.from} in ${e.namespace}`,
+      detail: `${e.from} uses ${e.target}${e.via ? ` through ${e.via}` : ""}, and ${e.why ?? "this change breaks it"}.`,
+      fix: "Keep the old contract until they move, or coordinate the change with their owners.",
+      element: e.target,
+    });
+  }
+
+  // Attention: new warnings, sensitive data, critical journeys, consumers elsewhere, suggested facts.
+  s.attention.push(
+    ...s.findings.introduced.filter((f) => f.severity === "warning").map((f) => concernOf(f)),
+  );
+  const ruled = s.findings.introduced.filter((f) => f.code === "rule/violation");
+  for (const f of s.data.flows) {
+    const to = f.flow.to.type === "external" ? f.flow.to.ref : f.flow.to.id;
+    // A rule the flow breaks already says it, as a blocking issue.
+    if (ruled.some((r) => r.message.includes(f.flow.data) && r.message.includes(to))) continue;
+    const fields = f.fields.map((x) => `${x.field} (${x.classification})`).join(", ");
+    const from = f.flow.from.type === "external" ? f.flow.from.ref : f.flow.from.id;
+    s.attention.push({
+      code: "data/sensitive",
+      title: f.external
+        ? "Sends sensitive data outside the system"
+        : "Sends sensitive data somewhere new",
+      detail: `${from} now sends ${f.flow.data}, with ${fields}, to ${to}${f.external ? " (external)" : ""}.`,
+      element: from,
+    });
+  }
+  for (const st of s.data.stores) {
+    s.attention.push({
+      code: "data/sensitive",
+      title: "Stores sensitive data somewhere new",
+      detail: `${st.element} now stores ${st.data} (${st.fields.map((x) => `${x.field} (${x.classification})`).join(", ")}) in ${st.table}.`,
+      element: st.element,
+    });
+  }
+  for (const d of s.decisions) {
+    const critical = d.journeys.filter((j) => j.importance === "critical");
+    const uses = d.journeys.map(
+      (j) => `${j.id} (step ${j.step}${j.importance === "critical" ? ", critical" : ""})`,
+    );
+    s.attention.push({
+      code: "logic/changed",
+      title: `Changes the decision ${d.id}`,
+      detail: `${d.change}${uses.length ? `. Decides ${critical.length ? "critical " : ""}journeys: ${uses.join(", ")}` : ""}.`,
+      element: d.element,
+    });
+  }
+  for (const e of s.elsewhere.filter((e) => e.effect === "deprecated")) {
+    s.attention.push({
+      code: "consumer/deprecated",
+      title: `Deprecates what ${e.from} in ${e.namespace} uses`,
+      detail: `${e.from} uses ${e.target}${e.via ? ` through ${e.via}` : ""}; ${e.why ?? "it's deprecated"}.`,
+      element: e.target,
+    });
+  }
+  if (s.suggested.length) {
+    s.attention.push({
+      code: "model/suggested",
+      title: `${plural(s.suggested.length, "fact")} an agent suggested`,
+      detail: s.suggested.join("; ").replace(/`/g, ""),
+      fix: "Accept them by removing their provenance block, or delete them.",
+    });
+  }
+
+  // People: owners approve, other repos' teams know, critical journeys still work.
+  const ownedBy = new Map<string, string[]>();
+  for (const t of s.touched) {
+    for (const o of t.owners) ownedBy.set(o, [...(ownedBy.get(o) ?? []), t.id]);
+  }
+  for (const [o, ids] of ownedBy) {
+    s.asks.push({ kind: "approve", who: o, why: `owns ${ids.slice(0, 3).join(", ")}` });
+  }
+  const repos = new Map<string, PrReport["elsewhere"]>();
+  for (const e of s.elsewhere) {
+    if (e.reach !== "direct" && e.effect === "affected") continue;
+    repos.set(e.namespace, [...(repos.get(e.namespace) ?? []), e]);
+  }
+  for (const [ns, uses] of repos) {
+    const worst = uses.find((u) => u.effect === "breaks") ?? uses[0];
+    if (!worst) continue;
+    const effect =
+      worst.effect === "breaks" ? "breaks" : worst.effect === "deprecated" ? "deprecated" : "uses";
+    s.asks.push({
+      kind: "inform",
+      who: ns,
+      why: `${worst.from} ${effect === "uses" ? "uses" : `${effect}:`} ${worst.target}${worst.via ? ` via ${worst.via}` : ""}${uses.length > 1 ? `, and ${uses.length - 1} more` : ""}`,
+    });
+  }
+  // Other repos whose journeys decide with a changed decision should know too.
+  for (const d of s.decisions) {
+    for (const j of d.journeys) {
+      const ns = j.id.includes(".") ? j.id.split(".")[0] : undefined;
+      if (!ns || repos.has(ns) || s.asks.some((a) => a.kind === "inform" && a.who === ns)) continue;
+      s.asks.push({
+        kind: "inform",
+        who: ns,
+        why: `${j.id} decides with ${d.id} at step ${j.step}`,
+      });
+    }
+  }
+  const critical = s.journeys.filter((j) => j.importance === "critical");
+  for (const j of critical.slice(0, 3)) {
+    s.asks.push({
+      kind: "verify",
+      who: j.namespace ? `${j.namespace}.${j.id}` : j.id,
+      why: `${j.goal ? `${j.goal}; ` : ""}critical${j.steps.length ? `, ${stepRange(j.steps)}` : ""}`,
+    });
+  }
+  // Consumers that may be affected are worth a look when they're direct.
+  const direct = s.elsewhere.filter((e) => e.reach === "direct" && e.effect === "affected");
+  if (direct.length) {
+    s.attention.push({
+      code: "consumer/affected",
+      title: `Used by ${plural(new Set(direct.map((e) => e.namespace)).size, "other repo")}`,
+      detail: direct
+        .slice(0, 4)
+        .map((e) => `${e.from} uses ${e.target}${e.via ? ` via ${e.via}` : ""}`)
+        .join("; "),
+    });
+  }
+
+  s.verdict = s.blocking.length
+    ? "blocking"
+    : s.attention.length || critical.length
+      ? "attention"
+      : s.touched.length || s.changes
+        ? "info"
+        : "none";
+  const teams = new Set(s.asks.filter((a) => a.kind !== "verify").map((a) => a.who)).size;
+  const parts: string[] = [];
+  if (s.blocking.length) parts.push(plural(s.blocking.length, "blocking issue"));
+  else if (s.attention.length)
+    parts.push(plural(s.attention.length, "thing to check", "things to check"));
+  if (critical.length) parts.push(plural(critical.length, "critical journey"));
+  else if (s.journeys.length) parts.push(plural(s.journeys.length, "journey"));
+  if (teams) parts.push(plural(teams, "team to ask", "teams to ask"));
+  if (!parts.length) {
+    parts.push(
+      s.verdict === "none"
+        ? "No architectural impact"
+        : `Touches ${
+            s.touched
+              .map((t) => t.id)
+              .slice(0, 3)
+              .join(", ") || "the model"
+          }`,
+    );
+  }
+  s.headline = parts;
+  return s;
+}
+
+/** 4, 5, 6, 9 as "steps 4–6, 9". */
+export function stepRange(steps: number[]): string {
+  const sorted = [...new Set(steps)].sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const start = sorted[i] as number;
+    let end = start;
+    while (sorted[i + 1] === end + 1) end = sorted[++i] as number;
+    runs.push(end > start ? `${start}–${end}` : `${start}`);
+  }
+  return `step${sorted.length === 1 ? "" : "s"} ${runs.join(", ")}`;
+}
+
+const VERDICT_ICON: Record<Verdict, string> = {
+  blocking: "⛔",
+  attention: "⚠️",
+  info: "ℹ️",
+  none: "✅",
+};
+
+/**
+ * The PR comment: the verdict first, then what blocks the merge and how to fix
+ * it, who to involve, and only the changed part of the architecture. The rest
+ * folds. A change with no architectural impact gets one line.
+ */
+export function renderPrComment(s: ChangeSummary, input: PrReportInput): string {
+  const footer = `<sub>Generated by [ArchDoc](https://github.com/ArchDoc/archdoc)${input.label ? ` for ${input.label}` : ""}.</sub>`;
+  const head = `${VERDICT_ICON[s.verdict]} **ArchDoc:** ${s.headline.join(" · ")}`;
+  const md: string[] = [REPORT_MARKER, head, ""];
+  if (s.verdict === "none") {
+    md.push(
+      s.findings.existing.length
+        ? `No model change, and nothing this change touches is in the model. ${s.findings.existing.length} finding${s.findings.existing.length === 1 ? " was" : "s were"} already on the base.`
+        : "No model change, and nothing this change touches is in the model.",
+      "",
+      footer,
+    );
+    return md.join("\n");
+  }
+
+  for (const f of s.fixes) {
+    md.push(
+      `🩹 Fixes the bug traced in \`${f.id}\`${f.title ? `: ${f.title}` : ""}${f.anchor ? ` (${f.anchor})` : ""}.`,
+      "",
+    );
+  }
+
+  const concern = (c: Concern, alert: "CAUTION" | "WARNING") => {
+    md.push(`> [!${alert}]`, `> **${c.title}**`, `> ${c.detail.replace(/\n/g, " ")}`);
+    const tail = [c.fix, c.where ? `\`${c.where}\`` : undefined].filter(Boolean).join(" · ");
+    if (tail) md.push(`> ${c.fix ? "To fix: " : ""}${tail}`);
+    md.push("");
+  };
+  for (const c of s.blocking.slice(0, 5)) concern(c, "CAUTION");
+  if (s.blocking.length > 5)
+    md.push(
+      `…and ${s.blocking.length - 5} more blocking issues, listed under Drift and rules.`,
+      "",
+    );
+
+  if (s.attention.length) {
+    md.push("**To check**", "");
+    for (const c of s.attention.slice(0, 8)) {
+      md.push(`- **${c.title}.** ${c.detail}${c.where ? ` \`${c.where}\`` : ""}`);
+    }
+    if (s.attention.length > 8) md.push(`- …and ${s.attention.length - 8} more`);
+    md.push("");
+  }
+
+  if (s.asks.length) {
+    md.push("**Before merging**", "");
+    const verb = { approve: "approves", inform: "knows", verify: "still works" };
+    for (const a of s.asks) md.push(`- [ ] **${a.who}** ${verb[a.kind]} · ${a.why}`);
+    md.push("");
+  }
+
+  // Only what changed, not its neighborhood.
+  const touched = new Map(s.touched.map((t) => [t.id, t.files]));
+  const diagram =
+    input.diagrams !== false &&
+    (s.changes > 0 || s.elsewhere.some((e) => e.effect !== "affected")) &&
+    changeDiagram({
+      model: input.model,
+      diff: input.diff,
+      touched,
+      context: false,
+      remote: s.elsewhere.filter((e) => e.reach === "direct" && e.effect !== "affected"),
+    });
+  md.push("**What changed**", "");
+  if (diagram) {
+    md.push("```mermaid", diagram, "```", "", `<sub>${CHANGE_LEGEND_SHORT}</sub>`, "");
+  }
+  const list = s.touched
+    .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id))
+    .map((t) => `\`${t.id}\`${t.files ? ` (${t.files} file${t.files === 1 ? "" : "s"})` : ""}`);
+  md.push(
+    `Touches ${list.join(", ") || "the model only"}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}. ${s.changes ? `In the model: ${summary(input.diff)}.` : "The model didn't change."}`,
+    "",
+  );
+  if (input.explorerUrl)
+    md.push(`**[Open this change in the explorer →](${input.explorerUrl})**`, "");
+
+  // The rest, folded.
+  const fold = (title: string, body: string[], open = false) => {
+    if (!body.length) return;
+    md.push(
+      `<details${open ? " open" : ""}><summary>${title}</summary>`,
+      "",
+      ...body,
+      "",
+      "</details>",
+      "",
+    );
+  };
+  if (s.journeys.length) {
+    const critical = s.journeys.filter((j) => j.importance === "critical").length;
+    const body = [
+      "| Journey | Importance | Actor | Steps |",
+      "|---|---|---|---|",
+      ...s.journeys.map((j) => {
+        const imp = j.importance === "critical" ? "**critical**" : j.importance;
+        const status = j.status !== "active" ? ` (${j.status})` : "";
+        const name = j.namespace ? `${j.namespace}.${j.id} (another repo)` : j.id;
+        return `| ${name}${status}: ${j.goal} | ${imp} | ${j.actor} | ${j.steps.join(", ") || "changed"} |`;
+      }),
+      "",
+    ];
+    if (s.actors.length) {
+      body.push(
+        `**Actors affected:** ${s.actors.map((a) => `${a.id} (${a.kind})`).join(", ")}`,
+        "",
+      );
+    }
+    if (input.diagrams !== false) body.push(...journeyDiagrams(input, s.journeys));
+    fold(
+      `Journeys affected (${s.journeys.length}${critical ? `, ${critical} critical` : ""})`,
+      body,
+    );
+  }
+  if (s.elsewhere.length) {
+    const reachNote = {
+      direct: "",
+      parent: " (through a parent)",
+      indirect: " (uses something that uses it)",
+    };
+    const body = ["| Consumer | Uses | Effect |", "|---|---|---|"];
+    for (const e of s.elsewhere.slice(0, 20)) {
+      const effect =
+        e.effect === "breaks"
+          ? `**breaks**: ${e.why}`
+          : e.effect === "deprecated"
+            ? `deprecated: ${e.why}`
+            : `may be affected${reachNote[e.reach]}`;
+      body.push(
+        `| \`${e.from}\` (${e.namespace}${e.version ? `@${e.version}` : ""}) | \`${e.target}\`${e.via ? ` via \`${e.via}\`` : ""}${e.description ? `: ${e.description}` : ""} | ${effect} |`,
+      );
+    }
+    if (s.elsewhere.length > 20) body.push("", `…and ${s.elsewhere.length - 20} more.`);
+    const from = input.model.landscape
+      ? `the landscape ${input.model.landscape.namespace}@${input.model.landscape.version ?? "?"}`
+      : "this repo's imports";
+    body.push("", `<sub>From ${from}, as synced in archdoc.lock.</sub>`);
+    const repos = new Set(s.elsewhere.map((e) => e.namespace)).size;
+    fold(`Used by other repos (${repos})`, body);
+  }
+  const data = dataSection(input.diff, s.data);
+  if (data.length) fold("Data", data.slice(2));
+  if (s.findings.introduced.length) {
+    fold(
+      `Drift and rules (${s.introduced.errors} error${s.introduced.errors === 1 ? "" : "s"}, ${s.introduced.warnings} warning${s.introduced.warnings === 1 ? "" : "s"} from this change)`,
+      [
+        formatFindings(
+          s.findings.introduced.map(({ introduced: _i, ...f }) => f),
+          "markdown",
+        ),
+      ],
+    );
+  }
+  if (s.changes) {
+    fold(`Model changes (${summary(input.diff)})`, [
+      formatDiff(input.diff, "markdown").split("\n").slice(2).join("\n"),
+    ]);
+  }
+  if (s.suggested.length) {
+    fold(`Suggested facts to review (${s.suggested.length})`, [
+      "An agent added these. Accept them by removing their `provenance` block, or reject them by deleting them.",
+      "",
+      ...s.suggested.map((x) => `- ${x}`),
+    ]);
+  }
+  if (s.findings.existing.length) {
+    fold(
+      `Already on the base (${s.findings.existing.length} finding${s.findings.existing.length === 1 ? "" : "s"}, not from this change)`,
+      [
+        formatFindings(
+          s.findings.existing.map(({ introduced: _i, ...f }) => f),
+          "markdown",
+        ),
+      ],
+    );
+  }
+  md.push(footer);
+  return md.join("\n");
+}
+
+/** Logic blocks the diff changed, where each runs, and the journeys (here and elsewhere) that decide with it. */
+function decisionChanges(
+  model: Model,
+  diff: ModelDiff,
+): {
+  id: string;
+  element?: string | undefined;
+  change: string;
+  journeys: { namespace?: string | undefined; journey: JourneyNode; steps: number[] }[];
+}[] {
+  const out: ReturnType<typeof decisionChanges> = [];
+  for (const c of diff.logic) {
+    const node = model.logic.get(c.id);
+    const runsIn = node?.spec["runs-in"];
+    const element = runsIn && model.elements.has(runsIn) ? runsIn : undefined;
+    const change =
+      c.kind === "changed"
+        ? blockChanges("logic", c) || "changed"
+        : c.kind === "added"
+          ? "added"
+          : "removed";
+    const journeys: ReturnType<typeof decisionChanges>[number]["journeys"] = [];
+    const scan = (m: Model, namespace: string | undefined) => {
+      for (const j of m.journeys.values()) {
+        const steps: number[] = [];
+        j.steps.forEach((step, i) => {
+          const ref = step.spec.decides;
+          if (ref === c.id || ref === `${model.namespace}.${c.id}`) steps.push(i + 1);
+        });
+        if (steps.length) journeys.push({ namespace, journey: j, steps });
+      }
+    };
+    scan(model, undefined);
+    for (const [ns, other] of otherModels(model)) scan(other.model, ns);
+    out.push({ id: c.id, element, change, journeys });
+  }
+  return out;
 }

@@ -190,9 +190,12 @@ describe("prReport across repos", () => {
       ["rides.gateway", "breaks", "proto/charges.proto is removed"],
       ["trips.api", "affected", undefined],
     ]);
+    expect(r.verdict).toBe("blocking");
+    expect(r.blocking.map((c) => c.title)).toEqual(["Breaks rides.gateway in rides"]);
     expect(r.markdown).toContain(
-      "> [!WARNING]\n> This change breaks 1 consumer in another repo (rides).",
+      "> [!CAUTION]\n> **Breaks rides.gateway in rides**\n> rides.gateway uses charges through proto/charges.proto, and proto/charges.proto is removed.",
     );
+    expect(r.asks.filter((a) => a.kind === "inform").map((a) => a.who)).toEqual(["rides", "trips"]);
     expect(r.markdown).toContain(
       "| `rides.gateway` (rides@1.2.0) | `charges` via `proto/charges.proto`: Refunds | **breaks**: proto/charges.proto is removed |",
     );

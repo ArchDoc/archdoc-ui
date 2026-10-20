@@ -171,5 +171,17 @@ export {
   type JourneyDiagramInput,
   journeyDiagram,
 } from "./report/mermaid.js";
-export { type PrReport, type PrReportInput, prReport, REPORT_MARKER } from "./report/pr-report.js";
+export {
+  type Ask,
+  type ChangeSummary,
+  type Concern,
+  type PrReport,
+  type PrReportInput,
+  prReport,
+  REPORT_MARKER,
+  renderPrComment,
+  stepRange,
+  summarizeChange,
+  type Verdict,
+} from "./report/pr-report.js";
 export * from "./report/report.js";
