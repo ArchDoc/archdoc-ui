@@ -11,6 +11,7 @@ export {
 } from "./load/fs.js";
 export {
   changedFiles,
+  listBranches,
   loadModelAtRef,
   mergeBase,
   readModelSourcesAtRef,

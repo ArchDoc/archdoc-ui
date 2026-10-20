@@ -85,6 +85,10 @@
                           "enum": ["active", "planned", "deprecated"],
                           "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
                         },
+                        "transport": {
+                          "description": "How it travels, when it isn't the contract's: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+                          "type": "string"
+                        },
                         "sends": {
                           "description": "Data entries sent along this relationship",
                           "anyOf": [
@@ -620,6 +624,25 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "lines": {
+                            "description": "A snippet of a file: one line, or a range such as 40-88",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^\\d+(-\\d+)?$"
+                              }
+                            ]
+                          },
+                          "symbol": {
+                            "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                            "type": "string",
+                            "minLength": 1
                           }
                         },
                         "required": ["path"],
@@ -644,6 +667,25 @@
                             },
                             "description": {
                               "type": "string"
+                            },
+                            "lines": {
+                              "description": "A snippet of a file: one line, or a range such as 40-88",
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^\\d+(-\\d+)?$"
+                                }
+                              ]
+                            },
+                            "symbol": {
+                              "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "required": ["path"],
@@ -788,6 +830,25 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "lines": {
+                            "description": "A snippet of a file: one line, or a range such as 40-88",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^\\d+(-\\d+)?$"
+                              }
+                            ]
+                          },
+                          "symbol": {
+                            "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                            "type": "string",
+                            "minLength": 1
                           }
                         },
                         "required": ["path"],
@@ -812,6 +873,25 @@
                             },
                             "description": {
                               "type": "string"
+                            },
+                            "lines": {
+                              "description": "A snippet of a file: one line, or a range such as 40-88",
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^\\d+(-\\d+)?$"
+                                }
+                              ]
+                            },
+                            "symbol": {
+                              "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "required": ["path"],
@@ -1435,6 +1515,25 @@
                     },
                     "description": {
                       "type": "string"
+                    },
+                    "lines": {
+                      "description": "A snippet of a file: one line, or a range such as 40-88",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^\\d+(-\\d+)?$"
+                        }
+                      ]
+                    },
+                    "symbol": {
+                      "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": ["path"],
@@ -1459,6 +1558,25 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "lines": {
+                        "description": "A snippet of a file: one line, or a range such as 40-88",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^\\d+(-\\d+)?$"
+                          }
+                        ]
+                      },
+                      "symbol": {
+                        "description": "A snippet of a file: the function, class, or type it declares, such as stepMessage",
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "required": ["path"],
@@ -1515,6 +1633,10 @@
                     "type": "string",
                     "enum": ["active", "planned", "deprecated"],
                     "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+                  },
+                  "transport": {
+                    "description": "How it travels, when it isn't the contract's: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+                    "type": "string"
                   },
                   "sends": {
                     "description": "Data entries sent along this relationship",
@@ -1597,6 +1719,10 @@
                     "enum": ["active", "planned", "deprecated"],
                     "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
                   },
+                  "transport": {
+                    "description": "How it travels: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+                    "type": "string"
+                  },
                   "accepts": {
                     "description": "Data entries it accepts",
                     "anyOf": [
@@ -1659,6 +1785,10 @@
                     "enum": ["active", "planned", "deprecated"],
                     "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
                   },
+                  "transport": {
+                    "description": "How it travels: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+                    "type": "string"
+                  },
                   "accepts": {
                     "description": "Data entries it accepts",
                     "anyOf": [
@@ -1720,6 +1850,10 @@
                     "type": "string",
                     "enum": ["active", "planned", "deprecated"],
                     "description": "Lifecycle status, used for roadmap overlays. Defaults to active."
+                  },
+                  "transport": {
+                    "description": "How it travels: http, grpc, graphql, websocket, kafka, sqs, sns, eventbridge, pubsub, rabbitmq, or another",
+                    "type": "string"
                   },
                   "accepts": {
                     "description": "Data entries it accepts",

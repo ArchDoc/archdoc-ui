@@ -1,4 +1,5 @@
 import type { Located } from "../codemap/codemap.js";
+import { isSnippet, snippetLabel } from "../codemap/snippet.js";
 import { dataFlows, dataStores, stepMessage } from "../data/flows.js";
 import type { FieldId, Lineage } from "../data/lineage.js";
 import { parseStates, qualifyData, resolveData } from "../data/resolve.js";
@@ -138,7 +139,14 @@ export function formatElement(model: Model, ref: string): string | undefined {
   if (v.children.length)
     out.push(`Contains: ${v.children.map((c) => `${c.key} (${c.spec.kind})`).join(", ")}`);
   if (v.owners.length) out.push(`Owners: ${v.owners.join(", ")}`);
-  if (e.code.length) out.push(`Code: ${e.code.map((c) => c.path).join(", ")}`);
+  if (e.code.length) {
+    // Whole paths on one line; snippets, and paths with a description, one each.
+    const plain = e.code.filter((c) => !isSnippet(c) && !c.description);
+    if (plain.length) out.push(`Code: ${plain.map((c) => c.path).join(", ")}`);
+    for (const c of e.code.filter((c) => isSnippet(c) || c.description)) {
+      out.push(`Code: ${snippetLabel(c)}${c.description ? ` · ${c.description}` : ""}`);
+    }
+  }
   if (v.uses.length) out.push(`Uses: ${rels(v.uses, "to")}`);
   if (e.spec.provides?.length) {
     out.push(

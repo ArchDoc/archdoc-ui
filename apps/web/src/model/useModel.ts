@@ -7,6 +7,7 @@ import {
   type LandscapeRepo,
   type Model,
   type ModelSource,
+  type SnippetPlace,
 } from "@archdoc/core/browser";
 import { useCallback, useEffect, useState } from "react";
 
@@ -18,6 +19,8 @@ export interface ModelPayload {
   watch: boolean;
   /** Repository files, relative to the repository root, for code mapping. */
   files?: string[];
+  /** Where each code snippet is, by snippetKey, so a symbol links to its lines. */
+  snippets?: Record<string, SnippetPlace>;
   repo?: RepoLinks;
   /** With `archdoc view --base <ref>`: the model's files at that ref. */
   base?: { ref: string; commit: string; root: string; sources: ModelSource[] };
@@ -64,8 +67,11 @@ export type ModelState =
   | {
       status: "ready";
       model: Model;
+      /** The model's own files, to compare them with another version's. */
+      sources: { root: string; sources: ModelSource[] };
       watch: boolean;
       files: string[];
+      snippets: Record<string, SnippetPlace>;
       repo: RepoLinks;
       /** The model at the base ref, for the before/after view. */
       base?: { ref: string; model: Model } | undefined;
@@ -110,8 +116,10 @@ export function useModel(): ModelState {
       setState((prev) => ({
         status: "ready",
         model,
+        sources: { root: payload.root, sources: payload.sources },
         watch: payload.watch,
         files: payload.files ?? [],
+        snippets: payload.snippets ?? {},
         repo: payload.repo ?? {},
         base: payload.base && {
           ref: payload.base.ref,

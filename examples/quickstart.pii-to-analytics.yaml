@@ -1,0 +1,87 @@
+# Quickstart, after adding analytics: orders now go to an outside analytics
+# tool, emails included, which the shop's own rule forbids. The report flags it:
+#   archdoc report --base examples/quickstart.yaml -m examples/quickstart.pii-to-analytics.yaml
+archdoc: "2.0"
+namespace: shop
+name: Online shop
+description: Sells things to shoppers on the web.
+
+actors:
+  shopper:
+    kind: person
+    description: Someone buying from the shop.
+    uses:
+      web: { description: Browses and checks out, sends: CheckoutRequest }
+
+elements:
+  shop:
+    kind: system
+    description: Everything the shop runs.
+    elements:
+      web:
+        kind: container
+        technology: Next.js
+        uses:
+          orders: { description: Places the order, sends: CheckoutRequest }
+      orders:
+        kind: container
+        technology: Node.js
+        description: Takes orders and charges for them.
+        uses:
+          db: { description: Saves orders, sends: Order }
+          payments: { description: Charges the card, sends: Charge }
+          analytics: { description: Tracks conversions, sends: Order }
+      db:
+        kind: datastore
+        technology: Postgres
+        stores:
+          orders: { entity: Order, key: id }
+  payments:
+    kind: external
+    description: The card processor.
+  analytics:
+    kind: external
+    description: A third-party analytics tool.
+
+data:
+  CheckoutRequest:
+    kind: message
+    fields:
+      email: { type: string, classification: pii }
+      total_cents: { type: int }
+  Order:
+    kind: entity
+    fields:
+      id: { type: string }
+      email: { type: string, classification: pii }
+      total_cents: { type: int }
+      status: { type: enum, values: [placed, paid] }
+  Charge:
+    kind: message
+    description: What the card processor needs. No email.
+    fields:
+      order_id: { type: string, references: Order }
+      amount_cents: { type: int }
+
+journeys:
+  check-out:
+    actor: shopper
+    goal: Buy what's in the cart
+    importance: critical
+    steps:
+      - { from: shopper, to: web, action: Clicks "Place order" }
+      - { from: web, to: orders, action: Sends the cart }
+      - from: orders
+        to: db
+        action: Saves the order
+        creates: { Order: { id: order-1, status: placed } }
+      - { from: orders, to: payments, action: Charges the card }
+      - from: orders
+        to: db
+        action: Marks it paid
+        changes: { Order.status: placed -> paid }
+
+rules:
+  - id: no-personal-data-out
+    description: Shoppers' personal data stays in the shop.
+    data: { classification: pii, not-sent-to: { kind: external } }

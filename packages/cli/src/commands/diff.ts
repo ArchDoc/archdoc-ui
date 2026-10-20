@@ -9,6 +9,7 @@ import {
   mergeBase,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
+import { isModelPath } from "../model-path.js";
 
 export interface DiffOptions {
   model?: string;
@@ -22,12 +23,15 @@ const FORMATS = ["text", "markdown", "mermaid", "json"];
 /**
  * `archdoc diff [range]`. No range: HEAD against the working tree. `main`:
  * main against the working tree. `a..b`: a against b. `a...b`: the merge base
- * of a and b against b, which is what a pull request shows.
+ * of a and b against b, which is what a pull request shows. Two model
+ * files: the first against the second.
  */
 export async function diff(
   range: string | undefined,
   options: DiffOptions,
   io: Io,
+  /** With a model path as `range`, the model to compare it with; else --model. */
+  after?: string,
 ): Promise<number> {
   const format = (options.format ?? "text") as DiffFormat;
   if (!FORMATS.includes(format)) {
@@ -36,6 +40,23 @@ export async function diff(
   }
   const target = options.model ?? ".";
   try {
+    // Two models on disk, such as an example and its variant: the first against the second.
+    if (range && isModelPath(io.cwd, range)) {
+      const other = after ?? target;
+      const [base, model] = await Promise.all([
+        loadModel(range, { cwd: io.cwd }),
+        loadModel(other, { cwd: io.cwd }),
+      ]);
+      warnOnErrors(base, range, io);
+      warnOnErrors(model, other, io);
+      const d = diffModels(base, model);
+      io.out(formatDiff(d, format, `${range} → ${other}`));
+      return options.exitCode && !isEmptyDiff(d) ? 1 : 0;
+    }
+    if (after) {
+      io.err(`${range} isn't a model file. Compare two model files, or give a git range.`);
+      return 2;
+    }
     const sides = await resolveRange(range ?? "HEAD", io.cwd);
     const [base, head] = await Promise.all([
       loadModelAtRef(target, sides.base, { cwd: io.cwd }),

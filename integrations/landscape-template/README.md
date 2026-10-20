@@ -26,4 +26,4 @@ Then `archdoc sync` there. From then on:
 
 Run `archdoc sync --update landscape` (or schedule it) to take a new landscape release.
 
-The demo org in [`examples/acme`](../../examples/acme) is a working landscape with three team repos.
+The demo org in [`examples/org`](../../examples/org) is a working landscape with three team repos.

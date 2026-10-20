@@ -34,7 +34,7 @@ if (existsSync(dir)) {
   rmSync(dir, { recursive: true, force: true });
 }
 mkdirSync(dir, { recursive: true });
-cpSync(join(root, "examples/acme"), dir, { recursive: true });
+cpSync(join(root, "examples/org"), dir, { recursive: true });
 writeFileSync(marker, "Made by scripts/playground.mjs. Safe to delete.\n");
 
 const git = (repo, ...a) =>

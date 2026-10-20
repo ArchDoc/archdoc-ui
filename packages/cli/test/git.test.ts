@@ -137,6 +137,35 @@ describe("against a git history", () => {
     ).rejects.toThrow('"nope" is not a commit');
   });
 
+  it("view lists the branches and sends the model at any two of them", async () => {
+    const server = await startViewServer({ target: ".", cwd: repo, webDir: repo, base: "main" });
+    try {
+      const refs = (await (await fetch(`${server.url}/api/refs`)).json()) as {
+        current: string;
+        branches: string[];
+        base: string;
+      };
+      expect(refs).toMatchObject({ current: "feature", base: "main" });
+      expect(refs.branches).toEqual(expect.arrayContaining(["main", "feature"]));
+
+      type Pair = { base: { ref: string; commit: string }; head?: { ref: string } };
+      const pair = (await (
+        await fetch(`${server.url}/api/compare?base=main&head=feature`)
+      ).json()) as Pair;
+      expect(pair.base).toMatchObject({ ref: "main", commit: git("rev-parse", "main").trim() });
+      expect(pair.head?.ref).toBe("feature");
+      // Without a head, the explorer compares with the working tree it already has.
+      const tree = (await (await fetch(`${server.url}/api/compare?base=main`)).json()) as Pair;
+      expect(tree.head).toBeUndefined();
+
+      const bad = await fetch(`${server.url}/api/compare?base=--output=x`);
+      expect(bad.status).toBe(400);
+      expect(((await bad.json()) as { error: string }).error).toContain("not a branch");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("diff a...b compares from the merge base", async () => {
     git("add", "-A");
     git("commit", "-q", "-m", "feature");

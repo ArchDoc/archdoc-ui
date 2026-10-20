@@ -1,4 +1,4 @@
-import { existsSync, type FSWatcher, watch } from "node:fs";
+import { existsSync, type FSWatcher, readFileSync, watch } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -8,14 +8,17 @@ import { contextFor, importSchemas } from "@archdoc/analyzers";
 import {
   buildModel,
   federationDir,
+  listBranches,
   listRepoFiles,
   readFederationInput,
   readModelSources,
   readModelSourcesAtRef,
   repoInfo,
+  resolveSnippets,
   type SourcesAtRef,
 } from "@archdoc/core";
 import { landscapePayload, loadLandscape } from "./landscape.js";
+import { isModelPath } from "./model-path.js";
 
 export interface ViewServerOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -64,7 +67,9 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
   const initial = await readModelSources(options.target, { cwd: options.cwd });
   // The base doesn't change while the server runs, so read it once.
   const base: SourcesAtRef | undefined = options.base
-    ? await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
+    ? isModelPath(options.cwd ?? process.cwd(), options.base)
+      ? await sourcesOfFile(options.base, options.cwd)
+      : await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
     : undefined;
 
   const server = createServer(async (req, res) => {
@@ -86,11 +91,22 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
           repoInfo(read.baseDir),
           readFederationInput(await federationDir(read.source), options.cwd),
         ]);
+        const model = buildModel(read.sources, { root: read.root });
+        const inRepo = new Set(files);
         return json(res, 200, {
           root: read.root,
           sources: read.sources,
           watch: watching,
           files,
+          // Where each code snippet is, so the explorer links a symbol to its lines.
+          snippets: resolveSnippets(model, (path) => {
+            if (!inRepo.has(path)) return undefined;
+            try {
+              return readFileSync(join(read.baseDir, path), "utf8");
+            } catch {
+              return undefined;
+            }
+          }),
           // Other repos' models, so the explorer checks and simulates across repos like the CLI.
           federation: {
             lockPath: federation.lockPath,
@@ -100,12 +116,9 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
           },
           samples: await readSamples(read.baseDir, files),
           // What data entries' schema sources say (types, values, foreign keys), as check reads them.
-          schemas: (
-            await importSchemas(
-              contextFor(read.baseDir, files),
-              buildModel(read.sources, { root: read.root }),
-            )
-          ).filter((s) => !s.error),
+          schemas: (await importSchemas(contextFor(read.baseDir, files), model)).filter(
+            (s) => !s.error,
+          ),
           repo: { ...repo, root: read.baseDir },
           base: base && {
             ref: base.ref,
@@ -114,6 +127,34 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             sources: base.sources,
           },
         });
+      }
+      if (url.pathname === "/api/refs") {
+        const { current, branches } = await listBranches(options.cwd);
+        return json(res, 200, { current, branches, base: options.base });
+      }
+      if (url.pathname === "/api/compare") {
+        // Only branches (and the --base the server started with), never arbitrary git arguments.
+        const allowed = new Set((await listBranches(options.cwd)).branches);
+        if (base) allowed.add(base.ref);
+        const at = async (ref: string | null) => {
+          if (ref === null || ref === "") return undefined;
+          if (!allowed.has(ref))
+            throw new RangeError(`"${ref}" is not a branch in this repository.`);
+          if (ref === base?.ref) return base;
+          return readModelSourcesAtRef(options.target, ref, { cwd: options.cwd });
+        };
+        try {
+          const [from, to] = await Promise.all([
+            at(url.searchParams.get("base")),
+            at(url.searchParams.get("head")),
+          ]);
+          if (!from) return json(res, 400, { error: "Pick a base branch to compare with." });
+          // No head means the working tree, which /api/model already sends.
+          return json(res, 200, { base: from, head: to });
+        } catch (err) {
+          if (err instanceof RangeError) return json(res, 400, { error: err.message });
+          throw err;
+        }
       }
       if (url.pathname === "/api/events") {
         if (!watching) return json(res, 404, { error: "Start with --watch for live reload." });
@@ -220,12 +261,25 @@ export function findWebDir(): string | undefined {
   return candidates.find((d): d is string => !!d && existsSync(join(d, "index.html")));
 }
 
-/** Sample records for simulating journeys: JSON files in any samples/ directory. */
+/** Another model on disk, as the base to compare with, in place of a git ref. */
+async function sourcesOfFile(path: string, cwd?: string): Promise<SourcesAtRef> {
+  const read = await readModelSources(path, { cwd });
+  if (!read) throw new Error(`No ArchDoc model at ${path}.`);
+  return { ref: path, commit: "", root: read.root, sources: read.sources };
+}
+
+/**
+ * Sample records for simulating journeys: JSON files in any samples/
+ * directory, and <journey>.sample.json files anywhere, such as next to a
+ * single-file model.
+ */
 async function readSamples(
   baseDir: string,
   files: readonly string[],
 ): Promise<{ path: string; text: string }[]> {
-  const paths = files.filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f)).slice(0, 50);
+  const paths = files
+    .filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f) || /\.sample\.json$/.test(f))
+    .slice(0, 50);
   const out: { path: string; text: string }[] = [];
   for (const path of paths) {
     const text = await readFile(join(baseDir, path), "utf8").catch(() => undefined);

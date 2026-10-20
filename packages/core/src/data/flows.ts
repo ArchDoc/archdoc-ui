@@ -134,6 +134,11 @@ export interface StepMessage {
    * and the entries it creates or changes.
    */
   how: "step" | "sends" | "accepts" | "returns" | "carries" | "writes";
+  /**
+   * The data goes from the step's target to its source: a subscriber's step to
+   * what it subscribes to, or a call whose contract only says what it answers.
+   */
+  against?: boolean | undefined;
 }
 
 /**
@@ -182,7 +187,7 @@ export function stepMessage(
       const answers = flows.filter(
         (f) => (f.how === "returns" || f.how === "carries") && key(f.from) === b && key(f.to) === a,
       );
-      if (answers.length) return pick(answers);
+      if (answers.length) return { ...pick(answers), against: true };
     }
     // A coarse step backed by finer relationships: between what's inside the boxes.
     const inside = flows.filter(
@@ -245,6 +250,32 @@ function writtenBy(model: Model, step: JourneyStep): string[] {
   }
   const ns = `${model.namespace}.`;
   return all.flatMap((e) => (e.startsWith(ns) ? [e, e.slice(ns.length)] : [e, `${ns}${e}`]));
+}
+
+/** A relationship that subscribes to a topic or event: the channel, and how it travels. */
+export interface Subscription {
+  /** The topic or event the target provides. */
+  channel: string;
+  kind: "topic" | "event";
+  transport?: string | undefined;
+}
+
+/**
+ * Whether a relationship subscribes to a topic or event its target provides.
+ * Its messages then go the other way, from the publisher to the subscriber.
+ */
+export function subscriptionOf(
+  model: Model,
+  rel: Pick<Relationship, "to" | "via" | "transport">,
+): Subscription | undefined {
+  const contract = findContract(providesOf(model, rel.to), rel.via);
+  if (!contract || !rel.via) return undefined;
+  if (!("topic" in contract) && !("event" in contract)) return undefined;
+  return {
+    channel: rel.via,
+    kind: "topic" in contract ? "topic" : "event",
+    transport: rel.transport ?? contract.transport,
+  };
 }
 
 /** A datastore a journey step writes into without going to it. */

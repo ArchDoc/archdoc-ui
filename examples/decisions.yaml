@@ -1,7 +1,11 @@
-# Banking: card authorization at a card issuer. A purchase comes in from the
-# card network, gets scored for fraud, is approved or declined against the
-# account's balance, and lands in the ledger. Exercises card data (pci) rules,
-# a decision with several outcomes, and a hold that is captured later.
+# Decisions: card authorization at a card issuer. A decision (CEL rules over
+# the request, the account, the card, and a fraud score) picks the path a
+# purchase takes: each outcome writes its own records, a held purchase
+# continues as a review journey, and mappings say field by field how one
+# record becomes another. authorize-purchase.sample.json runs when the journey
+# opens; try a frozen card, a bigger amount, or a riskier score.
+#   archdoc simulate authorize-purchase --sample examples/authorize-purchase.sample.json -m examples/decisions.yaml
+#   archdoc lineage AuthRequest.amount_cents -m examples/decisions.yaml
 archdoc: "2.0"
 namespace: issuer
 name: Card issuer
@@ -34,7 +38,7 @@ elements:
     owners: [cards-team]
     provides:
       - { api: iso8583/auth, accepts: AuthRequest, returns: AuthResponse }
-      - { topic: authorizations, carries: AuthorizationMade }
+      - { topic: authorizations, transport: kafka, carries: AuthorizationMade }
     uses:
       fraud-model: { description: Scores the purchase, sends: FraudFeatures }
       core-ledger: { description: Places a hold, sends: [Authorization, Hold] }
@@ -64,12 +68,8 @@ elements:
     technology: Rails
     owners: [risk-team]
     uses:
-      authorizations-topic: { description: Picks up held purchases, sends: AuthorizationMade }
+      authorizer: { description: Picks up held purchases, via: authorizations }
       core-ledger: { description: Releases or confirms holds, sends: ReviewDecision }
-  authorizations-topic:
-    kind: queue
-    technology: Kafka
-    owners: [cards-team]
   mobile-banking:
     kind: container
     technology: Swift, Kotlin
@@ -208,7 +208,9 @@ journeys:
         decides: authorize
         branches:
           approved: { creates: { Authorization: { outcome: approved }, Hold: {} } }
-          held-for-review: { creates: { Authorization: { outcome: held } } }
+          held-for-review:
+            creates: { Authorization: { outcome: held } }
+            next: review-held-purchase
           declined-funds: { creates: { Authorization: { outcome: declined } } }
           declined-frozen: { creates: { Authorization: { outcome: declined } } }
   review-held-purchase:
@@ -216,7 +218,7 @@ journeys:
     goal: Clear or stop a purchase the model held
     importance: high
     steps:
-      - { from: case-manager, to: authorizations-topic, action: Picks up the held purchase }
+      - { from: authorizer, to: case-manager, action: Publishes the held purchase }
       - { from: fraud-analyst, to: case-manager, action: Confirms it with the cardholder }
       - { from: case-manager, to: core-ledger, action: Releases or confirms the hold }
   freeze-card:
@@ -228,12 +230,3 @@ journeys:
       - { from: mobile-banking, to: card-controls, action: Asks to freeze it }
       - { from: card-controls, to: vault, action: Marks the card frozen, changes: { Card.frozen: "false -> true" } }
 
-rules:
-  - id: card-numbers-stay-in-the-vault
-    description: Full card numbers are only stored in the PCI zone.
-    data: { classification: pci, stored-in: { tag: pci-zone } }
-  - id: no-card-numbers-to-models
-    description: The fraud model scores tokens, never card numbers.
-    data: { classification: pci, not-sent-to: fraud-model }
-  - id: apps-go-through-services
-    deny: { from: { tag: app }, to: { kind: datastore } }

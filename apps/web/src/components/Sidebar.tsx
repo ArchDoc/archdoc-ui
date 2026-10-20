@@ -1,8 +1,8 @@
 import type { Model } from "@archdoc/core/browser";
 import { forwardRef, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import type { Compare } from "../App.js";
 import { sensitivity } from "../graph/data.js";
 import type { GroupBy } from "../graph/groups.js";
+import type { ChangeItem, Compare } from "../model/compare.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 
 export interface SidebarProps {
@@ -16,6 +16,8 @@ export interface SidebarProps {
   onToggle: (elementId: string) => void;
   onJourney: (id: string) => void;
   compare?: Compare | undefined;
+  /** On the Changes tab, why there's no comparison yet. */
+  changesNote?: string | undefined;
   landscape?: LandscapeInfo | undefined;
   onGroupBy?: ((by: GroupBy) => void) | undefined;
 }
@@ -75,7 +77,13 @@ export const Sidebar = forwardRef<HTMLInputElement, SidebarProps>(function Sideb
         </Section>
       ) : (
         <>
-          {props.compare ? <Changes {...props} compare={props.compare} section={section} /> : null}
+          {props.compare ? (
+            <Changes {...props} compare={props.compare} section={section} />
+          ) : props.changesNote ? (
+            <Section {...section("changes", "Changes", 0)}>
+              <p className="empty">{props.changesNote}</p>
+            </Section>
+          ) : null}
           {props.landscape ? (
             <Landscape {...props} landscape={props.landscape} section={section} />
           ) : null}
@@ -213,48 +221,64 @@ function crossesRepos(model: Model, journeyId: string): boolean {
   return repos.size > 1;
 }
 
-const MARK = { added: "+", removed: "−", changed: "~", moved: "→" } as const;
+const MARK = {
+  added: "+",
+  removed: "−",
+  changed: "~",
+  moved: "→",
+  error: "✗",
+  warning: "!",
+} as const;
 
-/** What changed since the base, as a clickable list. */
+const GROUPS = [
+  ["breaks", "What breaks"],
+  ["journeys", "Journeys affected"],
+  ["elements", "Elements and arrows"],
+  ["data", "Data"],
+  ["suggested", "Suggested facts to review"],
+] as const;
+
+/** What changed since the base, grouped by what to look at first. */
 function Changes(props: SidebarProps & { compare: Compare; section: SectionFor }) {
-  const { diff, ref } = props.compare;
-  const items = [
-    ...diff.elements.map((c) => ({
-      key: `element:${c.id}`,
-      kind: c.kind,
-      label: c.id,
-      hint: "element",
-    })),
-    ...diff.actors.map((c) => ({ key: `actor:${c.id}`, kind: c.kind, label: c.id, hint: "actor" })),
-    ...diff.journeys.map((c) => ({
-      key: `journey:${c.id}`,
-      kind: c.kind,
-      label: c.id,
-      hint: "journey",
-    })),
-  ];
-  const rels = diff.relationships.length;
+  const { groups, ref, head, count, diff } = props.compare;
+  const pick = (i: ChangeItem) => {
+    if (!i.key) return;
+    if (i.key.startsWith("journey:")) props.onJourney(i.key.slice(8));
+    else props.onSelect(i.key);
+  };
+  const other = diff.mappings.length + diff.logic.length + diff.rules.length;
   return (
-    <Section {...props.section("changes", `Changes since ${ref}`, items.length + rels)}>
-      {items.length === 0 && rels === 0 ? <p className="empty">The model didn't change.</p> : null}
-      {items.map((i) => (
-        <Item
-          key={i.key}
-          active={props.selected === i.key || props.journeyId === i.key.slice(8)}
-          onClick={() =>
-            i.key.startsWith("journey:")
-              ? i.kind !== "removed" && props.onJourney(i.key.slice(8))
-              : props.onSelect(i.key)
-          }
-          hint={i.hint}
-          hintClass={`change-${i.kind}`}
-        >
-          <span className={`change-mark change-${i.kind}`}>{MARK[i.kind]}</span> {i.label}
-        </Item>
-      ))}
-      {rels ? (
+    <Section {...props.section("changes", `${head ?? "Changes"} since ${ref}`, count)}>
+      {count === 0 && groups.suggested.length === 0 ? (
+        <p className="empty">The model didn't change.</p>
+      ) : null}
+      {GROUPS.map(([id, title]) =>
+        groups[id].length ? (
+          <div key={id} className={`change-group change-group-${id}`}>
+            <h3>
+              {title} <span className="count">{groups[id].length}</span>
+            </h3>
+            {groups[id].map((i) => (
+              <Item
+                key={`${i.kind} ${i.key} ${i.label}`}
+                active={
+                  !!i.key && (props.selected === i.key || `journey:${props.journeyId}` === i.key)
+                }
+                onClick={() => pick(i)}
+                hint={i.hint}
+                hintClass={`change-${i.kind}`}
+                disabled={!i.key}
+              >
+                <span className={`change-mark change-${i.kind}`}>{MARK[i.kind]}</span> {i.label}
+                {i.detail ? <span className="change-detail">{i.detail}</span> : null}
+              </Item>
+            ))}
+          </div>
+        ) : null,
+      )}
+      {other ? (
         <p className="empty">
-          {rels} relationship change{rels === 1 ? "" : "s"}, shown on the canvas
+          Also {other} change{other === 1 ? "" : "s"} to mappings, logic, or rules.
         </p>
       ) : null}
     </Section>
@@ -418,6 +442,7 @@ function Item(props: {
   onClick: () => void;
   hint?: string;
   hintClass?: string;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -425,6 +450,7 @@ function Item(props: {
       type="button"
       className={`side-item${props.active ? " is-active" : ""}`}
       onClick={props.onClick}
+      disabled={props.disabled}
     >
       <span className="side-item-label">{props.children}</span>
       {props.hint ? (

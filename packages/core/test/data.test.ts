@@ -278,8 +278,8 @@ describe("journey step messages", () => {
       { data: ["payments.LedgerEntry"], how: "writes" },
       { data: ["Charge"], how: "writes" },
       undefined,
-      // A subscriber's step carries what the topic does.
-      { data: ["RefundIssued"], how: "carries" },
+      // A subscriber's step carries what the topic does, from the publisher to it.
+      { data: ["RefundIssued"], how: "carries", against: true },
     ]);
   });
 

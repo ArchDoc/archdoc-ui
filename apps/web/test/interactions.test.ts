@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { buildModel, simulate } from "@archdoc/core/browser";
 import { describe, expect, it } from "vitest";
 import {
+  dataFocus,
   interactionRows,
   journeyInteractions,
   journeyRows,
   sampleSkeleton,
   stepData,
 } from "../src/graph/data.js";
-import { journeyEdges } from "../src/graph/graph.js";
+import { buildGraph, journeyEdges } from "../src/graph/graph.js";
 
 // The shop from core's tests: its journey's step 2 and step 3 also write the order into db.
 const shop = buildModel([
@@ -100,24 +101,81 @@ describe("a journey's interactions", () => {
 });
 
 describe("rows without a sample", () => {
-  const dir = new URL("../../../examples/industries/", import.meta.url);
-  const grid = buildModel([
-    { path: "energy.yaml", text: readFileSync(new URL("energy.yaml", dir), "utf8") },
+  const dir = new URL("../../../examples/", import.meta.url);
+  const issuer = buildModel([
+    { path: "decisions.yaml", text: readFileSync(new URL("decisions.yaml", dir), "utf8") },
   ]);
-  const j = grid.journeys.get("reading-to-outage");
+  const j = issuer.journeys.get("authorize-purchase");
   if (!j) throw new Error("no journey");
 
   it("show example data, never a mapping's expressions", () => {
     // Declared, a mapping's record is there without values.
-    const stored = j.steps.findIndex((s) => s.spec.via === "raw-to-reading");
-    expect(stepData(grid, j, stored).writes).toEqual([
-      expect.objectContaining({ entry: "grid.MeterReading", values: new Map() }),
-    ]);
+    const stored = j.steps.findIndex((s) => s.spec.via === "request-to-authorization");
+    expect(stepData(issuer, j, stored).writes[0]).toMatchObject({
+      entry: "issuer.Authorization",
+      values: new Map(),
+    });
     // Run on example data, the record has values a reader expects.
-    const sim = simulate(grid, j.id, sampleSkeleton(grid, j));
-    const reading = journeyRows(grid, j, stored, sim).get("grid.MeterReading")?.[0];
-    expect(reading?.record).toMatchObject({ meter_id: "meter-1", quality: "actual" });
-    const values = Object.values(reading?.record ?? {}).map(String);
+    const sim = simulate(issuer, j.id, sampleSkeleton(issuer, j));
+    const auth = journeyRows(issuer, j, stored, sim).get("issuer.Authorization")?.[0];
+    expect(auth?.record).toMatchObject({ id: "auth-token-1", status: "pending" });
+    const values = Object.values(auth?.record ?? {}).map(String);
     expect(values.some((v) => v.startsWith("="))).toBe(false);
+  });
+});
+
+describe("a topic on the arrow", () => {
+  // The meter feed publishes readings on a topic; the meter data service subscribes to it.
+  const grid = buildModel([
+    {
+      path: "a.yaml",
+      text: `
+archdoc: "2.0"
+namespace: grid
+actors: { operator: { kind: role, uses: { mdm: Watches } } }
+elements:
+  head-end:
+    kind: container
+    provides: [{ topic: meter-readings, carries: Reading, transport: kafka }]
+  mdm: { kind: container, uses: { head-end: { description: Consumes readings, via: meter-readings } } }
+data:
+  Reading: { kind: message, fields: { kwh: { type: number } } }
+journeys:
+  watch:
+    actor: operator
+    goal: Watch
+    steps:
+      - { from: head-end, to: mdm, action: Publishes a reading }
+      - { from: mdm, to: head-end, action: Consumes it }
+`,
+    },
+  ]);
+
+  it("is drawn from the publisher to the subscriber, with its channel and transport", () => {
+    const graph = buildGraph(grid, { expanded: new Set() });
+    const edge = graph.edges.find((e) => e.subscription);
+    expect(edge).toMatchObject({
+      source: "element:head-end",
+      target: "element:mdm",
+      subscription: { channel: "meter-readings", transport: "kafka" },
+    });
+  });
+
+  it("plays every step the way the message goes, even one written from the subscriber", () => {
+    const j = grid.journeys.get("watch");
+    if (!j) throw new Error("no journey");
+    expect(
+      journeyInteractions(grid, j).map(
+        (x) =>
+          `${x.label} ${x.from.type === "external" ? x.from.ref : x.from.id} → ${x.to.type === "external" ? x.to.ref : x.to.id}`,
+      ),
+    ).toEqual(["1 head-end → mdm", "2 head-end → mdm"]);
+  });
+
+  it("lights its arrow when the message is picked, flowing publisher to subscriber", () => {
+    const focus = dataFocus(grid, { expanded: new Set() }, "grid.Reading");
+    expect(focus.edges.has("element:head-end->element:mdm")).toBe(true);
+    expect(focus.along.has("element:head-end->element:mdm")).toBe(true);
+    expect(focus.along.has("element:mdm->element:head-end")).toBe(false);
   });
 });

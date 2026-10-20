@@ -275,6 +275,7 @@ export function buildModel(sources: readonly ModelSource[], options: BuildOption
           description: rel.description,
           technology: rel.technology,
           via: rel.via,
+          transport: rel.transport,
           status: rel.status ?? "active",
           sends: rel.sends === undefined ? [] : [rel.sends].flat(),
           provenance: rel.provenance,
@@ -449,7 +450,11 @@ export function contractName(p: ProvideSpec): string {
 
 export function normalizeCode(code: CodeSpec | undefined): CodeRef[] {
   if (code === undefined) return [];
-  return [code].flat().map((c) => (typeof c === "string" ? { path: c } : c));
+  return [code].flat().map((c): CodeRef => {
+    if (typeof c === "string") return { path: c };
+    const { lines, ...rest } = c;
+    return lines === undefined ? rest : { ...rest, lines: String(lines) };
+  });
 }
 
 function error(code: string, message: string, file: ParsedFile, path: YamlPath): Diagnostic {

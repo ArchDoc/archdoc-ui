@@ -1,0 +1,127 @@
+# Event-driven: an electricity utility's meters and outages. A message is the
+# same idea however it travels; how it travels is a detail on the arrow.
+# Publishers provide topics and events, with their transport (Kafka,
+# EventBridge, SQS, MQTT, HTTP), and subscribers use them. There are no broker
+# boxes: arrows go from publisher to subscriber, the way the messages go, and
+# one topic fans out to two subscribers.
+archdoc: "2.0"
+namespace: grid
+name: Electricity utility
+description: Meter readings in, outages and bills out.
+
+actors:
+  control-room:
+    kind: role
+    description: Dispatches crews to outages.
+    uses:
+      outage-board: { description: Watches and dispatches outages, sends: Dispatch }
+  customer:
+    kind: person
+    uses:
+      customer-portal: { description: Sees usage, sends: UsageQuery }
+
+elements:
+  smart-meters:
+    kind: external
+    description: Two million meters on a cellular network, each reporting every 15 minutes.
+    uses:
+      head-end: { description: Report readings, via: readings-in }
+  head-end:
+    kind: container
+    technology: Vendor head-end system
+    description: Collects readings from the meters and publishes them.
+    provides:
+      - { api: readings-in, transport: mqtt, accepts: RawReading }
+      - { topic: meter-readings, transport: kafka, carries: MeterReading }
+  mdm:
+    kind: container
+    technology: Scala, Flink
+    description: Meter data management. Validates readings and spots outages.
+    provides:
+      - { event: outage.detected, transport: eventbridge, carries: OutageAlert }
+    uses:
+      head-end: { description: Consumes readings, via: meter-readings }
+      timeseries-db: { description: Stores validated readings, sends: MeterReading }
+  billing:
+    kind: container
+    technology: SAP IS-U
+    description: Bills from the same readings, at its own pace.
+    uses:
+      head-end: { description: Consumes readings, via: meter-readings }
+      billing-db: { description: Issues bills, sends: Bill }
+  outage-board:
+    kind: container
+    technology: React, WebSockets
+    uses:
+      mdm: { description: Shows outages as they're detected, via: outage.detected }
+      crew-dispatch: { description: Queues a crew job, sends: Dispatch, transport: sqs }
+  crew-dispatch:
+    kind: external
+    description: The field workforce system. Takes jobs off its queue.
+  customer-portal:
+    kind: container
+    technology: Vue
+    uses:
+      usage-api: { description: Shows usage, via: openapi/usage.yaml }
+  usage-api:
+    kind: container
+    technology: Node.js
+    provides:
+      - { api: openapi/usage.yaml, transport: http, accepts: UsageQuery, returns: UsageSummary }
+    uses:
+      timeseries-db: { description: Reads daily totals, sends: MeterReading, transport: grpc }
+  timeseries-db:
+    kind: datastore
+    technology: TimescaleDB
+    stores:
+      readings: { entity: MeterReading, key: id }
+  billing-db:
+    kind: datastore
+    technology: Oracle
+    stores:
+      bills: { entity: Bill, key: id }
+
+data:
+  RawReading:
+    kind: message
+    fields: { meter_id: { type: string }, register_wh: { type: int }, at: { type: timestamp } }
+  MeterReading:
+    kind: event
+    fields:
+      id: { type: string }
+      meter_id: { type: string }
+      kwh: { type: number }
+      at: { type: timestamp }
+  OutageAlert:
+    kind: event
+    fields: { feeder: { type: string }, meters_dark: { type: int }, since: { type: timestamp } }
+  Dispatch:
+    kind: message
+    fields: { feeder: { type: string }, priority: { type: enum, values: [p1, p2, p3] } }
+  Bill:
+    kind: entity
+    fields: { id: { type: string }, kwh: { type: number }, amount_pence: { type: int } }
+  UsageQuery: { kind: message, fields: { meter_id: { type: string } } }
+  UsageSummary: { kind: message, fields: { daily_kwh: { type: json } } }
+
+journeys:
+  reading-to-outage:
+    actor: control-room
+    goal: Get a crew out when a street loses power
+    importance: critical
+    steps:
+      - { from: smart-meters, to: head-end, action: Report their readings }
+      - { from: head-end, to: mdm, action: Publishes them on meter-readings }
+      - { from: mdm, to: timeseries-db, action: Stores the validated readings, creates: { MeterReading: { id: reading-1 } } }
+      - { from: mdm, to: outage-board, action: Publishes outage.detected for a feeder gone quiet }
+      - { from: control-room, to: outage-board, action: Sees the outage on the map }
+      - { from: outage-board, to: crew-dispatch, action: Queues a crew job }
+  monthly-bill:
+    actor: customer
+    goal: Get a bill for what they used
+    steps:
+      # Written from the subscriber's side; the explorer plays it the way the readings go.
+      - { from: billing, to: head-end, action: Consumes the month's readings }
+      - { from: billing, to: billing-db, action: Issues the bill, creates: { Bill: { id: bill-1 } } }
+      - { from: customer, to: customer-portal, action: Checks their usage }
+      - { from: customer-portal, to: usage-api, action: Loads the daily totals }

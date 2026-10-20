@@ -1,13 +1,16 @@
+import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import {
   filesUnder,
   formatActor,
+  formatCode,
   formatData,
   formatElement,
   formatImpact,
   formatJourney,
   formatLocate,
   formatSearch,
+  getElement,
   hasErrors,
   impact as impactOf,
   impactToJSON,
@@ -149,9 +152,22 @@ export async function map(options: ModelOptions & { unmapped?: boolean }, io: Io
 }
 
 /** Prints the details of an element, actor, or journey by ID. */
-export async function show(id: string, options: ModelOptions, io: Io): Promise<number> {
+export async function show(
+  id: string,
+  options: ModelOptions & { code?: boolean },
+  io: Io,
+): Promise<number> {
   const model = await load(options, io);
   if (!model) return 1;
+  if (options.code) {
+    const e = getElement(model, id)?.element;
+    if (!e) {
+      io.err(`No element "${id}" in this repo.`);
+      return 1;
+    }
+    io.out(formatCode(e.id, e.code, (path) => readRepoFile(model.baseDir, path)));
+    return 0;
+  }
   const journey = model.journeys.get(id);
   const sections = [
     formatElement(model, id),
@@ -175,4 +191,15 @@ export async function show(id: string, options: ModelOptions, io: Io): Promise<n
   }
   io.out(sections.join("\n\n"));
   return 0;
+}
+
+/** A file in the repository, or undefined when there's none (or it's outside it). */
+export function readRepoFile(baseDir: string, path: string): string | undefined {
+  const absolute = resolve(baseDir, path);
+  if (relative(baseDir, absolute).startsWith("..")) return undefined;
+  try {
+    return readFileSync(absolute, "utf8");
+  } catch {
+    return undefined;
+  }
 }

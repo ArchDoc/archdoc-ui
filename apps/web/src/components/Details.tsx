@@ -13,8 +13,8 @@ import {
   type Target,
 } from "@archdoc/core/browser";
 import { type ReactNode, useEffect, useRef } from "react";
-import type { Compare } from "../App.js";
 import { hasData } from "../graph/data.js";
+import type { Compare } from "../model/compare.js";
 import type { LandscapeInfo } from "../model/useModel.js";
 import { type CodeContext, CodeSection, StepCode } from "./code.js";
 import { DataDetails, FieldDetails, SimulatePanel, StepMessagePanel } from "./DataPanels.js";

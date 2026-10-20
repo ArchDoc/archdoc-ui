@@ -21,9 +21,9 @@ describe("loadModel", () => {
   });
 
   it("loads a single file", async () => {
-    const m = await loadModel("examples/blog.yaml", { cwd: repo });
+    const m = await loadModel("examples/quickstart.yaml", { cwd: repo });
     expect(m.diagnostics).toEqual([]);
-    expect(m.files).toEqual(["examples/blog.yaml"]);
+    expect(m.files).toEqual(["examples/quickstart.yaml"]);
   });
 
   it("reports a missing model", async () => {

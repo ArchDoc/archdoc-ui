@@ -29,7 +29,7 @@ async function run(repo: string, ...args: string[]) {
 
 beforeAll(async () => {
   org = await mkdtemp(join(tmpdir(), "archdoc-cli-fed-"));
-  const examples = fileURLToPath(new URL("../../../examples/acme/", import.meta.url));
+  const examples = fileURLToPath(new URL("../../../examples/org/", import.meta.url));
   for (const repo of ["payments", "rides"]) {
     await cp(join(examples, repo), join(org, repo), { recursive: true });
     git(repo, "init", "-q", "-b", "main");

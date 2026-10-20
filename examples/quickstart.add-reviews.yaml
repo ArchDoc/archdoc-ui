@@ -1,0 +1,111 @@
+# Quickstart, after adding reviews: a new service and its store, a new data
+# entry, and a journey. Compare it with the quickstart:
+#   archdoc diff examples/quickstart.yaml examples/quickstart.add-reviews.yaml
+#   archdoc view examples/quickstart.add-reviews.yaml --base examples/quickstart.yaml
+archdoc: "2.0"
+namespace: shop
+name: Online shop
+description: Sells things to shoppers on the web.
+
+actors:
+  shopper:
+    kind: person
+    description: Someone buying from the shop.
+    uses:
+      web: { description: "Browses, checks out, and reviews", sends: CheckoutRequest }
+
+elements:
+  shop:
+    kind: system
+    description: Everything the shop runs.
+    elements:
+      web:
+        kind: container
+        technology: Next.js
+        uses:
+          orders: { description: Places the order, sends: CheckoutRequest }
+          reviews: { description: Posts a review, sends: Review }
+      orders:
+        kind: container
+        technology: Node.js
+        description: Takes orders and charges for them.
+        uses:
+          db: { description: Saves orders, sends: Order }
+          payments: { description: Charges the card, sends: Charge }
+      reviews:
+        kind: container
+        technology: Go
+        description: Collects and shows reviews of what shoppers bought.
+        uses:
+          reviews-db: { description: Saves reviews, sends: Review }
+      reviews-db:
+        kind: datastore
+        technology: DynamoDB
+        stores:
+          reviews: { entity: Review, key: id }
+      db:
+        kind: datastore
+        technology: Postgres
+        stores:
+          orders: { entity: Order, key: id }
+  payments:
+    kind: external
+    description: The card processor.
+
+data:
+  CheckoutRequest:
+    kind: message
+    fields:
+      email: { type: string, classification: pii }
+      total_cents: { type: int }
+  Order:
+    kind: entity
+    fields:
+      id: { type: string }
+      email: { type: string, classification: pii }
+      total_cents: { type: int }
+      status: { type: enum, values: [placed, paid] }
+  Charge:
+    kind: message
+    description: What the card processor needs. No email.
+    fields:
+      order_id: { type: string, references: Order }
+      amount_cents: { type: int }
+
+  Review:
+    kind: entity
+    fields:
+      id: { type: string }
+      order_id: { type: string, references: Order }
+      stars: { type: int }
+      text: { type: string }
+
+journeys:
+  check-out:
+    actor: shopper
+    goal: Buy what's in the cart
+    importance: critical
+    steps:
+      - { from: shopper, to: web, action: Clicks "Place order" }
+      - { from: web, to: orders, action: Sends the cart }
+      - from: orders
+        to: db
+        action: Saves the order
+        creates: { Order: { id: order-1, status: placed } }
+      - { from: orders, to: payments, action: Charges the card }
+      - from: orders
+        to: db
+        action: Marks it paid
+        changes: { Order.status: placed -> paid }
+  review-a-purchase:
+    actor: shopper
+    goal: Tell others what they thought of it
+    steps:
+      - { from: shopper, to: web, action: Writes a review }
+      - { from: web, to: reviews, action: Posts it, sends: Review }
+      - { from: reviews, to: reviews-db, action: Saves it, creates: { Review: { id: review-1, stars: 5 } } }
+
+rules:
+  - id: no-personal-data-out
+    description: Shoppers' personal data stays in the shop.
+    data: { classification: pii, not-sent-to: { kind: external } }

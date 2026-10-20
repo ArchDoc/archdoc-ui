@@ -28,6 +28,51 @@ afterEach(async () => {
 afterAll(() => rm(tmp, { recursive: true, force: true }));
 
 describe("view server", () => {
+  it("says where each code snippet is, so the explorer links a symbol to its lines", async () => {
+    const shop = join(tmp, "shop");
+    await mkdir(join(shop, ".archdoc"), { recursive: true });
+    await mkdir(join(shop, "src"), { recursive: true });
+    await writeFile(
+      join(shop, "src", "orders.ts"),
+      "import x from 'y';\n\nexport function place() {\n  return x;\n}\n",
+    );
+    await writeFile(
+      join(shop, ".archdoc", "archdoc.yaml"),
+      'archdoc: "2.0"\nnamespace: shop\nelements:\n  orders:\n    kind: component\n    code:\n      - { path: src/orders.ts, symbol: place }\n      - { path: src/orders.ts, symbol: gone }\n',
+    );
+    server = await startViewServer({ target: ".", cwd: shop, webDir: web });
+    const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+      snippets: Record<string, unknown>;
+    };
+    expect(payload.snippets).toEqual({
+      "src/orders.ts##place": { start: 3, end: 5 },
+      "src/orders.ts##gone": { problem: "doesn't declare gone" },
+    });
+  });
+
+  it("compares with another model file, and finds samples named after journeys", async () => {
+    const examples = join(tmp, "examples");
+    await mkdir(examples, { recursive: true });
+    const model = (desc: string) =>
+      `archdoc: "2.0"\nnamespace: shop\nelements:\n  web: { kind: container, description: ${desc} }\n`;
+    await writeFile(join(examples, "shop.yaml"), model("Before"));
+    await writeFile(join(examples, "shop.next.yaml"), model("After"));
+    await writeFile(join(examples, "buy.sample.json"), "{}");
+    server = await startViewServer({
+      target: "shop.next.yaml",
+      cwd: examples,
+      webDir: web,
+      base: "shop.yaml",
+    });
+    const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+      base: { ref: string; sources: { text: string }[] };
+      samples: { path: string }[];
+    };
+    expect(payload.base.ref).toBe("shop.yaml");
+    expect(payload.base.sources[0]?.text).toContain("Before");
+    expect(payload.samples.map((s) => s.path)).toContain("buy.sample.json");
+  });
+
   it("serves the model sources and the explorer", async () => {
     server = await startViewServer({ target: ".", cwd: repo, webDir: web });
     expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
