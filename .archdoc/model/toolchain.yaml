@@ -223,7 +223,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Hierarchy, actor, and journey views, a code panel with links, and a before/after view of model changes; runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain, with journeys marked where they cross into another repo. Data shares the canvas. Messages flow along the arrows they travel, datastores open into their tables with foreign keys, a field's lineage lights up across tables and arrows, and every journey step shows the message it carries; a journey simulator runs a sample request in the browser and shows what each step writes. Tours next.
+        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time, samples in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
         code: [{ path: apps/web/** }]
         uses:
           core:
@@ -232,7 +232,7 @@ elements:
         elements:
           model-loader:
             kind: component
-            description: Fetches the model files and rebuilds the model on every change event.
+            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, samples, the comparison, the address).
             code: [{ path: apps/web/src/model/** }]
             uses:
               graph: Hands the model to the canvas
@@ -242,7 +242,7 @@ elements:
             code: [{ path: apps/web/src/graph/** }]
           ui:
             kind: component
-            description: Canvas, sidebar, details panel with code links, and journey stepper.
+            description: Tabs, the map, journey lanes and the step panel, the side lists, and the details panel with code links.
             code: [{ path: apps/web/src/components/**, description: Components }, apps/web/src/App.tsx]
             uses:
               graph: Renders the laid-out graph

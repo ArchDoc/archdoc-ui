@@ -130,19 +130,66 @@ function build(s: Sources): Model {
   return s.sources.length ? modelOf(s) : buildModel([]);
 }
 
-/** The pair in the address, such as #changes=main...feature, so a link opens the same comparison. */
-export function readHash(): { tab?: "changes"; pair?: Pair } {
-  const match = /(?:^#|&)changes(?:=([^&]*))?/.exec(window.location.hash);
-  if (!match) return {};
-  const [base, head] = decodeURIComponent(match[1] ?? "").split("...");
-  return { tab: "changes", pair: base ? { base, head: head || undefined } : undefined };
+/** The explorer's tabs. */
+export type Tab = "overview" | "journeys" | "data" | "changes";
+
+/** What the address says to open. */
+export interface HashState {
+  tab?: Tab | undefined;
+  pair?: Pair | undefined;
+  /** The open journey on the Journeys tab. */
+  journey?: string | undefined;
+  /** The selected entry or field on the Data tab, as data:<entry> or field:<entry.field>. */
+  data?: string | undefined;
 }
 
-export function writeHash(tab: "explore" | "changes", pair: Pair | undefined) {
-  const hash =
-    tab === "changes"
-      ? `#changes${pair ? `=${encodeURIComponent(pair.base)}${pair.head ? `...${encodeURIComponent(pair.head)}` : ""}` : ""}`
-      : "";
+/**
+ * What the address opens, such as #changes=main...feature (so a link opens the
+ * same comparison), #journeys=request-refund, or #data=payments.Refund.
+ */
+export function readHash(hash = window.location.hash): HashState {
+  const parts = hash.replace(/^#/, "").split("&").filter(Boolean);
+  for (const part of parts) {
+    const eq = part.indexOf("=");
+    const name = eq < 0 ? part : part.slice(0, eq);
+    const value = eq < 0 ? "" : decodeURIComponent(part.slice(eq + 1));
+    if (name === "changes") {
+      const [base, head] = value.split("...");
+      return { tab: "changes", pair: base ? { base, head: head || undefined } : undefined };
+    }
+    if (name === "journeys") return { tab: "journeys", journey: value || undefined };
+    if (name === "data") {
+      const data = value
+        ? value.split(".").length > 2
+          ? `field:${value}`
+          : `data:${value}`
+        : undefined;
+      return { tab: "data", data };
+    }
+    if (name === "overview") return { tab: "overview" };
+  }
+  return {};
+}
+
+/** The address for what's open; the Overview has none. */
+export function hashOf(state: HashState): string {
+  const pair = state.pair;
+  switch (state.tab) {
+    case "changes":
+      return `#changes${pair ? `=${encodeURIComponent(pair.base)}${pair.head ? `...${encodeURIComponent(pair.head)}` : ""}` : ""}`;
+    case "journeys":
+      return `#journeys${state.journey ? `=${encodeURIComponent(state.journey)}` : ""}`;
+    case "data": {
+      const entry = state.data?.replace(/^(data|field):/, "");
+      return `#data${entry ? `=${encodeURIComponent(entry)}` : ""}`;
+    }
+    default:
+      return "";
+  }
+}
+
+export function writeHash(state: HashState) {
+  const hash = hashOf(state);
   if (window.location.hash === hash) return;
   window.history.replaceState(
     null,

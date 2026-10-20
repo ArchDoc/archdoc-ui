@@ -40,6 +40,8 @@ export interface ChangeItem {
   label: string;
   hint: string;
   detail?: string | undefined;
+  /** For a journey in another repo: its namespace. */
+  repo?: string | undefined;
 }
 
 export interface ChangeGroups {
@@ -114,14 +116,15 @@ export function compareModels(
 }
 
 function journeyItems(report: ChangeSummary, diff: ModelDiff): ChangeItem[] {
-  const own = report.journeys.filter((j) => !j.namespace);
-  const items: ChangeItem[] = own.map((j) => {
-    const change = diff.journeys.find((c) => c.id === j.id);
+  // Journeys in other repos too: their teams need to know.
+  const items: ChangeItem[] = report.journeys.map((j) => {
+    const change = j.namespace ? undefined : diff.journeys.find((c) => c.id === j.id);
     return {
-      key: `journey:${j.id}`,
+      key: j.namespace ? "" : `journey:${j.id}`,
       kind: change?.kind ?? "changed",
       label: j.goal || j.id,
       hint: j.importance,
+      repo: j.namespace,
       detail: j.steps.length
         ? `step${j.steps.length === 1 ? "" : "s"} ${j.steps.join(", ")}`
         : change?.kind === "added"
@@ -161,7 +164,7 @@ function elementItems(diff: ModelDiff): ChangeItem[] {
           r.from.type === "element" || r.from.type === "actor" ? `${r.from.type}:${r.from.id}` : "",
         kind: c.kind,
         label: `${end(r.from)} → ${end(r.to)}`,
-        hint: "arrow",
+        hint: "uses",
         detail: c.kind === "changed" ? c.fields.join(", ") : r.description,
       };
     }),
@@ -226,7 +229,7 @@ function suggestedItems(diff: ModelDiff): ChangeItem[] {
         key: `${r.from.type}:${r.from.id}`,
         kind: c.kind,
         label: `${end(r.from)} → ${end(r.to)}`,
-        hint: "arrow",
+        hint: "uses",
         detail: by(c.after),
       };
     }),
