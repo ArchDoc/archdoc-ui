@@ -10,6 +10,7 @@ import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
+import { site } from "./commands/site.js";
 import { validate } from "./commands/validate.js";
 import { view } from "./commands/view.js";
 import { type Io, processIo } from "./io.js";
@@ -74,6 +75,16 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
         program.exitCode = result.code;
       },
     );
+
+  program
+    .command("site")
+    .description(
+      "Write the explorer as a static site; with --base, opened on a change, for a pull request to link to",
+    )
+    .argument("[path]", "repository, .archdoc directory, or model file", ".")
+    .option("-o, --out <dir>", "directory to write the site to", "site")
+    .option("-b, --base <ref>", "show the change since this branch or commit")
+    .action((path: string, opts: { out?: string; base?: string }) => run(site(path, opts, io)));
 
   program
     .command("search")
@@ -170,7 +181,11 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       "-b, --base <ref>",
       "mark what changed since this ref introduced, and fail only on that",
     )
-    .option("-f, --format <format>", "text, markdown, or json", "text")
+    .option(
+      "-f, --format <format>",
+      "text, markdown, json, or github (workflow annotations on the diff)",
+      "text",
+    )
     .option("--fail-on <severity>", "error, warning, or never", "error")
     .option("--no-code", "check the model only, without analyzing code")
     .action(
@@ -188,8 +203,15 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "markdown or json", "markdown")
     .option("--no-diagrams", "leave out the Mermaid diagrams of the change and its journeys")
-    .action((opts: { model?: string; base?: string; format?: string; diagrams?: boolean }) =>
-      run(report(opts, io)),
+    .option("--explorer-url <url>", "a page that shows this change in the explorer, to link to")
+    .action(
+      (opts: {
+        model?: string;
+        base?: string;
+        format?: string;
+        diagrams?: boolean;
+        explorerUrl?: string;
+      }) => run(report(opts, io)),
     );
 
   program

@@ -16,6 +16,8 @@ export interface ReportOptions {
   format?: string;
   /** False leaves out the Mermaid diagrams. */
   diagrams?: boolean;
+  /** A page that shows the change in the explorer, linked from the comment. */
+  explorerUrl?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
       diff: diffModels(baseModel, model),
       findings,
       diagrams: options.diagrams !== false,
+      explorerUrl: options.explorerUrl,
       // A commit hash, as the Action passes, reads better short.
       label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });

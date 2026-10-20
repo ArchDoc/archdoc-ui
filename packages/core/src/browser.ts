@@ -163,7 +163,7 @@ export {
 } from "./query/impact.js";
 export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
-export { formatFindings, type MarkedFinding } from "./report/check-report.js";
+export { formatAnnotations, formatFindings, type MarkedFinding } from "./report/check-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
 export {
   CHANGE_LEGEND,
@@ -183,6 +183,7 @@ export {
   renderPrComment,
   stepRange,
   summarizeChange,
+  VERDICT_MARKER,
   type Verdict,
 } from "./report/pr-report.js";
 export * from "./report/report.js";
