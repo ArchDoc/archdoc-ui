@@ -10,6 +10,7 @@ import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
+import { traceAnchor, traceCheck, traceList, traceShow } from "./commands/trace.js";
 import { validate } from "./commands/validate.js";
 import { view } from "./commands/view.js";
 import { type Io, processIo } from "./io.js";
@@ -107,8 +108,8 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
 
   program
     .command("show")
-    .description("Print the details of an element, actor, or journey")
-    .argument("<id>", "element, actor, or journey ID")
+    .description("Print the details of an element, actor, journey, data entry, or trace")
+    .argument("<id>", "element, actor, journey, data entry, or trace ID")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--code", "print the code snippets an element points at")
     .action((id: string, opts: { model?: string; code?: boolean }) => run(show(id, opts, io)));
@@ -159,6 +160,55 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action((journey: string, opts: { model?: string; json?: boolean; sample?: string }) =>
       run(simulateCommand(journey, opts, io)),
     );
+
+  const trace = program
+    .command("trace")
+    .description(
+      "Traces: the path a failing request took, attached to the journey step where the error showed up (.archdoc/traces/)",
+    );
+  trace
+    .command("anchor")
+    .description(
+      "Where an error belongs: the journey steps and elements its stack frames and paths point at, best first, and a trace to start from",
+    )
+    .argument("[text...]", "the error, a log line, or a stack trace; - reads stdin")
+    .option("-f, --file <file>", "read the error from a file")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-n, --limit <n>", "how many journey steps to list", "5")
+    .option("--no-skeleton", "leave out the suggested trace")
+    .option("--json", "print the result as JSON")
+    .action(
+      (
+        words: string[],
+        opts: { file?: string; model?: string; limit?: string; skeleton?: boolean; json?: boolean },
+      ) => run(traceAnchor(words, opts, io)),
+    );
+  trace
+    .command("check")
+    .description(
+      "Check traces against the model and the code: elements, the journey step, code references, and hops the model doesn't declare",
+    )
+    .argument("[files...]", "trace files (default: every .archdoc/traces/*.yaml)")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-f, --format <format>", "text or json", "text")
+    .action((files: string[], opts: { model?: string; format?: string }) =>
+      run(traceCheck(files, opts, io)),
+    );
+  trace
+    .command("list")
+    .description("List the traces in .archdoc/traces/")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the result as JSON")
+    .action((opts: { model?: string; json?: boolean }) => run(traceList(opts, io)));
+  trace
+    .command("show")
+    .description(
+      "Print a trace: the symptom, the journey step, every hop with its evidence, and the fix",
+    )
+    .argument("<id>", "trace ID or file")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--json", "print the resolved trace as JSON")
+    .action((id: string, opts: { model?: string; json?: boolean }) => run(traceShow(id, opts, io)));
 
   program
     .command("check")

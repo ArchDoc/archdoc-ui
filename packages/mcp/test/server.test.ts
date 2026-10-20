@@ -31,6 +31,7 @@ describe("archdoc MCP server", () => {
   it("exposes its tools, all read-only except propose", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "archdoc_anchor",
       "archdoc_check",
       "archdoc_code",
       "archdoc_data",
@@ -45,6 +46,7 @@ describe("archdoc MCP server", () => {
       "archdoc_propose",
       "archdoc_search",
       "archdoc_simulate",
+      "archdoc_trace_check",
       "archdoc_validate",
     ]);
     const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);
@@ -95,6 +97,35 @@ describe("archdoc MCP server", () => {
     );
     expect((await call("archdoc_overview")).text).toMatch(/^ArchDoc \(namespace archdoc\)/);
     expect((await call("archdoc_validate")).text).toBe("The model is valid.");
+  });
+
+  it("anchors an error and starts a trace", async () => {
+    const r = await call("archdoc_anchor", {
+      text: "TypeError: x is undefined\n    at diffModels (/ci/repo/packages/core/dist/diff/diff.js:12:3)\n    at report (/ci/repo/packages/cli/dist/commands/report.js:50:20)",
+    });
+    expect(r.isError).toBe(false);
+    expect(r.text).toMatch(/^Where this error belongs, best first:\n {2}1\. review-ai-change#4/);
+    expect(r.text).toContain("toolchain.core.differ · packages/core/src/diff/diff.ts:12");
+    expect(r.text).toContain("  - from: toolchain.cli.commands\n    to: toolchain.core.differ");
+    expect(INSTRUCTIONS).toContain("archdoc_anchor");
+  });
+
+  it("checks a trace's YAML, a trace file, or every trace", async () => {
+    const draft = await call("archdoc_trace_check", {
+      trace:
+        "trace: draft\ntitle: Draft\nsymptom: x\nexpands: check-model#2\nsteps:\n  - { from: mcp, to: web, role: cause, evidence: read }\n",
+    });
+    expect(draft.text).toContain(
+      "warning trace/undeclared-hop Step 1: toolchain.mcp → toolchain.web",
+    );
+    expect(draft.text).toContain("Opens up check-model step 2");
+    const file = await call("archdoc_trace_check", {
+      path: ".archdoc/traces/report-false-data-changes.yaml",
+    });
+    expect(file.text).toContain("2. ✗ cause  toolchain.cli → toolchain.core.loader");
+    const all = await call("archdoc_trace_check");
+    expect(all.text).toMatch(/\d+ traces?: 0 errors/);
+    expect(all.text).not.toContain("What happened:");
   });
 
   it("returns errors as tool errors", async () => {

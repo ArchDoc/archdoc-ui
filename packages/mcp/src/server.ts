@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { checkRepository } from "@archdoc/analyzers";
 import {
+  anchorError,
+  checkTrace,
   diffModels,
   formatActor,
+  formatAnchors,
   formatCode,
   formatData,
   formatDiagnostics,
@@ -17,17 +20,23 @@ import {
   formatOverview,
   formatSearch,
   formatSimulation,
+  formatTrace,
+  formatTraceChecks,
   getElement,
   impact,
   type LoadedModel,
   lineage,
+  listRepoFiles,
   loadModel,
   loadModelAtRef,
+  loadTraces,
   locate,
   propose,
+  readTraceSources,
   resolveRef,
   search,
   simulate,
+  traceSkeleton,
 } from "@archdoc/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -50,6 +59,8 @@ Start every coding task here, before you grep or read files:
 archdoc_locate tells you which element owns a file. archdoc_code returns the code a component points at, with the text of its snippets, so read it before searching the files yourself.
 
 When a change touches data (what a component sends or stores, how a record is mapped, or a decision such as an approval rule), call archdoc_data on the entry to see its fields, classifications, and where it's stored and sent; archdoc_lineage on a field to see every place its value is copied or derived, across repos; and archdoc_simulate to see which branch a journey takes for a sample request and which records it writes.
+
+When you're asked to explain or fix a bug, call archdoc_anchor with the error (a log line, a stack trace, or the wrong output). It names the journey step it showed up in and the elements involved, and starts a trace for you. Follow the code from there, write the path the failing request took to .archdoc/traces/<id>.yaml with evidence on every step, and call archdoc_trace_check on it. Commit it with the fix.
 
 After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Use archdoc_diff to describe your model changes in the PR.`;
 
@@ -197,15 +208,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       withModel((m) => {
         const e = getElement(m, id)?.element;
         if (!e) throw new Error(notFound(m, id, "element"));
-        return formatCode(e.id, e.code, (path) => {
-          const absolute = resolve(m.baseDir, path);
-          if (relative(m.baseDir, absolute).startsWith("..")) return undefined;
-          try {
-            return readFileSync(absolute, "utf8");
-          } catch {
-            return undefined;
-          }
-        });
+        return formatCode(e.id, e.code, (path) => readRepoFile(m.baseDir, path));
       }),
   );
 
@@ -480,6 +483,88 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
   );
 
   server.registerTool(
+    "archdoc_anchor",
+    {
+      title: "Where an error belongs",
+      description:
+        "Map an error (a log line, a stack trace, or wrong output) onto the model: the elements its stack frames and paths point at, the journey steps it most likely showed up in (best first, with why), and a trace to start from. Call it first when you're asked to explain or fix a bug.",
+      inputSchema: {
+        text: z
+          .string()
+          .min(1)
+          .describe("The error, log lines, or stack trace, as the user gave it"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .optional()
+          .describe("Journey steps to list (default 5)"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ text: errorText, limit }) => {
+      const model = await loadModel(options.model ?? ".", { cwd });
+      if (model.diagnostics.some((d) => d.code === "model/not-found")) {
+        return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
+      }
+      const files = await listRepoFiles(model.baseDir);
+      const result = anchorError(model, errorText, { files, root: model.baseDir, limit });
+      return text(formatAnchors(result, traceSkeleton(result, errorText)));
+    },
+  );
+
+  server.registerTool(
+    "archdoc_trace_check",
+    {
+      title: "Check a trace",
+      description:
+        "Check a trace (the path a failing request took, in .archdoc/traces/<id>.yaml) against the model and the code: its elements, the journey step it expands, code references, and hops the model doesn't declare. Returns the findings and the trace resolved against the model. Pass the YAML you're writing, a path, or nothing to check every trace.",
+      inputSchema: {
+        trace: z.string().optional().describe("A trace's YAML, to check before you save it"),
+        path: z
+          .string()
+          .optional()
+          .describe("A trace file, relative to the repository root or absolute"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ trace, path }) => {
+      try {
+        const model = await loadModel(options.model ?? ".", { cwd });
+        if (model.diagnostics.some((d) => d.code === "model/not-found")) {
+          return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
+        }
+        const sources =
+          trace !== undefined
+            ? [{ path: "trace.yaml", text: trace }]
+            : path
+              ? [
+                  {
+                    path: repoPath(model, path),
+                    text: readFileSync(resolve(model.baseDir, repoPath(model, path)), "utf8"),
+                  },
+                ]
+              : await readTraceSources(options.model ?? ".", { cwd });
+        const { traces, diagnostics } = loadTraces(sources);
+        const files = await listRepoFiles(model.baseDir);
+        const inRepo = new Set(files);
+        const checks = traces.map((t) =>
+          checkTrace(model, t, {
+            files,
+            read: (p) => (inRepo.has(p) ? readRepoFile(model.baseDir, p) : undefined),
+          }),
+        );
+        const out = [formatTraceChecks(checks, diagnostics)];
+        if (trace !== undefined || path) for (const c of checks) out.push("", formatTrace(c.view));
+        return text(out.join("\n"));
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
     "archdoc_validate",
     {
       title: "Validate the model",
@@ -495,6 +580,17 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
   );
 
   return server;
+}
+
+/** A file in the repository, or undefined when there's none (or it's outside it). */
+function readRepoFile(baseDir: string, path: string): string | undefined {
+  const absolute = resolve(baseDir, path);
+  if (relative(baseDir, absolute).startsWith("..")) return undefined;
+  try {
+    return readFileSync(absolute, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 function notFound(model: LoadedModel, id: string, what: string): string {
