@@ -163,3 +163,53 @@ describe("journeyDiagram", () => {
     expect(journeyDiagram({ model: long, journeyId: "nope", steps: [] })).toBeUndefined();
   });
 });
+
+describe("journeyDiagram branches", () => {
+  const branched = model({
+    "archdoc.yaml": root(`
+      actors:
+        rider: { kind: person, uses: { api: Asks } }
+      elements:
+        api: { kind: container, uses: { db: { description: Saves, sends: Refund } } }
+        db: { kind: datastore }
+      data:
+        Request: { kind: message, fields: { amount: { type: int }, reason: { type: string } } }
+        Refund: { kind: entity, fields: { amount: { type: int } } }
+      logic:
+        approval:
+          runs-in: api
+          input: { request: Request }
+          rules:
+            - { when: "request.reason == 'safety'", then: escalate }
+            - { when: "request.amount <= 100", then: approve }
+            - { else: review }
+      journeys:
+        refund:
+          actor: rider
+          goal: Get money back
+          steps:
+            - { from: rider, to: api, action: Asks for a refund, sends: Request, decides: approval }
+            - { from: api, to: db, action: Saves the approved refund, sends: Refund, when: approve }
+            - { from: api, to: db, action: Saves it for review, sends: Refund, when: review }
+            - { from: api, to: db, action: Saves it for safety, sends: Refund, when: escalate }
+            - { from: api, to: db, action: Records the payout, sends: Refund, when: approve }
+    `),
+  });
+
+  it("draws steps after a decision as alt / else blocks, in the decision's order", () => {
+    const d = journeyDiagram({ model: branched, journeyId: "refund", steps: [2] }) ?? "";
+    expect(d).not.toContain("autonumber");
+    const lines = d.split("\n").map((l) => l.trim());
+    const alt = lines.findIndex((l) => l.startsWith("alt escalate: request.reason == 'safety'"));
+    const approve = lines.findIndex((l) => l === "else approve: request.amount ≤ 100");
+    const review = lines.findIndex((l) => l === "else review: otherwise");
+    expect(alt).toBeGreaterThan(0);
+    expect(approve).toBeGreaterThan(alt);
+    expect(review).toBeGreaterThan(approve);
+    // Both approve steps sit in the approve block, numbered as the journey numbers them.
+    const block = lines.slice(approve, review).join("\n");
+    expect(block).toContain("2. Saves the approved refund");
+    expect(block).toContain("5. Records the payout");
+    expect(block).toContain("rect rgba");
+  });
+});

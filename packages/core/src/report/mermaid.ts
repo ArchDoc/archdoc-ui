@@ -1,3 +1,4 @@
+import { DataRegistry } from "../data/registry.js";
 import type { ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
 import { type Model, nodeKey, type Target } from "../model.js";
 
@@ -344,6 +345,8 @@ export interface JourneyDiagramInput {
   steps: number[];
   /** Steps the change added or removed, from the model diff. */
   changes?: StepChange[] | undefined;
+  /** For another repo's journey: the model it was found from, which may know its logic. */
+  from?: Model | undefined;
 }
 
 /**
@@ -380,23 +383,54 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
     return p.id;
   };
 
-  const body: string[] = [];
-  let inside = false;
-  j.steps.forEach((s, i) => {
+  // Steps that run only for one outcome of an earlier decision are drawn as
+  // alt / else blocks, labeled with the decision's conditions, so branches
+  // don't read as steps that all happen.
+  const items = branchItems([input.model, input.from], j.steps);
+  const branched = items.some((it) => it.kind === "alt");
+  const line = (i: number, indent: string) => {
+    const s = j.steps[i];
+    if (!s) return "";
     const n = i + 1;
     const from = participant(s.from, s.spec.from);
     const to = participant(s.to, s.spec.to);
-    if (affected.has(n) && !inside) {
-      body.push("  rect rgba(212, 167, 44, 0.18)");
-      inside = true;
-    } else if (!affected.has(n) && inside) {
-      body.push("  end");
-      inside = false;
+    const text = `${branched ? `${n}. ` : ""}${added.has(n) ? "🆕 " : ""}${message(s.spec.action ?? "")}`;
+    return `${indent}${from}->>${to}: ${wrap(text) || " "}`;
+  };
+  // Runs of steps the change passes through are highlighted.
+  const steps = (list: number[], indent: string): string[] => {
+    const out: string[] = [];
+    let inside = false;
+    for (const i of list) {
+      const hit = affected.has(i + 1);
+      if (hit && !inside) out.push(`${indent}rect rgba(212, 167, 44, 0.18)`);
+      else if (!hit && inside) out.push(`${indent}end`);
+      inside = hit;
+      out.push(line(i, inside ? `${indent}  ` : indent));
     }
-    const text = `${added.has(n) ? "🆕 " : ""}${message(s.spec.action ?? "")}`;
-    body.push(`  ${inside ? "  " : ""}${from}->>${to}: ${wrap(text) || " "}`);
-  });
-  if (inside) body.push("  end");
+    if (inside) out.push(`${indent}end`);
+    return out;
+  };
+  const body: string[] = [];
+  let plain: number[] = [];
+  const flush = () => {
+    body.push(...steps(plain, "  "));
+    plain = [];
+  };
+  for (const it of items) {
+    if (it.kind === "step") {
+      plain.push(it.index);
+      continue;
+    }
+    flush();
+    it.outcomes.forEach((o, k) => {
+      const head = `${o.name}${o.condition ? `: ${o.condition}` : ""}`;
+      body.push(`  ${k === 0 ? "alt" : "else"} ${message(head)}`);
+      body.push(...steps(o.steps, "    "));
+    });
+    body.push("  end");
+  }
+  flush();
   for (const r of removed) {
     const from = participant(undefined, r.from);
     const to = participant(undefined, r.to);
@@ -405,11 +439,84 @@ export function journeyDiagram(input: JourneyDiagramInput): string | undefined {
     );
   }
 
-  const lines = ["sequenceDiagram", "  autonumber"];
+  const lines = branched ? ["sequenceDiagram"] : ["sequenceDiagram", "  autonumber"];
   for (const p of participants.values()) {
     lines.push(`  ${p.actor ? "actor" : "participant"} ${p.id} as ${message(p.label)}`);
   }
   return [...lines, ...body].join("\n");
+}
+
+type BranchItem =
+  | { kind: "step"; index: number }
+  | {
+      kind: "alt";
+      outcomes: { name: string; condition?: string | undefined; steps: number[] }[];
+    };
+
+/**
+ * A journey's steps in drawing order: plain steps, and for each run of steps
+ * with `when:`, one block per outcome of the decision before them, in the
+ * order the decision's rules list them.
+ */
+function branchItems(
+  models: (Model | undefined)[],
+  steps: { spec: { when?: string | undefined; decides?: string | undefined } }[],
+): BranchItem[] {
+  const items: BranchItem[] = [];
+  const registries = models.filter((m): m is Model => !!m).map((m) => new DataRegistry(m));
+  const logic = (ref: string) => {
+    for (const r of registries) {
+      const found = r.logic(ref);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  let decision: string | undefined;
+  for (let i = 0; i < steps.length; i++) {
+    const spec = steps[i]?.spec;
+    if (!spec?.when) {
+      items.push({ kind: "step", index: i });
+      if (spec?.decides) decision = spec.decides;
+      continue;
+    }
+    const run: number[] = [];
+    while (i < steps.length && steps[i]?.spec.when) run.push(i++);
+    i--;
+    const rules = decision ? (logic(decision)?.node.spec.rules ?? []) : [];
+    const order = rules.map((r) => ("then" in r ? r.then : r.else));
+    const conditionOf = (name: string) => {
+      const rule = rules.find((r) => ("then" in r ? r.then : r.else) === name);
+      if (!rule) return undefined;
+      return "when" in rule ? readable(rule.when) : "otherwise";
+    };
+    const names = [...new Set(run.map((k) => steps[k]?.spec.when ?? ""))].sort(
+      (a, b) => rank(order, a) - rank(order, b),
+    );
+    items.push({
+      kind: "alt",
+      outcomes: names.map((name) => ({
+        name,
+        condition: conditionOf(name),
+        steps: run.filter((k) => steps[k]?.spec.when === name),
+      })),
+    });
+  }
+  return items;
+}
+
+/** A CEL condition with comparison operators Mermaid can show. */
+function readable(cel: string): string {
+  return cel
+    .replace(/<=/g, "≤")
+    .replace(/>=/g, "≥")
+    .replace(/!=/g, "≠")
+    .replace(/</g, "＜")
+    .replace(/>/g, "＞");
+}
+
+function rank(order: string[], name: string): number {
+  const i = order.indexOf(name);
+  return i < 0 ? order.length : i;
 }
 
 function boxKey(t: Target, shown: (id: string) => string): string {

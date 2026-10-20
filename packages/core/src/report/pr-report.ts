@@ -485,7 +485,8 @@ function journeyDiagrams(input: PrReportInput, journeys: PrReport["journeys"]): 
     const changes = j.namespace ? undefined : input.diff.journeys.find((c) => c.id === j.id)?.steps;
     const owner = j.namespace ? others.get(j.namespace)?.model : input.model;
     const diagram =
-      owner && journeyDiagram({ model: owner, journeyId: j.id, steps: j.steps, changes });
+      owner &&
+      journeyDiagram({ model: owner, journeyId: j.id, steps: j.steps, changes, from: input.model });
     if (!diagram) continue;
     const where = j.steps.length
       ? `step${j.steps.length === 1 ? "" : "s"} ${j.steps.join(", ")} go${j.steps.length === 1 ? "es" : ""} through this change`
