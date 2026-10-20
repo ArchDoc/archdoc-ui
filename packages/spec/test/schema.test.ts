@@ -88,9 +88,9 @@ describe("archdocJsonSchema", () => {
     expect(committed).toEqual(archdocJsonSchema());
   });
 
-  it("describes both file forms", () => {
+  it("describes model files, journey files, and trace files", () => {
     const schema = archdocJsonSchema();
     expect(schema.$id).toMatch(/archdoc\.v2\.schema\.json$/);
-    expect(schema.anyOf).toHaveLength(2);
+    expect(schema.anyOf).toHaveLength(3);
   });
 });

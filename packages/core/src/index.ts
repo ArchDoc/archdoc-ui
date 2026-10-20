@@ -8,6 +8,7 @@ export {
   MODEL_DIR,
   type ModelSources,
   readModelSources,
+  readTraceSources,
 } from "./load/fs.js";
 export {
   changedFiles,

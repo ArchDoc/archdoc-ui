@@ -96,6 +96,18 @@ data:
       url: { type: string }
       ref: { type: string }
 
+  Trace:
+    kind: entity
+    description: A bug trace in .archdoc/traces/, the path one failing request took, attached to the journey step it expands. Read by archdoc trace and archdoc_trace_check; never part of the model.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      trace: { type: string }
+      title: { type: string }
+      symptom: { type: string, description: "The log line, error, or wrong output" }
+      expands: { type: string, description: "<journey>#<step>" }
+      steps: { type: json, description: "Hops in journey step syntax, with role, evidence, observed, expected, and missing" }
+      fix: { type: string }
+
   Lock:
     kind: entity
     description: archdoc.lock, the version and integrity each import is pinned at.

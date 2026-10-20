@@ -325,10 +325,24 @@ async function payloadOf(
       bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
     },
     samples: await readSamples(snap.files, readRel),
+    // Bug traces beside the model, for the explorer's trace view. Never part of the model.
+    traces: await readTraces(snap),
     // What data entries' schema sources say (types, values, foreign keys), as check reads them.
     schemas: (await importSchemas(contextOf(snap), model)).filter((s) => !s.error),
     repo,
   };
+}
+
+/** The trace files in the model directory's traces/, as the snapshot has them. */
+async function readTraces(snap: Snapshot): Promise<{ path: string; text: string }[]> {
+  const dir = relative(snap.baseDir, join(snap.source, "traces")).replace(/\\/g, "/");
+  if (dir.startsWith("..")) return [];
+  const out: { path: string; text: string }[] = [];
+  for (const path of snap.files.filter((f) => f.startsWith(`${dir}/`) && /\.ya?ml$/.test(f))) {
+    const text = await snap.read(path);
+    if (text !== undefined) out.push({ path, text });
+  }
+  return out;
 }
 
 /** Another model on disk, as the base to compare with, in place of a git ref. */

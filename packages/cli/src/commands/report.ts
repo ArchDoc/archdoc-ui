@@ -3,8 +3,11 @@ import {
   diffModels,
   type Finding,
   loadModel,
+  loadTraces,
   type MarkedFinding,
   prReport,
+  readTraceSources,
+  tracesInChange,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
 import { isModelPath } from "../model-path.js";
@@ -39,6 +42,8 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
     if (!base) throw new Error(`Couldn't read the model at ${options.base}.`);
     const baseModel = base.model;
     const changed = base.changedFiles;
+    // Bug traces the change adds or edits: the comment says which bug it fixes.
+    const { traces } = loadTraces(await readTraceSources(options.model ?? ".", { cwd: io.cwd }));
     const r = prReport({
       model,
       base: baseModel,
@@ -47,6 +52,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
       findings,
       diagrams: options.diagrams !== false,
       explorerUrl: options.explorerUrl,
+      fixes: tracesInChange(changed, traces),
       // A commit hash, as the Action passes, reads better short.
       label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });

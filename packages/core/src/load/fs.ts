@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
+import { TRACES_DIR } from "@archdoc/spec";
 import { federate } from "../federation/federate.js";
 import { federationDir, readFederationInput } from "../federation/vendor.js";
 import type { Model } from "../model.js";
@@ -97,7 +98,8 @@ async function findModel(
     for (const name of ROOT_FILES) {
       const root = join(dir, name);
       if (await isFile(root)) {
-        const others = (await listYaml(dir)).filter((f) => f !== root).sort();
+        // Traces are evidence of one run, never part of the model.
+        const others = (await listYaml(dir, true)).filter((f) => f !== root).sort();
         return { root, files: [root, ...others], dir, baseDir };
       }
     }
@@ -105,11 +107,12 @@ async function findModel(
   return undefined;
 }
 
-async function listYaml(dir: string): Promise<string[]> {
+async function listYaml(dir: string, top = false): Promise<string[]> {
   const out: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (top && entry.name === TRACES_DIR) continue;
       if (!IGNORED_DIRS.has(entry.name) && !entry.name.startsWith(".")) {
         out.push(...(await listYaml(full)));
       }
@@ -118,6 +121,29 @@ async function listYaml(dir: string): Promise<string[]> {
     }
   }
   return out;
+}
+
+/**
+ * The trace files beside a model (`.archdoc/traces/*.yaml`), read but not
+ * parsed. `target` is found the way {@link readModelSources} finds a model.
+ * Empty when there's no model or no traces.
+ */
+export async function readTraceSources(
+  target = ".",
+  options: LoadOptions = {},
+): Promise<{ path: string; text: string }[]> {
+  const cwd = options.cwd ?? process.cwd();
+  const found = await findModel(resolve(cwd, target), cwd);
+  if (!found?.dir) return [];
+  const dir = join(found.dir, TRACES_DIR);
+  if (!(await stat(dir).catch(() => undefined))?.isDirectory()) return [];
+  const files = (await listYaml(dir)).sort();
+  return Promise.all(
+    files.map(async (file) => ({
+      path: relative(cwd, file) || basename(file),
+      text: await readFile(file, "utf8"),
+    })),
+  );
 }
 
 async function hasLock(source: string): Promise<boolean> {

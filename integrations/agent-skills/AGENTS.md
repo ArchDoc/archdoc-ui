@@ -12,6 +12,13 @@ At the start of every coding task, before grepping or reading files:
 
 `archdoc_locate` (or `archdoc locate <paths>`) tells you which element owns any file, including files you're about to create.
 
+When you're asked to explain or fix a bug (a log line, a stack trace, wrong output):
+
+1. Anchor the error: the `archdoc_anchor` MCP tool with the text, or `archdoc trace anchor --file log.txt` (or `-` for stdin). It ranks the journey steps the error most likely showed up in, names the elements its frames and paths map to, and suggests a trace to start from.
+2. Follow the code from there, and write the path the failing request actually took to `.archdoc/traces/<id>.yaml`: `expands: <journey>#<step>`, one step per hop with `role` (cause, spreads, symptom) and `evidence` on every step (`reproduced` if you saw it run, `read` if you followed it in the code, `inferred` otherwise), `observed`/`expected` values where they differ, and `missing` for a call that didn't happen. A trace is evidence of one run, not the design: it's never part of the model.
+3. Check it: `archdoc_trace_check`, or `archdoc trace check`. Fix unknown elements and stale code references; a hop the model doesn't declare is drift you found while debugging, so mention it.
+4. Commit the trace with the fix, so the PR says which bug it fixes.
+
 After editing:
 
 - Check for drift: the `archdoc_check` MCP tool with base "main", or `archdoc check --base main`. Fix what it reports as introduced by your change: imports the model doesn't declare, broken rules, broken journeys, stale code paths. If a new dependency isn't intended, remove the import.

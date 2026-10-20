@@ -187,3 +187,51 @@ export {
   type Verdict,
 } from "./report/pr-report.js";
 export * from "./report/report.js";
+export {
+  formatAnchors,
+  formatTrace,
+  formatTraceChecks,
+  formatTraceList,
+} from "./report/trace-report.js";
+export {
+  type AnchorCandidate,
+  type AnchorElement,
+  type AnchorOptions,
+  type AnchorResult,
+  anchorError,
+  describeEvidence,
+  type ErrorEvidence,
+  traceSkeleton,
+} from "./trace/anchor.js";
+export { type TraceInChange, tracesInChange } from "./trace/change.js";
+export {
+  type CheckTraceOptions,
+  checkTrace,
+  resolveAnchor,
+  type TraceAnchorView,
+  type TraceCheck,
+  type TraceCodeView,
+  type TraceFinding,
+  type TraceStepView,
+  type TraceView,
+} from "./trace/check.js";
+export {
+  classifyHop,
+  type HopKind,
+  resolveTraceEnd,
+  type TraceEnd,
+  type TraceHop,
+} from "./trace/hops.js";
+export {
+  loadTraces,
+  type ParsedTraces,
+  parseExpands,
+  parseTrace,
+  type Trace,
+  type TraceCodeRef,
+  type TraceSpec,
+  traceCodeLabel,
+  traceCodeRefs,
+  traceEvidenceOf,
+  traceRoleOf,
+} from "./trace/trace.js";

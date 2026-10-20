@@ -93,7 +93,7 @@ describe("archdoc show", () => {
   it("fails with suggestions when the ID doesn't exist", async () => {
     const r = await run(repo, "show", "cli-commands");
     expect(r.code).toBe(1);
-    expect(r.err).toContain('No element, actor, journey, or data entry "cli-commands"');
+    expect(r.err).toContain('No element, actor, journey, data entry, or trace "cli-commands"');
     expect(r.err).toContain("archdoc search");
   });
 });

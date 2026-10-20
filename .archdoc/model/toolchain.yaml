@@ -97,6 +97,9 @@ elements:
               codemap:
                 description: Formats locate results
                 provenance: { source: suggested, by: agent:claude-code }
+              traces:
+                description: Prints traces, trace checks, and error anchors
+                provenance: { source: suggested, by: agent:claude-code }
           checker:
             kind: component
             description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans).
@@ -140,6 +143,27 @@ elements:
               imports:
                 description: Reads other repos' data, mappings, and logic for lineage and simulation
                 provenance: { source: suggested, by: agent:claude-code }
+          traces:
+            kind: component
+            description: Bug traces, in .archdoc/traces/ and never part of the model. Parses them, checks them against the model and the code (elements, the journey step they expand, code references, and hops the model doesn't declare), and anchors an error's stack frames, paths, and names to elements and ranked journey steps.
+            code:
+              - { path: packages/core/src/trace/** }
+              - { path: packages/core/src/trace/check.ts, symbol: checkTrace, description: Checks a trace and resolves it for drawing }
+              - { path: packages/core/src/trace/anchor.ts, symbol: anchorError, description: Where an error belongs }
+            provenance: { source: suggested, by: agent:claude-code }
+            uses:
+              loader:
+                description: Parses trace YAML and resolves references the way journey steps do
+                provenance: { source: suggested, by: agent:claude-code }
+              codemap:
+                description: Maps code references and stack frames to elements, and checks lines and symbols
+                provenance: { source: suggested, by: agent:claude-code }
+              query:
+                description: Finds the journey steps through the elements an error names
+                provenance: { source: suggested, by: agent:claude-code }
+              imports:
+                description: Resolves hops and journeys in other repos
+                provenance: { source: suggested, by: agent:claude-code }
 
       analyzers:
         kind: container
@@ -174,7 +198,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, site, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, site, search, show, locate, impact, map, check, diff, report, lineage, simulate, trace (anchor, check, list, show), sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -210,7 +234,7 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate), plus propose, which adds suggested facts to the model.
+        description: MCP tools for agents. Read-only (search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate, and anchor and trace check for bugs), plus propose, which adds suggested facts to the model.
         code: [{ path: packages/mcp/** }]
         uses:
           core:
@@ -267,7 +291,7 @@ elements:
       agent-skills:
         kind: container
         technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflow. At the start of a task, search the model and check impact; afterwards, update the model with suggested facts and validate.
+        description: Teaches coding agents the workflow. At the start of a task, search the model and check impact; afterwards, update the model with suggested facts and validate. For a bug, anchor the error, write a trace with evidence on every step, and check it.
         code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools
@@ -290,6 +314,7 @@ elements:
           ".archdoc": { entity: ModelFile, key: path }
           archdoc.lock: { entity: Lock }
           vendor: { entity: Bundle, key: namespace }
+          traces: { entity: Trace, key: trace }
 
       other-repos:
         kind: external

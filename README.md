@@ -96,6 +96,9 @@ pnpm archdoc map                            # how the repo's files map onto the 
 pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
 pnpm archdoc diff main                      # what changed in the model since main
 pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
+pnpm archdoc trace anchor --file error.log  # which journey step an error showed up in, and a trace to start
+pnpm archdoc trace check                    # check the traces in .archdoc/traces/
+pnpm archdoc trace show report-false-data-changes   # a bug, hop by hop, with its evidence
 pnpm archdoc sync                           # pin imported repos' models in archdoc.lock
 pnpm archdoc publish 1.0.0 --out -          # the bundle other repos would import
 pnpm archdoc landscape build                # in a landscape repo: check it and write the site
@@ -108,7 +111,7 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
-`show` prints the details of any element, actor, journey, or data entry by ID. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+`show` prints the details of any element, actor, journey, data entry, or trace by ID. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
 
 ## Keep the model honest
 
@@ -204,6 +207,12 @@ The explorer shows data on the same canvas as the system. Pick a message and the
 
 The pull request report lists the data entries a change touches, the mappings and decisions it changes (with the expressions before and after), and calls out sensitive data that goes somewhere new, external services first.
 
+## Explain a bug
+
+A journey is the design; a **trace** is what one failing request actually did. When someone hands you (or your agent) an error, `archdoc trace anchor` reads its stack frames, paths, and the names it mentions, maps them to elements, and ranks the journey steps it most likely showed up in, with a trace to start from. Follow the code from there and write `.archdoc/traces/<id>.yaml`: the journey step it opens up (`expands: review-ai-change#4`), each hop the request took in journey step syntax, which one is the `cause`, how each claim is known (`evidence: reproduced | read | inferred`), the values `observed` and `expected`, any call that's `missing`, and the `fix`. Traces are never part of the model.
+
+`archdoc trace check` checks every trace against the model and the code: elements and the journey step exist, `code:` references (`path:line`) still match, and hops the model doesn't declare, which is drift found while debugging. `archdoc trace list` lists them, and `archdoc trace show <id>` (or `archdoc show <id>`) prints one. [`.archdoc/traces/report-false-data-changes.yaml`](./.archdoc/traces/report-false-data-changes.yaml) is a real one, and the demo org has one for a refund bug. Agents use `archdoc_anchor` and `archdoc_trace_check`.
+
 ## Share models across repos
 
 Each repo owns its namespace and models its own part. When it depends on another team's repo, it imports that repo's model and refers to its elements by namespace:
@@ -234,7 +243,7 @@ The [GitHub Action](./integrations/github-action) comments on every pull request
 
 ## Use it with your coding agent
 
-`archdoc mcp` starts an MCP server. Its read-only tools answer the questions an agent should ask: `archdoc_search`, `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_code` (an element's code, with the text of its snippets), `archdoc_get_actor`, `archdoc_journey`, `archdoc_validate`, `archdoc_check`, and `archdoc_diff`. One tool writes: `archdoc_propose` adds elements and relationships to the model as suggestions for a person to review, with a rationale note in `.archdoc/proposals/`. It only adds, and writes nothing that wouldn't validate.
+`archdoc mcp` starts an MCP server. Its read-only tools answer the questions an agent should ask: `archdoc_search`, `archdoc_overview`, `archdoc_locate`, `archdoc_impact`, `archdoc_get_element`, `archdoc_code` (an element's code, with the text of its snippets), `archdoc_get_actor`, `archdoc_journey`, `archdoc_validate`, `archdoc_check`, `archdoc_diff`, and, for bugs, `archdoc_anchor` (where an error belongs) and `archdoc_trace_check`. One tool writes: `archdoc_propose` adds elements and relationships to the model as suggestions for a person to review, with a rationale note in `.archdoc/proposals/`. It only adds, and writes nothing that wouldn't validate.
 
 [`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflow: at the start of a task, search the model for where the change belongs and check its impact; after editing, check for drift and propose the model changes the code needs. This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
 
