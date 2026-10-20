@@ -11,6 +11,7 @@ import {
 } from "@archdoc/core/browser";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { sampleSkeleton, sensitivity, stepData } from "../graph/data.js";
+import { Payload } from "./Payload.js";
 
 const ROUTINE = new Set(["public", "internal"]);
 const name = (t: Target) => (t.type === "external" ? t.ref : t.id);
@@ -468,39 +469,7 @@ export function StepMessagePanel(props: {
       </button>
       {open ? (
         <div className="step-message-body">
-          {msg.entries.map((e) => (
-            <table key={e.entry} className="fields compact">
-              <caption>
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => props.onSelect(`data:${e.entry}`)}
-                >
-                  {e.label}
-                </button>
-                {e.kind ? <span className="muted"> {e.kind}</span> : null}
-              </caption>
-              <tbody>
-                {e.fields.map((f) => (
-                  <tr key={f.name}>
-                    <td>
-                      <button
-                        type="button"
-                        className="link"
-                        onClick={() => props.onSelect(`field:${e.entry}.${f.name}`)}
-                      >
-                        {f.name}
-                      </button>
-                      {f.classification && !ROUTINE.has(f.classification) ? (
-                        <span className="chip small classification">{f.classification}</span>
-                      ) : null}
-                    </td>
-                    <td className="muted">{f.value ?? f.type ?? ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ))}
+          <Payload entries={msg.entries} onSelect={props.onSelect} />
           {data.writes.length ? (
             <ul className="step-writes">
               {data.writes.map((w) => (

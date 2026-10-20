@@ -83,6 +83,30 @@ export type ModelState =
     };
 
 /**
+ * Builds the model from what the server sends, as the CLI does: its files,
+ * then what schema sources say, then other repos' models.
+ */
+export function modelOf(
+  payload: Pick<ModelPayload, "root" | "sources" | "schemas" | "federation">,
+): Model {
+  const model = buildModel(payload.sources, { root: payload.root });
+  applySchemas(model, payload.schemas ?? []);
+  const fed = payload.federation;
+  if (
+    fed &&
+    (fed.lock || fed.lockError || Object.keys(model.imports).length || model.landscapeImport)
+  ) {
+    federate(model, {
+      lockPath: fed.lockPath,
+      lock: fed.lock as Parameters<typeof federate>[1]["lock"],
+      lockError: fed.lockError,
+      bundles: new Map(fed.bundles.map(({ key, ...b }) => [key, b])),
+    });
+  }
+  return model;
+}
+
+/**
  * Loads the model files from the CLI and builds the model in the browser with
  * the same engine the CLI uses. With `archdoc view --watch`, rebuilds whenever
  * a file changes.
@@ -99,20 +123,7 @@ export function useModel(): ModelState {
         throw new Error(body.error ?? `The server answered ${res.status}.`);
       }
       const payload = (await res.json()) as ModelPayload;
-      const model = buildModel(payload.sources, { root: payload.root });
-      applySchemas(model, payload.schemas ?? []);
-      const fed = payload.federation;
-      if (
-        fed &&
-        (fed.lock || fed.lockError || Object.keys(model.imports).length || model.landscapeImport)
-      ) {
-        federate(model, {
-          lockPath: fed.lockPath,
-          lock: fed.lock as Parameters<typeof federate>[1]["lock"],
-          lockError: fed.lockError,
-          bundles: new Map(fed.bundles.map(({ key, ...b }) => [key, b])),
-        });
-      }
+      const model = modelOf(payload);
       setState((prev) => ({
         status: "ready",
         model,

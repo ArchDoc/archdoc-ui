@@ -12,8 +12,10 @@ export {
 export {
   changedFiles,
   listBranches,
+  listFilesAtRef,
   loadModelAtRef,
   mergeBase,
+  readFileAtRef,
   readModelSourcesAtRef,
   resolveRef as resolveGitRef,
   type SourcesAtRef,

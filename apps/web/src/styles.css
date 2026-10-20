@@ -2247,3 +2247,169 @@ table.fields.compact caption {
 .react-flow__edge.rel.inactive {
   pointer-events: visibleStroke;
 }
+
+/* ---------- The data a journey step sends ---------- */
+
+.btn.small {
+  padding: 2px 8px;
+  font-size: 0.74rem;
+}
+
+.journey-card-inspect {
+  margin-left: auto;
+}
+
+.btn.journey-card-inspect.is-on {
+  border-color: var(--k-data);
+  background: color-mix(in srgb, var(--k-data) 12%, var(--surface));
+  color: var(--k-data);
+}
+
+.journey-card .payload {
+  margin: 8px 16px 0;
+  max-height: min(280px, 38vh);
+  overflow: auto;
+}
+
+.payload {
+  border: 1px solid color-mix(in srgb, var(--k-data) 30%, var(--line));
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+}
+
+.payload-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.payload-name {
+  font-family: var(--f-mono);
+  font-weight: 600;
+}
+
+.payload-entries {
+  display: flex;
+  gap: 4px;
+}
+
+.payload-entries button {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--surface);
+  padding: 1px 8px;
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.payload-entries button.is-on {
+  border-color: var(--k-data);
+  color: var(--k-data);
+}
+
+.payload-fields {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payload-fields caption {
+  padding: 6px 8px 0;
+  text-align: left;
+  font-size: 0.74rem;
+}
+
+.payload-fields th,
+.payload-fields td {
+  padding: 3px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.payload-fields th {
+  width: 40%;
+  font-weight: 400;
+  font-family: var(--f-mono);
+  white-space: nowrap;
+}
+
+.payload-fields td {
+  font-family: var(--f-mono);
+  word-break: break-word;
+}
+
+.payload-fields tr.is-changed th::before {
+  content: "~ ";
+  color: var(--chg-changed);
+  font-weight: 600;
+}
+
+.payload-fields tr.is-undeclared th {
+  color: var(--warn);
+}
+
+.payload-fields .chip {
+  margin-left: 6px;
+}
+
+.v-str {
+  color: var(--k-datastore);
+}
+
+.v-num,
+.v-bool {
+  color: var(--brand);
+}
+
+.v-null {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.v-obj summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.v-obj dl {
+  margin: 2px 0 0 10px;
+}
+
+.v-obj dl > div {
+  display: flex;
+  gap: 8px;
+}
+
+.v-obj dt {
+  color: var(--muted);
+}
+
+.v-obj dd {
+  margin: 0;
+}
+
+.payload-json {
+  position: relative;
+}
+
+.payload-json pre {
+  margin: 0;
+  padding: 8px;
+  font-family: var(--f-mono);
+  font-size: 0.74rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.payload-json .btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}

@@ -2,6 +2,7 @@ import {
   buildModel,
   DataRegistry,
   formatDiagnostic,
+  type JourneyNode,
   lineage,
   type Model,
   resolveCodeMap,
@@ -13,6 +14,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "./components/Canvas.js";
 import { Details } from "./components/Details.js";
+import { Payload, type PayloadEntry } from "./components/Payload.js";
 import { Sidebar } from "./components/Sidebar.js";
 import {
   dataPlaces,
@@ -45,10 +47,6 @@ import { type LandscapeInfo, type RepoLinks, useModel } from "./model/useModel.j
 
 export function App() {
   const state = useModel();
-  const samples = useMemo(
-    () => (state.status === "ready" ? samplesFor(state.model, state.samples) : []),
-    [state],
-  );
   const refs = useRefs();
   const [initial] = useState(readHash);
   const [tab, setTab] = useState<Tab>(initial.tab ?? "explore");
@@ -61,22 +59,24 @@ export function App() {
     [chosen, presetRef],
   );
   const compared = useCompared(pair, preset);
-  const sources = state.status === "ready" ? state.sources : undefined;
+  // A branch replaces the working tree while the Changes tab shows it: its model, files, and samples.
+  const branch = tab === "changes" && compared.status === "ready" ? compared.head : undefined;
+  const shown = branch ?? (state.status === "ready" ? state : undefined);
+  const samples = useMemo(() => (shown ? samplesFor(shown.model, shown.samples) : []), [shown]);
+  const sources = compared.status === "ready" ? (compared.head ?? shown)?.sources : undefined;
   const compare = useMemo<Compare | undefined>(() => {
-    if (!pair || compared.status !== "ready") return undefined;
+    if (!pair || compared.status !== "ready" || !sources?.sources.length) return undefined;
     // The model's files alone, as the base was built, so only what they change shows.
-    const head =
-      compared.head ??
-      (sources?.sources.length ? buildModel(sources.sources, { root: sources.root }) : undefined);
-    return head ? compareModels(pair.base, compared.base, pair.head, head) : undefined;
+    const head = buildModel(sources.sources, { root: sources.root });
+    return compareModels(pair.base, compared.base, pair.head, head);
   }, [pair, compared, sources]);
   useEffect(() => writeHash(tab, chosen), [tab, chosen]);
 
   if (state.status === "loading") return <Splash>Loading the model…</Splash>;
-  if (state.status === "error") {
+  if (state.status === "error" || !shown) {
     return (
       <Splash>
-        <strong>Couldn't load the model.</strong> {state.message}
+        <strong>Couldn't load the model.</strong> {state.status === "error" ? state.message : ""}
         <br />
         Start the explorer with <code>archdoc view</code> from your repository.
       </Splash>
@@ -102,17 +102,12 @@ export function App() {
   return (
     <ReactFlowProvider>
       <Explorer
-        // A branch's model replaces the working tree's while the Changes tab shows it.
-        model={
-          tab === "changes" && compared.status === "ready" && compared.head
-            ? compared.head
-            : state.model
-        }
+        model={shown.model}
         watch={state.watch}
         reloads={state.reloads}
-        files={state.files}
-        snippets={state.snippets}
-        repo={state.repo}
+        files={shown.files}
+        snippets={shown.snippets}
+        repo={shown.repo}
         tab={changes ? tab : "explore"}
         onTab={setTab}
         changes={changes}
@@ -186,6 +181,7 @@ function Explorer({
   // The interaction the journey is at: a step's arrow, or its writer storing what it wrote.
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [inspect, setInspect] = useState(false);
   const [centerOn, setCenterOn] = useState<string>();
   const [query, setQuery] = useState("");
   const [panelWidth, setPanelWidth] = usePanelWidth();
@@ -579,6 +575,10 @@ function Explorer({
         {journey && interaction ? (
           <JourneyCard
             model={model}
+            journey={journey}
+            inspect={inspect}
+            onInspect={setInspect}
+            onSelect={select}
             name={journey.spec.name ?? journey.id}
             steps={journey.steps.length}
             interactions={interactions}
@@ -670,6 +670,11 @@ function Explorer({
 
 interface JourneyCardProps {
   model: Model;
+  journey: JourneyNode;
+  /** Whether the data the step sends or writes is open. It stays open from step to step. */
+  inspect: boolean;
+  onInspect: (open: boolean) => void;
+  onSelect: (key: string) => void;
   name: string;
   /** How many steps the journey has. */
   steps: number;
@@ -709,6 +714,10 @@ function JourneyCard(props: JourneyCardProps) {
       : ((t.type === "element" ? model.elements.get(t.id)?.spec.name : undefined) ?? t.id);
   const action =
     x.action ?? (props.carries.length ? `Sends ${props.carries.map(short).join(", ")}` : "");
+  const payload = useMemo(
+    () => payloadOf(model, props.journey, x, props.simulation),
+    [model, props.journey, x, props.simulation],
+  );
   return (
     <section className="journey-card" aria-label="Journey">
       <header className="journey-card-head">
@@ -747,7 +756,21 @@ function JourneyCard(props: JourneyCardProps) {
             {short(e)}
           </span>
         ))}
+        {payload.length ? (
+          <button
+            type="button"
+            className={`btn small journey-card-inspect${props.inspect ? " is-on" : ""}`}
+            aria-expanded={props.inspect}
+            onClick={() => props.onInspect(!props.inspect)}
+            title={x.store ? "See the records this step writes" : "See the data this step sends"}
+          >
+            {props.inspect ? "Hide data" : "Inspect data"}
+          </button>
+        ) : null}
       </p>
+      {props.inspect && payload.length ? (
+        <Payload key={`${x.label}`} entries={payload} onSelect={props.onSelect} />
+      ) : null}
       {props.simulation ? <StepData simulation={props.simulation} interaction={x} /> : null}
       {props.crossing ? <p className="journey-card-note">{props.crossing}</p> : null}
       <div className="journey-card-controls">
@@ -817,6 +840,36 @@ function JourneyCard(props: JourneyCardProps) {
       ) : null}
     </section>
   );
+}
+
+/** What an interaction carries, or for a writer storing it, what it writes: with the simulated records. */
+function payloadOf(
+  model: Model,
+  journey: JourneyNode,
+  x: Interaction,
+  simulation: Simulation | undefined,
+): PayloadEntry[] {
+  const d = stepData(model, journey, x.step, simulation);
+  if (!x.store) return d.message?.entries ?? [];
+  const registry = new DataRegistry(model);
+  const ns = `${model.namespace}.`;
+  return d.writes
+    .filter((w) => x.writes.includes(w.entry))
+    .map((w) => {
+      const node = registry.entry(w.entry)?.node;
+      return {
+        entry: w.entry,
+        label: w.entry.startsWith(ns) ? w.entry.slice(ns.length) : w.entry,
+        kind: node?.spec.kind,
+        fields: Object.entries(node?.spec.fields ?? {}).map(([name, f]) => ({
+          name,
+          type: f.type,
+          classification: f.classification,
+        })),
+        record: w.record,
+        changed: new Set(w.values.keys()),
+      };
+    });
 }
 
 /** What the current interaction does to the data, in the simulation. */
