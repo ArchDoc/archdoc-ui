@@ -106,3 +106,30 @@ describe("comparing revisions", () => {
     git("clean", "-qfd");
   });
 });
+
+describe("archdoc site", () => {
+  it("writes the explorer with the change since a base, for a static host", async () => {
+    const { mkdtemp: tmp, readFile } = await import("node:fs/promises");
+    const webDir = await tmp(join(tmpdir(), "archdoc-web-"));
+    await writeFile(join(webDir, "index.html"), "<!doctype html>");
+    const out = join(await tmp(join(tmpdir(), "archdoc-site-")), "site");
+    process.env.ARCHDOC_WEB_DIR = webDir;
+    try {
+      const r = await run("site", "--base", "main", "--out", out);
+      expect(r.code).toBe(0);
+      const body = JSON.parse(await readFile(join(out, "api", "model"), "utf8")) as {
+        watch: boolean;
+        base: { ref: string; root: string; schemas: unknown[] };
+        change: { findings: { introduced?: boolean }[] };
+      };
+      expect(body.watch).toBe(false);
+      expect(body.base.ref).toBe("main");
+      expect(body.base.root).toBe("main:.archdoc/archdoc.yaml");
+      expect(body.base.schemas.length).toBeGreaterThan(0);
+      expect(body.change.findings.some((f) => f.introduced === false)).toBe(true);
+    } finally {
+      delete process.env.ARCHDOC_WEB_DIR;
+      await rm(webDir, { recursive: true, force: true });
+    }
+  });
+});
