@@ -17,5 +17,6 @@ export {
   type SchemaImporter,
   sql,
 } from "./schemas/index.js";
-export { tsImports } from "./ts-imports.js";
+export { indexCode, indexRepository, indexSource } from "./symbols.js";
+export { resolveSpecifier, tsImports } from "./ts-imports.js";
 export { packageNameOf, type WorkspacePackage, workspacePackages } from "./workspace.js";
