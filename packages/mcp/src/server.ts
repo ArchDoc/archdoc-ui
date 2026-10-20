@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import { checkRepository } from "@archdoc/analyzers";
+import { checkRepository, indexRepository } from "@archdoc/analyzers";
 import {
+  context,
   diffModels,
   formatActor,
   formatCode,
+  formatContext,
   formatData,
   formatDiagnostics,
   formatDiff,
@@ -43,8 +45,8 @@ export interface ArchdocServerOptions {
 export const INSTRUCTIONS = `This repository has an ArchDoc architecture model in .archdoc/: who uses the system (actors), what it's made of (elements, each mapped to code paths), and how people use it (journeys). People own it. It's the fastest way to find where code lives and what a change affects.
 
 Start every coding task here, before you grep or read files:
-1. Call archdoc_search with a few words for the area you're changing (for example "cli command"). It returns the elements involved and their code paths, so you know where to look.
-2. Call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules.
+1. Call archdoc_context with the task in a few words, or the files you plan to change (or both). It returns the files and functions to open first, other code that does the same job (other callers of the same functions, which a fix usually needs too), the data, rules, and journeys involved, the tests to run, and owners.
+2. For the wider blast radius, call archdoc_impact on the element or the files you plan to change. It returns what depends on them, which actors and journeys the change affects (most important first), owners, and rules. archdoc_search finds elements, journeys, and files by words when you only need where something lives.
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
 archdoc_locate tells you which element owns a file. archdoc_code returns the code a component points at, with the text of its snippets, so read it before searching the files yourself.
@@ -63,7 +65,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     { instructions: INSTRUCTIONS },
   );
 
-  const withModel = async (fn: (model: LoadedModel) => string) => {
+  const withModel = async (fn: (model: LoadedModel) => string | Promise<string>) => {
     const model = await loadModel(options.model ?? ".", { cwd });
     if (model.diagnostics.some((d) => d.code === "model/not-found")) {
       return error(model.diagnostics[0]?.message ?? "No ArchDoc model found.");
@@ -73,7 +75,7 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       ? `\n\nNote: the model has ${errors} error(s), so this may be incomplete. Call archdoc_validate for details.`
       : "";
     try {
-      return text(fn(model) + note);
+      return text((await fn(model)) + note);
     } catch (err) {
       return error(err instanceof Error ? err.message : String(err));
     }
@@ -116,7 +118,42 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       },
       annotations: READ_ONLY,
     },
-    ({ query }) => withModel((m) => formatSearch(query, search(m, query, 8))),
+    ({ query }) =>
+      withModel(async (m) =>
+        formatSearch(query, search(m, query, 8, await indexRepository(m.baseDir))),
+      ),
+  );
+
+  server.registerTool(
+    "archdoc_context",
+    {
+      title: "Where to start a task",
+      description:
+        "A short brief for starting a task, before you grep: the files and functions to open first (ranked, with line numbers), other code that does the same job (other callers of the functions the start files use), data, rules, the narrowest journeys (those whose steps name the files), tests to run, and owners. Pass the task in a few words, the files you plan to change, or both.",
+      inputSchema: {
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'The task in a few words, such as "pr report shows type undefined for data fields"',
+          ),
+        paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Files or directories you plan to change, relative to the repository root or absolute",
+          ),
+      },
+      annotations: READ_ONLY,
+    },
+    ({ query, paths }) =>
+      withModel(async (m) => {
+        if (!query?.trim() && !paths?.length) throw new Error("Pass a query, paths, or both.");
+        const index = await indexRepository(m.baseDir);
+        return formatContext(
+          context(m, query ?? "", { index, paths: paths?.map((p) => repoPath(m, p)) }),
+        );
+      }),
   );
 
   server.registerTool(
