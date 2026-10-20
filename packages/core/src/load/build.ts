@@ -507,7 +507,7 @@ function refDiagnostic(
   };
 }
 
-function schemaDiagnostics(err: z.ZodError, file: ParsedFile): Diagnostic[] {
+export function schemaDiagnostics(err: z.ZodError, file: ParsedFile): Diagnostic[] {
   const out: Diagnostic[] = [];
   for (const issue of err.issues) {
     const path = issue.path.filter((p): p is string | number => typeof p !== "symbol");
