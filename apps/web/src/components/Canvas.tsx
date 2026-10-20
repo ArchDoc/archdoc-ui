@@ -441,7 +441,7 @@ export function Canvas(props: CanvasProps) {
           source: e.source,
           target: e.target,
           data: { points: layout.routes.get(e.id) },
-          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+          markerEnd: arrowHead(12, "fk"),
           className: ["fk", dimming && !lit ? "is-dim" : ""].filter(Boolean).join(" "),
           label: e.id === hoverEdge ? `${e.reference.field} → ${e.reference.to}` : undefined,
           labelBgPadding: [6, 3] as [number, number],
@@ -459,30 +459,31 @@ export function Canvas(props: CanvasProps) {
       const label = [channel, ...e.relationships.map((r) => r.description)]
         .filter(Boolean)
         .join(" · ");
+      const className = [
+        "rel",
+        e.planned ? "is-planned" : "",
+        e.relationships.length > 0 &&
+        e.relationships.every((r) => r.provenance?.source === "suggested")
+          ? "is-suggested"
+          : "",
+        overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
+        e.subscription ? "is-async" : "",
+        lit ? "is-lit" : "",
+        // A selected message or field travels along its arrows, the way it goes.
+        lit && focus ? "is-flow" : "",
+        lit && focus && !focus.along.has(e.id) ? "is-flow-back" : "",
+        dimming && !lit ? "is-dim" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
       return {
         id: e.id,
         type: "routed" as const,
         source: e.source,
         target: e.target,
         data: { points: layout.routes.get(e.id) },
-        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-        className: [
-          "rel",
-          e.planned ? "is-planned" : "",
-          e.relationships.length > 0 &&
-          e.relationships.every((r) => r.provenance?.source === "suggested")
-            ? "is-suggested"
-            : "",
-          overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
-          e.subscription ? "is-async" : "",
-          lit ? "is-lit" : "",
-          // A selected message or field travels along its arrows, the way it goes.
-          lit && focus ? "is-flow" : "",
-          lit && focus && !focus.along.has(e.id) ? "is-flow-back" : "",
-          dimming && !lit ? "is-dim" : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
+        markerEnd: arrowHead(16, className),
+        className,
         label: e.id === hoverEdge && label ? truncate(label, 60) : undefined,
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 4,
@@ -509,7 +510,7 @@ export function Canvas(props: CanvasProps) {
                   : { label: "no message", missing: true }
                 : undefined,
           },
-          markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
+          markerEnd: arrowHead(18, s.at === at ? "journey is-current" : "journey"),
           className: [
             "journey",
             s.at === at ? "is-current" : "",
@@ -740,4 +741,31 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+}
+
+/**
+ * An arrowhead the color of its arrow. React Flow draws heads as shared SVG
+ * markers that CSS on the edge doesn't reach, so each color gets its own
+ * marker. The order follows styles.css, where the later rule wins.
+ */
+function arrowHead(size: number, className: string) {
+  const has = new Set(className.split(" "));
+  const color = has.has("fk")
+    ? "var(--k-data)"
+    : has.has("journey")
+      ? has.has("is-current")
+        ? "var(--brand)"
+        : "var(--brand-2)"
+      : has.has("is-flow")
+        ? "var(--k-data)"
+        : has.has("change-removed")
+          ? "var(--chg-removed)"
+          : has.has("change-changed")
+            ? "var(--chg-changed)"
+            : has.has("change-added")
+              ? "var(--chg-added)"
+              : has.has("is-lit")
+                ? "var(--brand)"
+                : "var(--line-strong)";
+  return { type: MarkerType.ArrowClosed, width: size, height: size, color };
 }
