@@ -27,6 +27,10 @@
   --breaks-soft: #fce6e4;
   --shadow: rgb(17 26 39 / 8%);
   --shadow-strong: rgb(17 26 39 / 16%);
+  /* A log or terminal: dark in both themes. */
+  --log-bg: #121a26;
+  --log-ink: #e2e8f0;
+  --log-muted: #8a97aa;
 
   /* One type scale: six steps. */
   --fs-1: 12px;
@@ -64,6 +68,7 @@
     --breaks-soft: #3b1714;
     --shadow: rgb(0 0 0 / 30%);
     --shadow-strong: rgb(0 0 0 / 50%);
+    --log-bg: #06090e;
     color-scheme: dark;
   }
 }
@@ -90,6 +95,7 @@
   --breaks-soft: #3b1714;
   --shadow: rgb(0 0 0 / 30%);
   --shadow-strong: rgb(0 0 0 / 50%);
+  --log-bg: #06090e;
   color-scheme: dark;
 }
 /* tokens:end */
@@ -181,7 +187,8 @@ p {
   --side-width: 400px;
 }
 
-.app.tab-journeys {
+.app.tab-journeys,
+.app.tab-traces {
   --side-width: 240px;
 }
 
@@ -1574,6 +1581,331 @@ ul.plain {
   color: var(--muted);
 }
 
+/* ---------- Traces ---------- */
+
+.trace-story {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.trace-head {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.trace-head h1 {
+  font-size: var(--fs-4);
+  line-height: 1.3;
+}
+
+.trace-head-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.trace-log {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--log-bg);
+  color: var(--log-ink);
+  min-width: 0;
+}
+
+.trace-log-label {
+  font-size: var(--fs-1);
+  color: var(--log-muted);
+}
+
+.trace-log pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-1);
+  line-height: 1.5;
+}
+
+.trace-reproduce {
+  font-size: var(--fs-1);
+  color: var(--log-muted);
+}
+
+.trace-reproduce code {
+  font-size: var(--fs-1);
+  color: var(--log-ink);
+}
+
+.trace-diagnosis {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  font-size: var(--fs-2);
+  min-width: 0;
+}
+
+.trace-fix {
+  color: var(--muted);
+}
+
+.trace-fix strong {
+  color: var(--ink);
+}
+
+.trace-chip.chip-anchor {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.trace-chip.chip-reproduced,
+.trace-chip.evidence-reproduced {
+  color: var(--added);
+  border-color: var(--added);
+  background: var(--added-soft);
+}
+
+.trace-chip.chip-undeclared {
+  color: var(--ink);
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: none;
+}
+
+.trace-chip.role-cause {
+  color: var(--breaks);
+  border-color: var(--breaks);
+  background: var(--breaks-soft);
+  font-weight: 600;
+}
+
+.trace-chip.role-spreads {
+  color: var(--changed);
+  border-color: var(--changed);
+  background: var(--changed-soft);
+}
+
+.trace-chip.role-symptom {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* A hop in the lanes: cause in red, spreads in amber, what the model doesn't say dashed. */
+.lane-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: var(--fs-1);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+.lane-tag.tag-cause {
+  color: var(--surface);
+  background: var(--breaks);
+  border-color: var(--breaks);
+}
+
+.lane-tag.tag-spreads {
+  color: var(--changed);
+  background: var(--changed-soft);
+  border-color: var(--changed);
+}
+
+.lane-tag.tag-symptom {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.lane-tag.tag-undeclared {
+  color: var(--muted);
+  border-style: dashed;
+  font-weight: 400;
+}
+
+.lane-step.is-dashed .lane-line {
+  border-top-style: dashed;
+}
+
+.lane-step.tone-cause .lane-line {
+  border-top-width: 3px;
+  border-color: var(--breaks);
+}
+
+.lane-step.tone-cause .lane-line::after {
+  top: -7px;
+  border-left-color: var(--breaks);
+}
+
+.lane-step.tone-cause .lane-arrow.is-back .lane-line::after {
+  border-left-color: transparent;
+  border-right-color: var(--breaks);
+}
+
+.lane-step.tone-spreads .lane-line {
+  border-top-width: 2px;
+  border-color: var(--changed);
+}
+
+.lane-step.tone-spreads .lane-line::after {
+  border-left-color: var(--changed);
+}
+
+.lane-step.tone-spreads .lane-arrow.is-back .lane-line::after {
+  border-left-color: transparent;
+  border-right-color: var(--changed);
+}
+
+.lane-step.tone-missing {
+  min-height: 40px;
+}
+
+.lane-step.tone-missing .lane-action {
+  color: var(--breaks);
+  font-style: italic;
+}
+
+.lane-step.tone-missing .lane-line {
+  border-top: 2px dashed var(--breaks);
+}
+
+.lane-step.tone-missing .lane-line::after {
+  border-left-color: var(--breaks);
+}
+
+.lane-step.tone-missing .lane-arrow.is-back .lane-line::after {
+  border-left-color: transparent;
+  border-right-color: var(--breaks);
+}
+
+.lane-step.tone-cause.is-current,
+.lane-step.tone-missing.is-current {
+  background: var(--breaks-soft);
+}
+
+.lane-step.is-current.tone-cause .lane-action,
+.lane-step.is-current.tone-missing .lane-action {
+  font-weight: 600;
+}
+
+/* A band across the lanes: the step as modeled, or where the same job works. */
+.lane-band {
+  grid-template-rows: auto auto;
+  margin: 6px 6px 6px 0;
+  padding: 6px 0 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  min-height: 0;
+}
+
+.band-text {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  padding: 0 12px;
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+
+.band-arrow {
+  grid-row: 1;
+}
+
+.band-arrow .lane-line {
+  border-top: 6px solid var(--line);
+}
+
+.band-arrow .lane-line::after {
+  top: -9px;
+  border-width: 6px;
+  border-left: 10px solid var(--line);
+}
+
+.band-arrow.is-back .lane-line::after {
+  border-left: 0;
+  border-right: 10px solid var(--line);
+}
+
+.lane-band.band-works {
+  border-color: var(--added);
+  background: var(--added-soft);
+}
+
+.lane-band.band-works .band-text {
+  grid-row: 1;
+  color: var(--ink);
+}
+
+table.observed {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-2);
+}
+
+table.observed th,
+table.observed td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+table.observed thead th {
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+table.observed code {
+  overflow-wrap: anywhere;
+}
+
+table.observed td.is-wrong code {
+  color: var(--breaks);
+  font-weight: 600;
+}
+
+.trace-findings {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--fs-2);
+}
+
+.trace-findings .sev-error {
+  color: var(--breaks);
+}
+
+.trace-findings .sev-warning {
+  color: var(--changed);
+}
+
+.trace-findings .sev-info {
+  color: var(--muted);
+}
+
+.trace-findings .is-here {
+  font-weight: 600;
+}
+
+.trace-problems {
+  margin-top: 12px;
+  padding: 0 8px;
+  font-size: var(--fs-1);
+}
+
+.trace-problems ul {
+  padding-left: 16px;
+}
+
 /* The step panel: one step at a time. */
 .step-panel {
   padding-bottom: 0;
@@ -1748,7 +2080,7 @@ ul.plain {
 
 .card.shape-pill {
   border-radius: 999px;
-  padding: 8px 20px;
+  padding: 8px 14px 8px 16px;
 }
 
 /* A datastore: a lid near the top. */
@@ -2727,22 +3059,26 @@ ul.plain {
   .app.tab-journeys .story {
     max-height: 80vh;
   }
-  .app.tab-journeys .side-list {
+  .app.tab-journeys .side-list,
+  .app.tab-traces .side-list {
     display: flex;
     gap: 6px;
     overflow-x: auto;
     padding: 10px 12px;
   }
-  .app.tab-journeys .side-title {
+  .app.tab-journeys .side-title,
+  .app.tab-traces .side-title {
     display: none;
   }
-  .app.tab-journeys .side-item {
+  .app.tab-journeys .side-item,
+  .app.tab-traces .side-item {
     flex: none;
     width: auto;
     max-width: 75vw;
     border: 1px solid var(--line);
   }
-  .app.tab-journeys .side-item-sub {
+  .app.tab-journeys .side-item-sub,
+  .app.tab-traces .side-item-sub {
     display: none;
   }
   .resize-handle {
@@ -2757,5 +3093,15 @@ ul.plain {
   }
   .lanes {
     --gutter: 30px;
+  }
+  .trace-head-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app.tab-traces .main {
+    height: auto;
+    max-height: none;
+  }
+  .app.tab-traces .lanes {
+    max-height: 70vh;
   }
 }

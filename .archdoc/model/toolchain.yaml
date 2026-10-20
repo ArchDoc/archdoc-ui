@@ -253,7 +253,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time, samples in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
+        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time, samples in the browser), Traces (a bug's path as lanes beneath the modeled step, checked in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
         code: [{ path: apps/web/** }]
         uses:
           core:
