@@ -1,0 +1,24 @@
+# A real bug on main: run `archdoc report --base main` on main itself.
+trace: report-false-data-changes
+title: The PR report says data changed when it didn't
+symptom: |
+  Data entries changed (5)
+  - Charge (entity): fields ~id (type undefined → uuid) …
+reproduce: archdoc report --base main      # run on main itself
+expands: review-ai-change#4                 # cli → core: diffs base vs. head
+diagnosis: The report loads the base revision without its schema sources, so every field whose type comes from a schema looks new.
+steps:
+  - { from: cli, to: analyzers, action: Loads head and applies schemas, code: packages/analyzers/src/check.ts:53, evidence: read }
+  - from: cli
+    to: core.loader
+    action: Loads base at the ref
+    code: packages/cli/src/commands/report.ts:42
+    role: cause
+    evidence: reproduced
+    observed: { Charge.id.type: undefined }
+    expected: { Charge.id.type: uuid }
+    missing: { to: analyzers, call: applySchemas }
+  - { from: cli, to: core.differ, action: Diffs base vs. head, code: packages/cli/src/commands/report.ts:50, role: spreads, evidence: read }
+  - { from: core.report, to: github-action, action: 'Writes "Data entries changed (5)"', role: symptom, evidence: reproduced }
+works-in: { element: web.model-loader, code: apps/web/src/model/useModel.ts:93, note: applies schemas to base and head before diffing }
+fix: Load the base through the same path as head.
