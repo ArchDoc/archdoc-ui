@@ -75,7 +75,7 @@ elements:
               - { path: packages/core/src/codemap/snippet.ts, symbol: findSnippet, description: The lines or declaration a code reference points at }
           report:
             kind: component
-            description: Text, JSON, and Mermaid answers shared by the CLI and MCP, so people and agents read the same words. Draws the PR report's diagrams of the change and its journeys.
+            description: Text, JSON, and Mermaid answers shared by the CLI, MCP, and the explorer, so people and agents read the same words. summarizeChange is the one verdict on a change that the PR comment and the Changes tab both render; it also draws the change and its journeys, with their branches.
             code: [{ path: packages/core/src/report/** }]
             uses:
               imports:
@@ -144,7 +144,7 @@ elements:
       analyzers:
         kind: container
         technology: TypeScript (ts.preProcessFile), yaml
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf.
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf. loadRevision builds the model at any ref the way every surface reads it, and check --base checks the merge base the same way.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files
@@ -155,11 +155,14 @@ elements:
       federation:
         kind: container
         technology: Node.js, git, semver
-        description: Shares models across repos. `sync` reads other repos' models (and the landscape, with every model it pins) at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle.
+        description: Shares models across repos. `sync` reads other repos' models (and the landscape, with every model it pins) at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle, with what the model's schema sources say.
         code: [{ path: packages/federation/** }]
         provenance: { source: suggested, by: agent:claude-code }
         uses:
           core: Builds and validates bundles, and reads the current lock
+          analyzers:
+            description: Reads the schema sources a bundle carries the fields of
+            provenance: { source: suggested, by: agent:claude-code }
           spec: Reads and writes the lockfile and bundle formats
           model-files:
             description: Writes archdoc.lock and the bundles in .archdoc/vendor/
@@ -171,7 +174,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command: validate, view, site, search, show, locate, impact, map, check, diff, report, lineage, simulate, sync, publish, landscape build, mcp, migrate, and schema."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -253,7 +256,7 @@ elements:
       github-action:
         kind: container
         technology: GitHub Actions (composite), actions/github-script
-        description: Posts an architectural-impact comment, with Mermaid diagrams of the change and its journeys, on pull requests and fails on drift they introduce.
+        description: Posts a pull request comment that leads with a verdict (what blocks the merge, what to check, who to involve), stays quiet when nothing changes the architecture, puts introduced findings on their lines, and fails on drift the pull request introduces.
         code: [{ path: integrations/github-action/** }]
         uses:
           cli:
