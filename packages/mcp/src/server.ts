@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import { checkRepository } from "@archdoc/analyzers";
+import { checkRepository, loadRevision } from "@archdoc/analyzers";
 import {
   diffModels,
   formatActor,
@@ -22,7 +22,6 @@ import {
   type LoadedModel,
   lineage,
   loadModel,
-  loadModelAtRef,
   locate,
   propose,
   resolveRef,
@@ -384,10 +383,12 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     async ({ base, format }) => {
       try {
         const ref = base ?? "HEAD";
-        const [before, after] = await Promise.all([
-          loadModelAtRef(options.model ?? ".", ref, { cwd }),
-          loadModel(options.model ?? ".", { cwd }),
-        ]);
+        const at = async (r: string | undefined) => {
+          const rev = await loadRevision(options.model ?? ".", { cwd, ref: r });
+          if (!rev) throw new Error("No ArchDoc model here. Expected .archdoc/archdoc.yaml.");
+          return rev.model;
+        };
+        const [before, after] = await Promise.all([at(ref), at(undefined)]);
         return text(
           formatDiff(diffModels(before, after), format ?? "text", `${ref} → working tree`),
         );

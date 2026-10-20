@@ -5,6 +5,16 @@ export {
   checkRepository,
 } from "./check.js";
 export { manifests } from "./manifests.js";
+export {
+  contextOf,
+  type LoadRevisionOptions,
+  loadRevision,
+  type Revision,
+  revisionOf,
+  type Snapshot,
+  type SnapshotOptions,
+  snapshot,
+} from "./revision.js";
 export { analyze, builtinAnalyzers } from "./run.js";
 export {
   builtinImporters,
