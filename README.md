@@ -88,6 +88,7 @@ The packages aren't published yet, so run the CLI from a clone:
 pnpm install && pnpm build
 pnpm archdoc view --watch --open            # explore ArchDoc's own model in your browser
 pnpm archdoc validate                       # check it
+pnpm archdoc context pr report shows type undefined for data fields   # where to start a task
 pnpm archdoc search cli command             # where does this live?
 pnpm archdoc show toolchain.cli                      # details of an element, actor, or journey by ID
 pnpm archdoc locate packages/core/src/load/fs.ts   # which element owns this file?
@@ -96,6 +97,7 @@ pnpm archdoc map                            # how the repo's files map onto the 
 pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
 pnpm archdoc diff main                      # what changed in the model since main
 pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
+pnpm archdoc eval --min-recall 0.5          # how well context points at what recent commits changed
 pnpm archdoc sync                           # pin imported repos' models in archdoc.lock
 pnpm archdoc publish 1.0.0 --out -          # the bundle other repos would import
 pnpm archdoc landscape build                # in a landscape repo: check it and write the site
@@ -108,7 +110,7 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
-`show` prints the details of any element, actor, journey, or data entry by ID. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+`show` prints the details of any element, actor, journey, or data entry by ID. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `context` is where an agent starts a task: give it the task in words, the files it plans to change, or both, and it returns a short brief: the files and functions to open first (ranked from file names, exported symbols, tool names, the owning element, and the journey steps that name a file), other code that does the same job (other callers of the functions those files use from another element), the data and rules involved, the narrowest journeys (those whose steps name the files; the rest as a count), the tests to run, and owners. It reads an index of the code's exported symbols and named imports that the TS/JS analyzer builds. `eval` measures it: it replays the last 50 commits, asks `context` with each subject, and reports how many of the source files each changed the brief named in Start here or under the elements it involved (recall), next to plain `search`, using the model and code as they are now. `--min-recall` fails CI below a threshold. `search`, `locate`, and `impact` answer the questions an agent should ask before it edits: where does this belong, which part of the architecture is this, who depends on it, and which actors and journeys does a change affect? `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
 
 ## Keep the model honest
 
