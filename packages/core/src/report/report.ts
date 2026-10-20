@@ -304,6 +304,12 @@ export function formatSearch(query: string, hits: SearchHit[]): string {
   }
   const out = [`Matches for "${query}", best first:`];
   for (const h of hits) {
+    if (h.type === "file") {
+      out.push(
+        `  ${h.id}${h.line ? `:${h.line}` : ""}${h.symbol ? ` ${h.symbol}` : ""} (file${h.element ? ` in ${h.element}` : ""})${h.description ? `: ${h.description}` : ""}`,
+      );
+      continue;
+    }
     out.push(
       `  ${h.id} (${h.type === "element" ? h.kind : `${h.type}, ${h.kind}`})${h.description ? `: ${h.description}` : ""}`,
     );
@@ -311,7 +317,7 @@ export function formatSearch(query: string, hits: SearchHit[]): string {
   }
   out.push(
     "",
-    "Next: check the impact of the element or the files you plan to change (archdoc_impact, or archdoc impact).",
+    "Next: archdoc_context (or archdoc context) for the files to start in, or archdoc_impact (archdoc impact) on the element or the files you plan to change.",
   );
   return out.join("\n");
 }

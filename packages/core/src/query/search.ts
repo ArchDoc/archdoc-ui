@@ -1,7 +1,10 @@
 import type { Model } from "../model.js";
+import { type CodeIndex, pointAt, rankFiles } from "./code-index.js";
+import { STOP } from "./terms.js";
 
 export interface SearchHit {
-  type: "element" | "actor" | "journey" | "data";
+  /** "file" only when a code index is given. */
+  type: "element" | "actor" | "journey" | "data" | "file";
   id: string;
   /** Element kind, actor kind, journey importance, or data kind. */
   kind: string;
@@ -9,25 +12,29 @@ export interface SearchHit {
   /** Code paths (elements) or step code entry points (journeys). */
   code: string[];
   score: number;
+  /** Files: the declaration that matched, its line, and the element that owns the file. */
+  symbol?: string | undefined;
+  line?: number | undefined;
+  element?: string | undefined;
 }
-
-const STOP = new Set(
-  "a an the to of in on for and or with how where what which do does is are i we new add make change update this that it".split(
-    " ",
-  ),
-);
 
 /**
  * Finds elements, actors, journeys, and data entries by words, so an agent can ask "where do
  * CLI commands live?" before it knows any file paths. Plain phrasing works:
  * filler words are ignored, results that match more of the words rank first,
  * and at least half of the words must match. Matches in IDs, names, and code
- * paths count most.
+ * paths count most. Identifiers split into words (archdoc_check, loadModelAtRef).
+ *
+ * With a code index (from @archdoc/analyzers), it also ranks files by their
+ * paths and the names they export, and returns the best as `file` hits.
  */
-export function search(model: Model, query: string, limit = 10): SearchHit[] {
+export function search(model: Model, query: string, limit = 10, index?: CodeIndex): SearchHit[] {
   const words = query
-    .toLowerCase()
-    .split(/[^a-z0-9_./-]+/)
+    .split(/[^A-Za-z0-9_./-]+/)
+    .flatMap((w) =>
+      /[/.]/.test(w) ? [w] : w.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[_ ]+/),
+    )
+    .map((w) => w.toLowerCase())
     .map((w) => (w.length > 3 ? w.replace(/s$/, "") : w))
     .filter((w) => w.length > 1 && !STOP.has(w));
   if (words.length === 0) return [];
@@ -124,6 +131,25 @@ export function search(model: Model, query: string, limit = 10): SearchHit[] {
         description: d.spec.description,
         code: Object.values(d.spec.source ?? {}),
         score: s,
+      });
+    }
+  }
+  if (index) {
+    const files = rankFiles(model, index, query, 5);
+    const top = files[0]?.score ?? 1;
+    for (const f of files) {
+      const at = pointAt(f);
+      // After the model's own answers that match as many words: files are the detail.
+      hits.push({
+        type: "file",
+        id: f.path,
+        kind: at.kind ?? "file",
+        description: f.why.join("; ") || undefined,
+        code: [f.path],
+        score: Math.min(f.matched, words.length) * 1000 + 0.5 + (0.4 * f.score) / top,
+        symbol: at.name,
+        line: at.line,
+        element: f.element,
       });
     }
   }
