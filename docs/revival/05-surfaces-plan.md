@@ -30,24 +30,28 @@ The PR report said data changed when it didn't, blamed old warnings on the PR, a
 
 ## 4. Newcomers: an explorer that starts from what people do
 
-- [~] **Overview tab.** The model's description, its journeys as cards (path, steps, repos, decisions), owners. Replaces the count tiles and instructions. Hovering a journey lights it on the map.
-- [~] **One level at a time.** The map shows top-level boxes; components appear when a box is opened. Box type shown by shape, not a caps label. Unselected edges stay faint.
-- [~] **Journeys as stories.** One view: lanes with steps as rows, decisions and their branches drawn as forks, the current step's detail in the side panel, samples choose the branch. Fits beside the panel.
-- [~] **Tabs.** Overview, Journeys, Data, Changes. The sidebar stops being a catalog.
-- [~] **Readable labels.** No "· the step says"; provenance in a tooltip.
+- [x] **Overview tab.** The model's description, its journeys as cards (path, steps, repos, decisions), owners. Replaces the count tiles and instructions. Hovering a journey lights it on the map.
+- [x] **One level at a time.** The map shows top-level boxes; components appear when a box is opened. Box type shown by shape, not a caps label. Unselected edges stay faint.
+- [x] **Journeys as stories.** One view: lanes with steps as rows, decisions and their branches drawn as forks, the current step's detail in the side panel, samples choose the branch. Fits beside the panel.
+- [x] **Tabs.** Overview, Journeys, Data, Changes. The sidebar stops being a catalog.
+- [x] **Readable labels.** No "· the step says"; provenance in a tooltip.
 
 ## 5. Debugging: traces
 
 - [x] **Spec.** A trace document (`.archdoc/traces/*.yaml`, never part of the model): `trace`, `title`, `symptom`, `reproduce`, `expands: <journey>#<step>`, steps in journey step syntax plus `role` (ok, cause, spreads, symptom), `evidence` (reproduced, read, inferred), `observed`/`expected`, `missing`; `works-in`; `fix`.
 - [x] **Core.** `checkTrace` (elements, hops, code references, hops the model doesn't declare) and `anchorError(text)` (paths and frames → elements → journey steps, ranked). Deterministic.
 - [x] **CLI and MCP.** `archdoc trace check|anchor`, `archdoc_anchor`, `archdoc_trace_check`; the agent skill says when to write one. The PR comment says which traced bug a PR fixes. MCP `archdoc_report` gives agents the comment's verdict before they open a PR.
-- [ ] **Explorer.** A trace view: the log, the diagnosis, the modeled step with its real hops beneath, cause and missing hops marked, evidence on every claim.
+- [x] **Explorer.** A trace view: the log, the diagnosis, the modeled step with its real hops beneath, cause and missing hops marked, evidence on every claim.
 
 ## 6. Polish
 
-- [~] **Tokens.** One type scale and semantic colors (added, changed, removed, breaks; accent only for selection and links) in the explorer; Mermaid classDefs use the same meanings.
-- [~] **Glossary.** One term per concept across explorer, CLI, and report ("uses" for connections).
+- [x] **Tokens.** One type scale and semantic colors (added, changed, removed, breaks; accent only for selection and links) in the explorer; Mermaid classDefs use the same meanings.
+- [x] **Glossary.** One term per concept across explorer, CLI, and report ("uses" for connections).
 - [x] **Website.** ArchDoc.github.io describes v2.
+
+## Result
+
+On the playground, `report --base main` says "No architectural impact" on main, and each scenario branch gets a verdict the explorer's Changes tab repeats: pii-to-fraud and break-contract are blocking, looser-refunds needs a check, rename-email is blocking. `archdoc eval` over the 50 commits before this work: 62–64% of changed source files named in the brief or under its elements, against 43% for search. This branch's own PR comment says it fixes the bug traced in `report-false-data-changes`.
 
 ## Done when
 
