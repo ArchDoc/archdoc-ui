@@ -51,6 +51,16 @@ data:
       root: { type: string }
       sources: { type: "ModelFile[]" }
 
+  CodeIndex:
+    kind: message
+    description: What the analyzers read from the code for context, search, and eval, per TS/JS file. Plain data that core ranks.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      path: { type: string }
+      exports: { type: json, description: "Declarations with their kind and line" }
+      imports: { type: json, description: "Named imports, resolved to repository files where possible" }
+      literals: { type: "string[]", description: "Strings that look like identifiers, such as tool names" }
+
   ModelFile:
     kind: entity
     description: One YAML file under .archdoc/.

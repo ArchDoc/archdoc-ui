@@ -9,12 +9,18 @@ steps:
     code: integrations/agent-skills/claude-code/archdoc/SKILL.md
   - from: coding-agent
     to: mcp
-    action: Calls archdoc_search with a few words for the area, before grepping
+    action: Calls archdoc_context with the task in a few words, or the files it plans to change, before grepping
     code: packages/mcp/src/server.ts
   - from: mcp
+    to: analyzers
+    action: Indexes the code's exported symbols and named imports
+    code: packages/analyzers/src/symbols.ts
+    sends: CodeIndex
+  - from: mcp
     to: core
-    action: Reloads the model and finds the matching elements and their code paths
-    code: packages/core/src/query/search.ts
+    action: Reloads the model and briefs the task, with the files and functions to open first, other code that does the same job, rules, journeys, tests, and owners
+    code: packages/core/src/query/context.ts
+    sends: CodeIndex
   - from: coding-agent
     to: mcp
     action: Calls archdoc_impact on those files
