@@ -1,5 +1,4 @@
 import {
-  buildModel,
   DataRegistry,
   formatDiagnostic,
   type JourneyNode,

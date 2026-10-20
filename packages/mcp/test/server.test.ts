@@ -25,7 +25,9 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 describe("archdoc MCP server", () => {
   it("tells agents to check before editing", () => {
     expect(client.getInstructions()).toBe(INSTRUCTIONS);
-    expect(INSTRUCTIONS).toMatch(/before you grep[\s\S]*archdoc_search[\s\S]*archdoc_impact/);
+    expect(INSTRUCTIONS).toMatch(
+      /before you grep[\s\S]*archdoc_context[\s\S]*archdoc_impact[\s\S]*archdoc_search/,
+    );
   });
 
   it("exposes its tools, all read-only except propose", async () => {
@@ -34,6 +36,7 @@ describe("archdoc MCP server", () => {
       "archdoc_anchor",
       "archdoc_check",
       "archdoc_code",
+      "archdoc_context",
       "archdoc_data",
       "archdoc_diff",
       "archdoc_get_actor",
@@ -62,6 +65,39 @@ describe("archdoc MCP server", () => {
       /^Matches for "cli command", best first:\n {2}toolchain\.cli\.commands \(component\)/,
     );
     expect(r.text).toContain("code: packages/cli/src/commands/**");
+  });
+
+  it("finds files and tool names too", async () => {
+    const r = await call("archdoc_search", { query: "archdoc_check" });
+    expect(r.text).toMatch(
+      /packages\/mcp\/src\/server\.ts:\d+ "archdoc_check" \(file in toolchain\.mcp\)/,
+    );
+  });
+
+  it("briefs a task from words or paths", async () => {
+    const byPath = await call("archdoc_context", {
+      paths: ["packages/cli/src/commands/report.ts"],
+    });
+    expect(byPath.isError).toBe(false);
+    expect(byPath.text).toMatch(
+      /^Context for "packages\/cli\/src\/commands\/report\.ts"\n\nStart here\n {2}packages\/cli\/src\/commands\/report\.ts:\d+ report — you named it/,
+    );
+    // Other callers of what it uses from core: the bug class where surfaces load revisions differently.
+    expect(byPath.text).toMatch(
+      /diffModels \(toolchain\.core\.differ\) is also called from .*packages\/mcp\/src\/server\.ts:\d+/,
+    );
+    expect(byPath.text).toContain("Next: after editing, run archdoc check --base main");
+
+    const byWords = await call("archdoc_context", { query: "pr report" });
+    expect(byWords.text).toMatch(
+      /Start here\n {2}packages\/core\/src\/report\/pr-report\.ts:\d+ prReport/,
+    );
+    expect(byWords.text).toMatch(
+      /review-ai-change \(critical\) · step \d+ names packages\/core\/src\/report\/pr-report\.ts/,
+    );
+    expect(byWords.text).toContain("packages/core/test/pr-report.test.ts — same name");
+
+    expect((await call("archdoc_context", {})).isError).toBe(true);
   });
 
   it("locates relative and absolute paths", async () => {

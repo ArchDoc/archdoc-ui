@@ -8,8 +8,8 @@ This repository's architecture is modeled in `.archdoc/`: actors (who uses the s
 
 At the start of every coding task, before grepping or reading files:
 
-1. Find where the change belongs: the `archdoc_search` MCP tool with a few words (for example "cli command"), or `pnpm -s archdoc search <words>`. It returns the elements involved and their code paths.
-2. Check what the change affects: `archdoc_impact` on the element or the files you'll change, or `pnpm -s archdoc impact <element-or-path>`. It lists what depends on them, the affected journeys and actors (most important first), owners, and rules. With a landscape synced, it also lists who uses them from other repos; ask before removing or renaming anything they use.
+1. Find where to start: the `archdoc_context` MCP tool with the task in a few words, the files you plan to change, or both (for example "pr report shows type undefined for data fields"), or `pnpm -s archdoc context <words or paths>`. It returns the files and functions to open first, other code that does the same job (other callers of the functions they use, which a fix usually needs too), the data, rules, and narrowest journeys involved, the tests to run, and owners.
+2. Check what the change affects: `archdoc_impact` on the element or the files you'll change, or `pnpm -s archdoc impact <element-or-path>`. It lists what depends on them, the affected journeys and actors (most important first), owners, and rules. With a landscape synced, it also lists who uses them from other repos; ask before removing or renaming anything they use. `archdoc_search` (or `pnpm -s archdoc search <words>`) finds elements, journeys, and files by words when you only need where something lives.
 3. Name the affected journeys and actors when you share your plan. Ask the user before changing a critical journey.
 
 `archdoc_locate` (or `pnpm -s archdoc locate <paths>`) tells you which element owns any file, including files you're about to create.

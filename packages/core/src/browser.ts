@@ -155,15 +155,48 @@ export * from "./model.js";
 export { insertIntoMap } from "./propose/insert.js";
 export { type ProposalEdit, type ProposalPlan, planProposal } from "./propose/propose.js";
 export {
+  type CodeIndex,
+  fileStem,
+  filesNamed,
+  type IndexedImport,
+  type IndexedSource,
+  type IndexedSymbol,
+  isTestFile,
+  pointAt,
+  type RankedFile,
+  rankFiles,
+  type SymbolKind,
+} from "./query/code-index.js";
+export {
+  type ContextBrief,
+  type ContextCallSite,
+  type ContextInputs,
+  type ContextJourney,
+  type ContextSameJob,
+  type ContextStart,
+  context,
+} from "./query/context.js";
+export {
+  type EvalCase,
+  type EvalCommit,
+  type EvalReport,
+  evaluate,
+  isEvalSource,
+  subjectQuery,
+} from "./query/eval.js";
+export {
   type AffectedJourney,
   type Impact,
   type ImpactConsumer,
   type ImpactResult,
   impact,
+  rulesMentioning,
 } from "./query/impact.js";
 export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
+export { queryTerms, sameWord, splitIdentifier } from "./query/terms.js";
 export { formatAnnotations, formatFindings, type MarkedFinding } from "./report/check-report.js";
+export { formatContext, formatEval } from "./report/context-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";
 export {
   CHANGE_LEGEND,

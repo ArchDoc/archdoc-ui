@@ -62,8 +62,8 @@ export function formatFindings(
  * introduced.
  */
 export function formatAnnotations(findings: MarkedFinding[], introducedOnly = true): string {
-  const escape = (s: string) => s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-  const prop = (s: string) => escape(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
+  const esc = (s: string) => s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  const prop = (s: string) => esc(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
   const lines: string[] = [];
   for (const f of findings) {
     if (introducedOnly && f.introduced === false) continue;
@@ -83,7 +83,7 @@ export function formatAnnotations(findings: MarkedFinding[], introducedOnly = tr
       line ? `line=${line}` : "",
       `title=${prop(`ArchDoc ${f.rule ? `rule ${f.rule}` : f.code}`)}`,
     ].filter(Boolean);
-    lines.push(`::${f.severity} ${props.join(",")}::${escape(f.message)}`);
+    lines.push(`::${f.severity} ${props.join(",")}::${esc(f.message)}`);
   }
   return lines.join("\n");
 }

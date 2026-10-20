@@ -21,4 +21,5 @@ export {
   resolveRef as resolveGitRef,
   type SourcesAtRef,
 } from "./load/git.js";
+export { type CommitFiles, recentCommits } from "./load/history.js";
 export { type ProposeOptions, type ProposeResult, propose } from "./propose/write.js";

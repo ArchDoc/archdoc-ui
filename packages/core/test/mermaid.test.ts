@@ -201,8 +201,8 @@ describe("journeyDiagram branches", () => {
     expect(d).not.toContain("autonumber");
     const lines = d.split("\n").map((l) => l.trim());
     const alt = lines.findIndex((l) => l.startsWith("alt escalate: request.reason == 'safety'"));
-    const approve = lines.findIndex((l) => l === "else approve: request.amount ≤ 100");
-    const review = lines.findIndex((l) => l === "else review: otherwise");
+    const approve = lines.indexOf("else approve: request.amount ≤ 100");
+    const review = lines.indexOf("else review: otherwise");
     expect(alt).toBeGreaterThan(0);
     expect(approve).toBeGreaterThan(alt);
     expect(review).toBeGreaterThan(approve);
