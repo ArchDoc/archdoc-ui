@@ -1141,8 +1141,7 @@ kbd {
   box-shadow: 0 0 0 2px var(--chg-added-soft);
 }
 
-.card.change-changed,
-.card.contains-changes {
+.card.change-changed {
   border-color: var(--chg-changed);
   box-shadow: 0 0 0 2px var(--chg-changed-soft);
 }
@@ -1394,6 +1393,18 @@ kbd {
   padding: 4px 8px;
   background: var(--chg-changed-soft);
   border-radius: 0 6px 6px 0;
+}
+
+.change-note p {
+  margin: 0;
+}
+
+.change-inside {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--f-mono);
+  font-size: 0.8rem;
 }
 
 .change-note.change-added {

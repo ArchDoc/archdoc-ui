@@ -354,7 +354,7 @@ export function Canvas(props: CanvasProps) {
             hiddenChildren: n.hiddenChildren,
             isGroup: n.isGroup,
             change: overlay?.nodes.get(n.id),
-            containsChanges: overlay?.containsChanges.has(n.id),
+            changesInside: overlay?.inside.get(n.id),
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
             entered: crossings.get(at) === n.id,

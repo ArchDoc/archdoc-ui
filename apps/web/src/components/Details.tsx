@@ -327,15 +327,35 @@ function JourneyDetails(props: DetailsProps & { journey: JourneyNode }) {
 }
 
 function ChangeNote({ compare, id }: { compare?: Compare | undefined; id: string }) {
-  const c = compare?.diff.elements.find((x) => x.id === id);
-  if (!c || !compare) return null;
-  const what =
-    c.kind === "added"
+  if (!compare) return null;
+  const c = compare.diff.elements.find((x) => x.id === id);
+  // A box changes with what's inside it.
+  const inside = compare.diff.elements.filter((x) => x.id.startsWith(`${id}.`));
+  if (!c && !inside.length) return null;
+  const what = !c
+    ? `Changed since ${compare.ref}, inside:`
+    : c.kind === "added"
       ? `Added since ${compare.ref}.`
       : c.kind === "moved"
         ? `Moved from ${c.from} since ${compare.ref}.`
         : `Changed since ${compare.ref}: ${c.fields.join(", ")}.`;
-  return <p className={`change-note change-${c.kind}`}>{what}</p>;
+  return (
+    <div className={`change-note change-${c?.kind ?? "changed"}`}>
+      <p>{what}</p>
+      {inside.length && c?.kind !== "added" ? (
+        <ul className="change-inside">
+          {inside.map((x) => (
+            <li key={x.id}>
+              <span className={`change-mark change-${x.kind}`}>
+                {x.kind === "added" ? "+" : x.kind === "removed" ? "−" : "~"}
+              </span>{" "}
+              {x.id.slice(id.length + 1)} {x.kind}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 function RemovedDetails(props: DetailsProps & { compare: Compare; id: string }) {

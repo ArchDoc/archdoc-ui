@@ -1,5 +1,5 @@
 import type { Model, ModelDiff, RelationshipView, Target } from "@archdoc/core/browser";
-import { nodeKey } from "@archdoc/core/browser";
+import { nodeKey, subscriptionOf } from "@archdoc/core/browser";
 import {
   ancestorsOf,
   buildGraph,
@@ -16,8 +16,8 @@ export interface DiffGraph {
   graph: Graph;
   nodes: Map<string, ChangeKind>;
   edges: Map<string, ChangeKind>;
-  /** Collapsed boxes that hide changes inside them. */
-  containsChanges: Set<string>;
+  /** Boxes with changes inside them, and how many: they count as changed too. */
+  inside: Map<string, number>;
   /** Node keys that exist only in the base. */
   ghosts: Set<string>;
 }
@@ -25,8 +25,8 @@ export interface DiffGraph {
 /**
  * Overlays a model diff on the graph: what was added, changed, or removed,
  * by node and by edge. Removed elements and relationships appear as ghosts
- * where their place is still visible; changes hidden inside a collapsed box
- * mark the box instead.
+ * where their place is still visible. A box with changes inside it changed
+ * too, whether it's open or not.
  */
 export function buildDiffGraph(
   head: Model,
@@ -37,28 +37,24 @@ export function buildDiffGraph(
   const graph = buildGraph(head, view);
   const visible = new Set(graph.nodes.map((n) => n.id));
   const nodes = new Map<string, ChangeKind>();
-  const containsChanges = new Set<string>();
+  const inside = new Map<string, number>();
   const ghosts = new Set<string>();
 
   const mark = (key: string, kind: ChangeKind) => {
     if (visible.has(key)) nodes.set(key, kind);
   };
-  const markHidden = (id: string, model: Model) => {
-    // A change inside a collapsed box: mark the nearest visible ancestor.
-    for (const a of [...ancestorsOf(model, id)].reverse()) {
+  // Every box that holds a change, open or collapsed, changed with it.
+  const markAncestors = (id: string, model: Model) => {
+    for (const a of ancestorsOf(model, id)) {
       const key = `element:${a}`;
-      if (visible.has(key)) {
-        containsChanges.add(key);
-        return;
-      }
+      if (!head.elements.has(a) || !visible.has(key)) continue;
+      inside.set(key, (inside.get(key) ?? 0) + 1);
+      if (!nodes.has(key)) nodes.set(key, "changed");
     }
   };
-
   for (const c of diff.elements) {
-    const key = `element:${c.id}`;
     if (c.kind === "removed") continue;
-    if (visible.has(key)) mark(key, c.kind === "added" ? "added" : "changed");
-    else markHidden(c.id, head);
+    mark(`element:${c.id}`, c.kind === "added" ? "added" : "changed");
   }
   for (const c of diff.actors)
     if (c.kind !== "removed") mark(`actor:${c.id}`, c.kind === "added" ? "added" : "changed");
@@ -74,7 +70,6 @@ export function buildDiffGraph(
         !view.expanded.has(parent) ||
         !visible.has(`element:${parent}`))
     ) {
-      if (head.elements.has(parent)) markHidden(id, base);
       continue;
     }
     const ghost: GraphNode = {
@@ -99,6 +94,13 @@ export function buildDiffGraph(
     nodes.set(key, "removed");
   }
 
+  // What changed inside a box changes the box: its elements, and the arrows they start.
+  for (const c of diff.elements) markAncestors(c.id, c.kind === "removed" ? base : head);
+  for (const c of diff.relationships) {
+    const r = (c.after ?? c.before) as RelationshipView;
+    if (r.from.type === "element") markAncestors(r.from.id, c.kind === "removed" ? base : head);
+  }
+
   // Edges: added and changed ones exist in the head graph; removed ones become ghosts.
   const edges = new Map<string, ChangeKind>();
   const added = new Map<string, { added: number; other: number }>();
@@ -115,21 +117,29 @@ export function buildDiffGraph(
       return visible.has(nodeKey(t)) ? nodeKey(t) : undefined;
     return liftKey(head, view, t);
   };
+  const same = (a: RelationshipView, b: { from: Target; to: Target }) =>
+    nodeKey(a.from) === nodeKey(b.from) && nodeKey(a.to) === nodeKey(b.to);
   for (const c of diff.relationships) {
     const r = (c.after ?? c.before) as RelationshipView;
-    const source = endpoint(r.from);
-    const target = endpoint(r.to);
-    if (!source || !target || source === target) continue;
-    const id = `${source}->${target}`;
     const kind: ChangeKind =
       c.kind === "added" ? "added" : c.kind === "removed" ? "removed" : "changed";
-    const existing = graph.edges.find((e) => e.id === id);
+    // The edge that stands for it: a subscription's runs publisher to subscriber, against how it's declared.
+    const was = base.relationships.find((x) => same(r, x));
+    const [from, to] = was && subscriptionOf(base, was) ? [r.to, r.from] : [r.from, r.to];
+    const source = endpoint(from);
+    const target = endpoint(to);
+    // A removed one may still be lifted onto an edge others keep.
+    const existing =
+      graph.edges.find((e) => e.relationships.some((x) => same(r, x))) ??
+      graph.edges.find((e) => e.id === `${source}->${target}`);
+    if (!existing && (!source || !target || source === target)) continue;
+    const id = existing?.id ?? `${source}->${target}`;
     if (existing) {
       const counts = added.get(id) ?? { added: 0, other: 0 };
       if (kind === "added") counts.added++;
       else counts.other++;
       added.set(id, counts);
-    } else if (kind === "removed") {
+    } else if (kind === "removed" && source && target) {
       graph.edges.push({ id, source, target, relationships: [], planned: false });
       edges.set(id, "removed");
     }
@@ -140,5 +150,5 @@ export function buildDiffGraph(
     edges.set(id, counts.other === 0 && counts.added === total ? "added" : "changed");
   }
 
-  return { graph, nodes, edges, containsChanges, ghosts };
+  return { graph, nodes, edges, inside, ghosts };
 }
