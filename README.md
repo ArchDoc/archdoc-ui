@@ -28,7 +28,7 @@ A **deterministic engine** (`@archdoc/core`) answers every question about the mo
 People and agents reach the engine through the surface that fits the moment:
 
 - **AI agents, before editing:** an MCP server and agent skill. *Where am I? What depends on this? Which rules and journeys apply?*
-- **Reviewers, before merging:** a PR impact check. It lists affected journeys, owners, data changes, and consumers in other repos, and flags drift.
+- **Reviewers, before merging:** a PR comment that leads with a verdict: what blocks the merge and how to fix it, what to check, and who to involve. It stays quiet when the architecture didn't change.
 - **Everyone, anytime:** the explorer, which starts from what people do: journeys as stories, a map one level at a time, data and its lineage, and click-through to code.
 - **Enterprises, across teams:** the landscape, which composes every repo's model into one view.
 
@@ -95,8 +95,10 @@ pnpm archdoc locate packages/core/src/load/fs.ts   # which element owns this fil
 pnpm archdoc impact packages/cli/src/commands      # what would changing it affect?
 pnpm archdoc map                            # how the repo's files map onto the model
 pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
+pnpm archdoc check --base main --format github   # the same, as annotations on the diff in CI
 pnpm archdoc diff main                      # what changed in the model since main
-pnpm archdoc report --base main             # the architectural impact of your branch, as markdown
+pnpm archdoc report --base main             # what the PR comment will say about your branch
+pnpm archdoc site --base main --out site     # the explorer as a static site, opened on your branch's change
 pnpm archdoc trace anchor --file error.log  # which journey step an error showed up in, and a trace to start
 pnpm archdoc trace check                    # check the traces in .archdoc/traces/
 pnpm archdoc trace show report-false-data-changes   # a bug, hop by hop, with its evidence
@@ -117,9 +119,9 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 
 ## Keep the model honest
 
-`archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it marks what your change introduced and fails only on that, so it works as a CI gate from day one.
+`archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it checks the merge base the same way, marks what your change introduced (what the base didn't have), and fails only on that, so it works as a CI gate from day one.
 
-`archdoc diff` shows what changed in the model itself, by element, relationship, actor, and journey rather than by line. `diff`, `report --base`, and `view --base` also take another model file in place of a git ref, to compare two versions side by side.
+`archdoc diff` shows what changed in the model itself, by element, use, actor, journey, data entry, and decision rather than by line. Both sides are read the same way, with what their schema sources say. `diff`, `report --base`, and `view --base` also take another model file in place of a git ref, to compare two versions side by side.
 
 ## Data: what's sent and stored
 
@@ -241,7 +243,7 @@ The landscape repo itself runs `archdoc landscape build`. It composes every repo
 
 ## Review pull requests
 
-The [GitHub Action](./integrations/github-action) comments on every pull request with its architectural impact. It leads with Mermaid diagrams, which GitHub renders natively: one of the change (what was added, changed, or removed, and what an agent suggested, among its unchanged neighbors) and one of each of the most important journeys it affects, with the affected steps highlighted. With a landscape synced, it also lists consumers in other repos and marks the ones the change breaks. Below them: the elements it touches and their owners, the journeys and actors it affects (critical first), what changed in the model, facts an agent suggested that need a person's review, and drift the change introduced. It can fail the check on new drift. `archdoc report --base main` writes the same report, ready to paste into a PR description.
+The [GitHub Action](./integrations/github-action) comments on every pull request with a verdict a reviewer can act on in seconds: what blocks the merge and how to fix it (rules the change breaks, imports the model doesn't declare, consumers in other repos it breaks), what to check (sensitive data going somewhere new, a changed decision, new warnings), and a Before merging checklist of who to involve: owners approve, other repos' teams know, critical journeys still work. Then a diagram of only what changed, and a link to the change in the explorer if you host the site `archdoc site --base` writes. The journeys (as sequence diagrams, with their branches), consumers, data, drift, model changes, and findings already on the base fold below. When a pull request doesn't change the architecture, the Action stays quiet. Introduced findings also show on their lines in Files changed, and the check can fail on them. `archdoc report --base main` (or the `archdoc_report` MCP tool) writes the same comment, ready to paste into a PR description.
 
 ## Use it with your coding agent
 
@@ -258,7 +260,7 @@ ArchDoc is built in phases. Each phase ends with an exit test, not a date. The f
 | 0 · Reset | pnpm monorepo, Node 22/24 CI, this README |
 | 1 · Model core + explorer | Spec v2, `archdoc validate`, `archdoc view`, ArchDoc modeling itself |
 | 2 · Code mapping + MCP | `locate` and `impact` for agents, before they edit |
-| 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a PR impact comment, a before/after view, agents proposing model changes |
+| 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a verdict-first PR comment, a before/after view, agents proposing model changes, context briefs and eval, bug traces |
 | 4 · Federation | Models published across repos, a landscape repo, cross-repo impact |
 | 5 · Data | Entities, storage, field lineage, logic, and simulation |
 | 6 · Bootstrap + interop | Draft models from code, LikeC4/Structurizr importers |

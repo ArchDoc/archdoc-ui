@@ -169,7 +169,19 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
     cd trips && git checkout try/rename-email        # a migration renames a pii column
     archdoc check --base main
 
+    archdoc view --base main --open                  # on any of them: the Changes tab says what the comment says
+    archdoc site --base main --out /tmp/pr-site      # the same, as a static site a PR comment can link to
+    archdoc report --base main                       # on main itself: no architectural impact, one line
+
 Go back with \`git checkout main\`.
+
+## Explain a bug
+
+    cd rides
+    archdoc trace list                               # bugs traced in .archdoc/traces/
+    archdoc trace show small-refund-waits-for-finance
+    archdoc trace check
+    archdoc view --open                              # the trace on the journey step it opens up
 
 ## Edit and watch
 
