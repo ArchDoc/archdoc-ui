@@ -1,16 +1,21 @@
-import { existsSync, type FSWatcher, readFileSync, watch } from "node:fs";
+import { existsSync, type FSWatcher, watch } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { basename, dirname, extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { contextFor, importSchemas } from "@archdoc/analyzers";
+import { type AnalyzerContext, importSchemas } from "@archdoc/analyzers";
 import {
   buildModel,
   federationDir,
+  isSnippet,
   listBranches,
+  listFilesAtRef,
   listRepoFiles,
+  type ModelSource,
+  type RepoInfo,
   readFederationInput,
+  readFileAtRef,
   readModelSources,
   readModelSourcesAtRef,
   repoInfo,
@@ -72,6 +77,33 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
       : await readModelSourcesAtRef(options.target, options.base, { cwd: options.cwd })
     : undefined;
 
+  /** The model at a branch, as /api/model sends the working tree's, read from git. */
+  const payloadAtRef = async (at: SourcesAtRef) => {
+    const read = await readModelSources(options.target, { cwd: options.cwd });
+    if (!read || !at.commit) return { ...at };
+    const repo = await repoInfo(read.baseDir);
+    return {
+      ref: at.ref,
+      commit: at.commit,
+      ...(await modelPayload({
+        root: at.root,
+        sources: at.sources,
+        baseDir: read.baseDir,
+        files: await listFilesAtRef(read.baseDir, at.commit),
+        // Code links go to the files at this commit; there's no local copy to open.
+        repo: { webUrl: repo.webUrl, commit: at.commit },
+        fedDir: await federationDir(read.source),
+        cwd: options.cwd,
+        read: (path) => {
+          const rel = relative(read.baseDir, path).replace(/\\/g, "/");
+          return rel.startsWith("..")
+            ? Promise.resolve(undefined)
+            : readFileAtRef(read.baseDir, at.commit, rel);
+        },
+      })),
+    };
+  };
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     try {
@@ -86,40 +118,16 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml.`,
           });
         }
-        const [files, repo, federation] = await Promise.all([
-          listRepoFiles(read.baseDir),
-          repoInfo(read.baseDir),
-          readFederationInput(await federationDir(read.source), options.cwd),
-        ]);
-        const model = buildModel(read.sources, { root: read.root });
-        const inRepo = new Set(files);
         return json(res, 200, {
-          root: read.root,
-          sources: read.sources,
+          ...(await modelPayload({
+            ...read,
+            files: await listRepoFiles(read.baseDir),
+            repo: { ...(await repoInfo(read.baseDir)), root: read.baseDir },
+            fedDir: await federationDir(read.source),
+            cwd: options.cwd,
+            read: (path) => readFile(path, "utf8").catch(() => undefined),
+          })),
           watch: watching,
-          files,
-          // Where each code snippet is, so the explorer links a symbol to its lines.
-          snippets: resolveSnippets(model, (path) => {
-            if (!inRepo.has(path)) return undefined;
-            try {
-              return readFileSync(join(read.baseDir, path), "utf8");
-            } catch {
-              return undefined;
-            }
-          }),
-          // Other repos' models, so the explorer checks and simulates across repos like the CLI.
-          federation: {
-            lockPath: federation.lockPath,
-            lock: federation.lock,
-            lockError: federation.lockError,
-            bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
-          },
-          samples: await readSamples(read.baseDir, files),
-          // What data entries' schema sources say (types, values, foreign keys), as check reads them.
-          schemas: (await importSchemas(contextFor(read.baseDir, files), model)).filter(
-            (s) => !s.error,
-          ),
-          repo: { ...repo, root: read.baseDir },
           base: base && {
             ref: base.ref,
             commit: base.commit,
@@ -149,8 +157,9 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
             at(url.searchParams.get("head")),
           ]);
           if (!from) return json(res, 400, { error: "Pick a base branch to compare with." });
-          // No head means the working tree, which /api/model already sends.
-          return json(res, 200, { base: from, head: to });
+          // No head means the working tree, which /api/model already sends. A branch
+          // comes with what the working tree does: schemas, other repos, files, and samples.
+          return json(res, 200, { base: from, head: to && (await payloadAtRef(to)) });
         } catch (err) {
           if (err instanceof RangeError) return json(res, 400, { error: err.message });
           throw err;
@@ -261,6 +270,66 @@ export function findWebDir(): string | undefined {
   return candidates.find((d): d is string => !!d && existsSync(join(d, "index.html")));
 }
 
+/** One version of the model and its repository: the working tree, or a commit. */
+interface Snapshot {
+  root: string;
+  sources: ModelSource[];
+  /** Directory the files are relative to. */
+  baseDir: string;
+  files: string[];
+  repo: RepoInfo & { root?: string | undefined };
+  /** Where archdoc.lock and vendor/ are. */
+  fedDir: string;
+  cwd: string;
+  /** Reads a file by its absolute path. */
+  read: (path: string) => Promise<string | undefined>;
+}
+
+/** What the explorer needs to build and show one version of the model. */
+async function modelPayload(snap: Snapshot) {
+  const model = buildModel(snap.sources, { root: snap.root });
+  const inRepo = new Set(snap.files);
+  const readRel = (path: string) =>
+    inRepo.has(path) ? snap.read(join(snap.baseDir, path)) : Promise.resolve(undefined);
+  // Snippets are found synchronously, so read the files they're in first.
+  const snippetFiles = new Map<string, string | undefined>();
+  for (const e of model.elements.values()) {
+    for (const ref of e.code) {
+      if (isSnippet(ref) && !snippetFiles.has(ref.path)) {
+        snippetFiles.set(ref.path, await readRel(ref.path));
+      }
+    }
+  }
+  const federation = await readFederationInput(snap.fedDir, snap.cwd, snap.read);
+  const ctx: AnalyzerContext = {
+    baseDir: snap.baseDir,
+    files: snap.files,
+    read: async (path) => {
+      const text = await readRel(path);
+      if (text === undefined) throw new Error(`Can't read ${path}.`);
+      return text;
+    },
+  };
+  return {
+    root: snap.root,
+    sources: snap.sources,
+    files: snap.files,
+    // Where each code snippet is, so the explorer links a symbol to its lines.
+    snippets: resolveSnippets(model, (path) => snippetFiles.get(path)),
+    // Other repos' models, so the explorer checks and simulates across repos like the CLI.
+    federation: {
+      lockPath: federation.lockPath,
+      lock: federation.lock,
+      lockError: federation.lockError,
+      bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
+    },
+    samples: await readSamples(snap.files, readRel),
+    // What data entries' schema sources say (types, values, foreign keys), as check reads them.
+    schemas: (await importSchemas(ctx, model)).filter((s) => !s.error),
+    repo: snap.repo,
+  };
+}
+
 /** Another model on disk, as the base to compare with, in place of a git ref. */
 async function sourcesOfFile(path: string, cwd?: string): Promise<SourcesAtRef> {
   const read = await readModelSources(path, { cwd });
@@ -274,15 +343,15 @@ async function sourcesOfFile(path: string, cwd?: string): Promise<SourcesAtRef> 
  * single-file model.
  */
 async function readSamples(
-  baseDir: string,
   files: readonly string[],
+  read: (path: string) => Promise<string | undefined>,
 ): Promise<{ path: string; text: string }[]> {
   const paths = files
     .filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f) || /\.sample\.json$/.test(f))
     .slice(0, 50);
   const out: { path: string; text: string }[] = [];
   for (const path of paths) {
-    const text = await readFile(join(baseDir, path), "utf8").catch(() => undefined);
+    const text = await read(path);
     if (text !== undefined && text.length <= 256 * 1024) out.push({ path, text });
   }
   return out;

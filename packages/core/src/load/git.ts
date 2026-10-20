@@ -48,6 +48,21 @@ export async function listBranches(
   }
 }
 
+/** The files at a commit, relative to `cwd` and below it, as `listRepoFiles` lists the working tree. */
+export async function listFilesAtRef(cwd: string, commit: string): Promise<string[]> {
+  const out = await git(cwd, "ls-tree", "-r", "--name-only", "-z", commit).catch(() => "");
+  return out.split("\0").filter(Boolean).sort();
+}
+
+/** A file's text at a commit, by its path relative to `cwd`, or undefined if it wasn't there. */
+export async function readFileAtRef(
+  cwd: string,
+  commit: string,
+  path: string,
+): Promise<string | undefined> {
+  return git(cwd, "show", `${commit}:./${path}`).catch(() => undefined);
+}
+
 export async function mergeBase(cwd: string, a: string, b: string): Promise<string | undefined> {
   try {
     return (await git(cwd, "merge-base", a, b)).trim() || undefined;

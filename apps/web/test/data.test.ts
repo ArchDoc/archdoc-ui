@@ -199,11 +199,14 @@ data:
       name: "amount_cents",
       value: "300",
     });
+    // The whole record, to inspect: every value, not only the fields the model declares.
+    expect(run.message?.entries[0]?.record).toEqual(sample.RefundRequest);
     expect(run.writes).toEqual([
       {
         entry: "payments.Charge",
         created: false,
         values: new Map([["status", "captured → refunded"]]),
+        record: { amount_cents: 1000, status: "refunded" },
       },
     ]);
     expect(journeyStores(m, journey)).toEqual(["core.ledger"]);
@@ -242,6 +245,35 @@ data:
     });
     // The skeleton runs: 1200 is more than half of 1200, so it goes to a person.
     expect(simulate(m, "refund", sample)?.outcomes).toEqual(["manual"]);
+  });
+
+  it("put what an arrow sends in the sample, so a step's message has values to inspect", () => {
+    const arrow = buildModel([
+      {
+        path: "archdoc.yaml",
+        text: [
+          'archdoc: "2.0"',
+          "namespace: books",
+          "actors:",
+          "  finance: { kind: role, uses: { reports: { description: Opens, sends: ReportRequest } } }",
+          "elements:",
+          "  reports: { kind: container }",
+          "journeys:",
+          "  month-end:",
+          "    actor: finance",
+          "    goal: Close the books",
+          "    steps: [{ from: finance, to: reports, action: Opens the report }]",
+          "data:",
+          "  ReportRequest: { kind: message, fields: { month: { type: date } } }",
+        ].join("\n"),
+      },
+    ]);
+    const journey = arrow.journeys.get("month-end");
+    if (!journey) throw new Error("no journey");
+    const sample = sampleSkeleton(arrow, journey);
+    expect(Object.keys(sample)).toEqual(["ReportRequest"]);
+    const step = stepData(arrow, journey, 0, simulate(arrow, "month-end", sample));
+    expect(step.message?.entries[0]?.record).toEqual(sample.ReportRequest);
   });
 
   it("give keys and the fields that name them the same example, so records link up", () => {

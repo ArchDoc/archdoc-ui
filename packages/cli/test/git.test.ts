@@ -148,12 +148,33 @@ describe("against a git history", () => {
       expect(refs).toMatchObject({ current: "feature", base: "main" });
       expect(refs.branches).toEqual(expect.arrayContaining(["main", "feature"]));
 
-      type Pair = { base: { ref: string; commit: string }; head?: { ref: string } };
+      type Pair = {
+        base: { ref: string; commit: string };
+        head?: {
+          ref: string;
+          files: string[];
+          repo: { commit: string; root?: string };
+          federation: object;
+          schemas: unknown[];
+          samples: unknown[];
+        };
+      };
       const pair = (await (
         await fetch(`${server.url}/api/compare?base=main&head=feature`)
       ).json()) as Pair;
       expect(pair.base).toMatchObject({ ref: "main", commit: git("rev-parse", "main").trim() });
-      expect(pair.head?.ref).toBe("feature");
+      // A branch comes with what the working tree does, read from its commit.
+      expect(pair.head).toMatchObject({
+        ref: "feature",
+        repo: { commit: git("rev-parse", "feature").trim() },
+        federation: expect.any(Object),
+        schemas: [],
+        samples: [],
+      });
+      expect(pair.head?.files).toContain("services/billing/src/index.ts");
+      // Files only in the working tree aren't at the commit, and there's no local copy to open.
+      expect(pair.head?.files).not.toContain("apps/web/src/pay.ts");
+      expect(pair.head?.repo.root).toBeUndefined();
       // Without a head, the explorer compares with the working tree it already has.
       const tree = (await (await fetch(`${server.url}/api/compare?base=main`)).json()) as Pair;
       expect(tree.head).toBeUndefined();

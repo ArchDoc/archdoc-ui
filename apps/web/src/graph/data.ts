@@ -170,6 +170,8 @@ export function sampleSkeleton(
       }
     }
     for (const data of [s.spec.sends ?? []].flat()) need(data);
+    // What the step's arrow sends, accepts, or carries, when the step doesn't say.
+    for (const data of stepMessage(model, s)?.data ?? []) need(data);
     if (s.spec.decides) {
       const l = registry.logic(s.spec.decides);
       for (const ref of Object.values(l?.node.spec.input ?? {})) need(ref, l?.namespace);
@@ -257,7 +259,14 @@ export interface StepData {
   message?:
     | {
         how: StepMessage["how"];
-        entries: { entry: string; label: string; kind?: string | undefined; fields: FieldInfo[] }[];
+        entries: {
+          entry: string;
+          label: string;
+          kind?: string | undefined;
+          fields: FieldInfo[];
+          /** The record as simulated: every value, including fields the model doesn't declare. */
+          record?: Record<string, unknown> | undefined;
+        }[];
       }
     | undefined;
   /** Records it creates or changes: as simulated, or else as declared. */
@@ -270,6 +279,8 @@ export interface StepWrite {
   created: boolean;
   /** Field to its new value, or "from → to". */
   values: Map<string, string>;
+  /** The whole record after the step, when simulated. */
+  record?: Record<string, unknown> | undefined;
   /** The branch it's in, when declared and not simulated. */
   when?: string | undefined;
 }
@@ -295,7 +306,9 @@ export function stepData(
     entries: msg.data.map((ref) => {
       const entry = qualifyData(ref, ns);
       const node = registry.entry(entry)?.node;
-      const record = sent.get(entry);
+      // A message the arrow sends, not the step, is the record as it stands at this step.
+      const record =
+        sent.get(entry) ?? (sim && simulation ? recordAt(simulation, entry, index) : undefined);
       return {
         entry,
         label: shortRef(entry, ns),
@@ -306,6 +319,7 @@ export function stepData(
           classification: f.classification,
           value: record && name in record ? show(record[name]) : undefined,
         })),
+        record,
       };
     }),
   };
@@ -322,6 +336,7 @@ export function stepData(
             f.from === undefined ? show(f.to) : `${show(f.from)} → ${show(f.to)}`,
           ]),
         ),
+        record: e.record,
       }));
     return { message, writes };
   }
@@ -472,6 +487,19 @@ export function journeyStores(model: Model, journey: JourneyNode): string[] {
 
 function shortRef(entry: string, ns: string): string {
   return entry.startsWith(`${ns}.`) ? entry.slice(ns.length + 1) : entry;
+}
+
+/** An entry's record as it stands at step `index`: the last one a step made, or the sample's. */
+function recordAt(
+  simulation: Simulation,
+  entry: string,
+  index: number,
+): Record<string, unknown> | undefined {
+  for (let i = index; i >= 0; i--) {
+    const e = simulation.steps[i]?.events.findLast((x) => x.entry === entry);
+    if (e) return e.record;
+  }
+  return simulation.seed[entry]?.[0];
 }
 
 function show(v: unknown): string {

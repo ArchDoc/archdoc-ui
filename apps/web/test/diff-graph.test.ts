@@ -57,7 +57,10 @@ describe("buildDiffGraph", () => {
       "element:legacy": "removed",
       "element:api.old": "removed",
       "actor:clerk": "removed",
+      // What changed inside api changed api: a component added, changed, and removed, and an arrow.
+      "element:api": "changed",
     });
+    expect(d.inside.get("element:api")).toBe(4);
     expect([...d.ghosts].sort()).toEqual(["actor:clerk", "element:api.old", "element:legacy"]);
     expect(d.graph.nodes.find((n) => n.id === "element:api.old")?.parentId).toBe("element:api");
   });
@@ -73,12 +76,36 @@ describe("buildDiffGraph", () => {
     });
   });
 
-  it("marks a collapsed box that hides changes, and lifts edges onto it", () => {
+  it("marks a box with changes inside it changed, open or not, and lifts edges onto it", () => {
     const d = buildDiffGraph(head, base, diff, { expanded: new Set() });
-    expect([...d.containsChanges]).toEqual(["element:api"]);
+    expect(d.nodes.get("element:api")).toBe("changed");
+    expect(d.inside.get("element:api")).toBeGreaterThan(0);
+    const open = buildDiffGraph(head, base, diff, { expanded: new Set(["api"]) });
+    expect(open.nodes.get("element:api")).toBe("changed");
     expect(d.ghosts.has("element:api.old")).toBe(false);
     // web → api still exists (web uses api), so it isn't marked.
     expect(d.edges.has("element:web->element:api")).toBe(false);
+  });
+
+  it("finds a subscription's arrow, drawn from the publisher to the subscriber", () => {
+    const subBase = load(`
+archdoc: "2.0"
+namespace: x
+elements:
+  charges: { kind: container, provides: [{ event: RefundIssued }] }
+`);
+    const subHead = load(`
+archdoc: "2.0"
+namespace: x
+elements:
+  charges: { kind: container, provides: [{ event: RefundIssued }] }
+  receipts: { kind: container, uses: { charges: { description: Hears about refunds, via: RefundIssued } } }
+`);
+    const d = buildDiffGraph(subHead, subBase, diffModels(subBase, subHead), {
+      expanded: new Set(),
+    });
+    expect(d.graph.edges.map((e) => e.id)).toEqual(["element:charges->element:receipts"]);
+    expect(Object.fromEntries(d.edges)).toEqual({ "element:charges->element:receipts": "added" });
   });
 
   it("calls a lifted edge changed when only some of its relationships are new", () => {

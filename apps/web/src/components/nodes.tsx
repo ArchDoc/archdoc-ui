@@ -24,7 +24,8 @@ export interface CardData extends Record<string, unknown> {
   /** In the before/after view: how this changed. */
   change?: "added" | "changed" | "removed" | undefined;
   /** A collapsed box with changes inside. */
-  containsChanges?: boolean | undefined;
+  /** How many changes are inside the box; it counts as changed. */
+  changesInside?: number | undefined;
   emphasis: Emphasis;
   selected: boolean;
   /** The box the current journey step crosses into. */
@@ -74,7 +75,6 @@ export function Card({ data }: NodeProps<CardNode>) {
     data.suggested ? "is-suggested" : "",
     `emphasis-${data.emphasis}`,
     data.change ? `change-${data.change}` : "",
-    data.containsChanges ? "contains-changes" : "",
     data.selected ? "is-selected" : "",
     data.entered ? "is-entered" : "",
     data.stores ? "is-store" : "",
@@ -95,11 +95,15 @@ export function Card({ data }: NodeProps<CardNode>) {
         <span className="card-kind">{data.kind}</span>
         {data.version ? <span className="card-version">{data.version}</span> : null}
         {data.change ? (
-          <span className={`card-change change-${data.change}`}>{data.change}</span>
-        ) : null}
-        {data.containsChanges ? (
-          <span className="card-change change-changed" title="Something inside changed">
-            changes inside
+          <span
+            className={`card-change change-${data.change}`}
+            title={
+              data.changesInside
+                ? `${data.changesInside} change${data.changesInside === 1 ? "" : "s"} inside`
+                : undefined
+            }
+          >
+            {data.change}
           </span>
         ) : null}
         {data.status && data.status !== "active" ? (

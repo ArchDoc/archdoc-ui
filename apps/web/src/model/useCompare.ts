@@ -1,5 +1,6 @@
 import { buildModel, type Model, type ModelSource } from "@archdoc/core/browser";
 import { useEffect, useMemo, useState } from "react";
+import { type ModelPayload, modelOf, type RepoLinks } from "./useModel.js";
 
 /** The branches `archdoc view` can compare. Undefined on a static host, which has no git. */
 export interface Refs {
@@ -36,7 +37,19 @@ export type Compared =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; base: Model; head?: Model | undefined };
+  | { status: "ready"; base: Model; head?: Head | undefined };
+
+/** A branch as the Changes tab shows it: its model, and the files and samples at its commit. */
+export interface Head {
+  ref: string;
+  model: Model;
+  /** The model's files alone, to diff as the base is diffed. */
+  sources: { root: string; sources: ModelSource[] };
+  files: string[];
+  snippets: NonNullable<ModelPayload["snippets"]>;
+  repo: RepoLinks;
+  samples: { path: string; text: string }[];
+}
 
 interface Sources {
   ref: string;
@@ -65,11 +78,11 @@ export function useCompared(
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
           base?: Sources;
-          head?: Sources;
+          head?: Sources & Partial<ModelPayload>;
         };
         if (!res.ok || !body.base)
           throw new Error(body.error ?? `The server answered ${res.status}.`);
-        return { base: build(body.base), head: body.head && build(body.head) };
+        return { base: build(body.base), head: body.head && head(body.head) };
       })
       .then(
         (models) => !cancelled && setState({ status: "ready", ...models }),
@@ -91,6 +104,18 @@ export function useCompared(
 }
 
 const IDLE: Compared = { status: "idle" };
+
+function head(p: Sources & Partial<ModelPayload>): Head {
+  return {
+    ref: p.ref,
+    model: modelOf(p),
+    sources: { root: p.root, sources: p.sources },
+    files: p.files ?? [],
+    snippets: p.snippets ?? {},
+    repo: p.repo ?? {},
+    samples: p.samples ?? [],
+  };
+}
 
 function build(s: Sources): Model {
   return s.sources.length ? buildModel(s.sources, { root: s.root }) : buildModel([]);

@@ -17,12 +17,20 @@ export async function federationDir(modelSource: string): Promise<string> {
   return info?.isDirectory() ? modelSource : dirname(modelSource);
 }
 
-/** Reads archdoc.lock and the bundles it points to, for {@link federate}. */
-export async function readFederationInput(dir: string, cwd: string): Promise<FederationInput> {
+/**
+ * Reads archdoc.lock and the bundles it points to, for {@link federate}. Reads
+ * from disk, or with `read` from elsewhere, such as a git commit.
+ */
+export async function readFederationInput(
+  dir: string,
+  cwd: string,
+  read: (file: string) => Promise<string | undefined> = (file) =>
+    readFile(file, "utf8").catch(() => undefined),
+): Promise<FederationInput> {
   const lockFile = join(dir, LOCK_FILE);
   const display = (p: string) => relative(cwd, p) || basename(p);
   const lockPath = display(lockFile);
-  const text = await readFile(lockFile, "utf8").catch(() => undefined);
+  const text = await read(lockFile);
   if (text === undefined) return { lockPath, bundles: new Map() };
 
   let lock: Lock;
@@ -52,7 +60,7 @@ export async function readFederationInput(dir: string, cwd: string): Promise<Fed
     const file = resolve(dir, entry.bundle);
     // Bundles live under the model directory; a lockfile can't point elsewhere.
     const inside = file.startsWith(resolve(dir) + sep);
-    const body = inside ? await readFile(file, "utf8").catch(() => undefined) : undefined;
+    const body = inside ? await read(file) : undefined;
     bundles.set(ns, {
       path: display(file),
       text: body,
