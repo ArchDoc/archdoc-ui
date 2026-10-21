@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
-import { checkRepository, indexRepository, loadRevision } from "@archdoc/analyzers";
+import {
+  checkRepository,
+  indexRepository,
+  loadRevision,
+  resealedSince,
+  sealReport,
+} from "@archdoc/analyzers";
 import {
   anchorError,
   checkTrace,
@@ -20,8 +27,10 @@ import {
   formatLineage,
   formatLocate,
   formatOverview,
+  formatSealStatus,
   formatSearch,
   formatSimulation,
+  formatSum,
   formatTrace,
   formatTraceChecks,
   getElement,
@@ -36,6 +45,7 @@ import {
   prReport,
   readTraceSources,
   resolveRef,
+  sealSum,
   search,
   simulate,
   traceSkeleton,
@@ -65,7 +75,7 @@ When a change touches data (what a component sends or stores, how a record is ma
 
 When you're asked to explain or fix a bug, call archdoc_anchor with the error (a log line, a stack trace, or the wrong output). It names the journey step it showed up in and the elements involved, and starts a trace for you. Follow the code from there, write the path the failing request took to .archdoc/traces/<id>.yaml with evidence on every step, and call archdoc_trace_check on it. Commit it with the fix.
 
-After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. Before you open a PR, call archdoc_report with the same base: it gives the verdict the PR comment will give, with what blocks the merge and how to fix it. Use it, and archdoc_diff for model changes, in the PR description.`;
+After you edit, call archdoc_check with base "main" (or the branch you started from). It lists what your change introduced: imports the model doesn't declare, broken rules, broken journeys. If a new dependency or component is intended, call archdoc_propose to add it to the model as a suggestion for a person to review; otherwise remove it. If the repository keeps an archdoc.sum, call archdoc_verify too: it lists the model facts whose code your change touched (an element's files and exports, a snippet, a decision, a step's entry file, a schema's fields). Check each one, update the model where it no longer describes the code, then call archdoc_seal with the facts you checked; new facts you added get sealed when you call it without facts. Before you open a PR, call archdoc_report with the same base: it gives the verdict the PR comment will give, with what blocks the merge and how to fix it. Use it, and archdoc_diff for model changes, in the PR description.`;
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const;
 
@@ -464,9 +474,83 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
           findings: checked.findings,
           diagrams: false,
           fixes: tracesInChange(checked.base.changedFiles, traces),
+          resealed: await resealedSince(options.model ?? ".", cwd, checked.base.commit),
           label: `${base}...working tree`,
         });
         return text(r.markdown.replace(/^<!--.*-->\n?/gm, ""));
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_verify",
+    {
+      title: "Model facts to re-check",
+      description:
+        "Which model facts point at code that changed since they were sealed (archdoc.sum), what changed (files added or removed, exports renamed, a snippet's or decision's lines, a schema's fields), and where each fact is in the model. Call it after you change code: for each fact, check whether the model still describes the code, update the model if not, then call archdoc_seal with the fact.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      try {
+        const r = await sealReport(options.model ?? ".", cwd);
+        if (!r) return error("No ArchDoc model here. Expected .archdoc/archdoc.yaml.");
+        return text(
+          formatSealStatus(r.statuses, { file: r.file, hasSum: !!r.recorded, error: r.error }),
+        );
+      } catch (err) {
+        return error(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "archdoc_seal",
+    {
+      title: "Seal facts you checked",
+      description:
+        "Record in archdoc.sum that the model still describes the code these facts point at, after you checked them (and updated the model where it no longer did). Without facts, seals only new facts no one has sealed; changed facts stay flagged until you name them. It writes archdoc.sum only, never the model. Don't seal a fact you haven't checked: sealing is your word that the model is right.",
+      inputSchema: {
+        facts: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Facts to seal, as archdoc_verify names them, such as element:toolchain.cli, or an element ID",
+          ),
+        by: z.string().optional().describe("Who checked, such as agent:claude-code"),
+        dryRun: z.boolean().optional().describe("Say what would be sealed without writing"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ facts, by, dryRun }) => {
+      try {
+        const r = await sealReport(options.model ?? ".", cwd);
+        if (!r) return error("No ArchDoc model here. Expected .archdoc/archdoc.yaml.");
+        if (!r.recorded && !r.error && !facts?.length) {
+          return error(
+            "This repository has no archdoc.sum yet. A person starts sealing with archdoc seal --all, after checking the model describes the code.",
+          );
+        }
+        const { sum, sealed, unknown } = sealSum(r.statuses, { keys: facts, by });
+        if (unknown.length) {
+          return error(
+            `Not a fact that points at code: ${unknown.join(", ")}. archdoc_verify names them.`,
+          );
+        }
+        if (!dryRun) await writeFile(r.path, formatSum(sum));
+        const still = r.statuses.filter(
+          (x) => x.state === "changed" && !sealed.includes(x.fact.key),
+        ).length;
+        return text(
+          `${dryRun ? "Would seal" : "Sealed"} ${sealed.length} fact${sealed.length === 1 ? "" : "s"} in ${r.file}${sealed.length ? `: ${sealed.join(", ")}` : ""}.${still ? ` ${still} changed fact${still === 1 ? " is" : "s are"} still flagged.` : ""}`,
+        );
       } catch (err) {
         return error(err instanceof Error ? err.message : String(err));
       }

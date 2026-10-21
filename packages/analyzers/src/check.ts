@@ -10,9 +10,12 @@ import {
   type MarkedFinding,
   mergeBase,
   resolveGitRef,
+  sealedPaths,
 } from "@archdoc/core";
 import { contextOf, loadRevision, type Revision } from "./revision.js";
 import { analyze } from "./run.js";
+import { readSealedFiles, readSumFile } from "./seals.js";
+import { indexCode } from "./symbols.js";
 
 export interface CheckRepositoryOptions {
   /** Repository, .archdoc directory, or model file. Defaults to ".". */
@@ -109,11 +112,21 @@ async function checkRevision(
       }
     }
   }
+  // Seals, when the repository keeps an archdoc.sum: the files their code is in, and the code index.
+  const sum = await readSumFile(snap);
+  if (sum.text !== undefined) {
+    for (const [p, t] of await readSealedFiles(snap, sealedPaths(rev.model))) texts.set(p, t);
+  }
   return checkModel(rev.model, {
     observed,
     files: snap.files,
     schemas: code === false ? [] : rev.schemas,
     read: (path) => (inRepo.has(path) ? texts.get(path) : undefined),
+    seals: {
+      file: sum.file,
+      text: sum.text,
+      index: sum.text === undefined ? undefined : await indexCode(contextOf(snap)),
+    },
   });
 }
 

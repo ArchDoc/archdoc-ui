@@ -40,6 +40,8 @@ export interface PrReportInput {
   explorerUrl?: string | undefined;
   /** Bug traces the change adds, which the comment says it fixes. */
   fixes?: { id: string; title?: string | undefined; anchor?: string | undefined }[] | undefined;
+  /** Facts the change sealed again after their code changed: someone says they checked the model. */
+  resealed?: { key: string; by?: string | undefined }[] | undefined;
 }
 
 /** How much a change asks of its reviewers. */
@@ -83,6 +85,7 @@ export interface ChangeSummary {
   /** How many things changed in the model itself. */
   changes: number;
   fixes: NonNullable<PrReportInput["fixes"]>;
+  resealed: NonNullable<PrReportInput["resealed"]>;
   /** Decisions (logic) the change made: where they run, what changed, and the journeys that decide with them. */
   decisions: {
     id: string;
@@ -334,6 +337,7 @@ export function summarizeChange(input: PrReportInput): ChangeSummary {
     findings: { introduced, existing },
     changes: countChanges(diff),
     fixes: input.fixes ?? [],
+    resealed: input.resealed ?? [],
     decisions: decisions.map((d) => ({
       id: d.id,
       element: d.element,
@@ -511,6 +515,10 @@ const FIX: [RegExp, string][] = [
   [/^import\//, "Run archdoc sync."],
   [/^ref\//, "Fix the reference, or run archdoc sync if it's in another repo."],
   [/^data\//, "Fix the data entry or what sends it."],
+  [
+    /^seal\/(changed|unsealed)$/,
+    "Check that the model still describes the code (archdoc verify says what changed), update it if not, then archdoc seal the fact.",
+  ],
 ];
 
 const TITLE: [RegExp, (f: MarkedFinding) => string][] = [
@@ -524,6 +532,9 @@ const TITLE: [RegExp, (f: MarkedFinding) => string][] = [
   [/^import\//, () => "Another repo's model is out of sync"],
   [/^model\/orphan-element$/, () => "An element nothing connects to"],
   [/^data\//, () => "Invalid data"],
+  [/^seal\/changed$/, () => "Code changed under the model"],
+  [/^seal\/unsealed$/, () => "A new fact no one has checked against its code"],
+  [/^seal\/invalid$/, () => "archdoc.sum can't be read"],
 ];
 
 function concernOf(f: MarkedFinding): Concern {
@@ -802,6 +813,18 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
     `Touches ${list.join(", ") || "the model only"}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}. ${s.changes ? `In the model: ${summary(input.diff)}.` : "The model didn't change."}`,
     "",
   );
+  if (s.resealed.length) {
+    const who = [...new Set(s.resealed.map((r) => r.by).filter(Boolean))];
+    md.push(
+      `Re-checked against changed code${who.length ? ` by ${who.join(", ")}` : ""}: ${s.resealed
+        .slice(0, 8)
+        .map((r) => `\`${r.key}\``)
+        .join(
+          ", ",
+        )}${s.resealed.length > 8 ? `, and ${s.resealed.length - 8} more` : ""}. Sealing says the model still describes the code; worth a look.`,
+      "",
+    );
+  }
   if (input.explorerUrl)
     md.push(`**[Open this change in the explorer →](${input.explorerUrl})**`, "");
 
