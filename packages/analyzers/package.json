@@ -25,5 +25,8 @@
     "@archdoc/core": "workspace:*",
     "typescript": "~5.9.3",
     "yaml": "^2.9.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
