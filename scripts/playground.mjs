@@ -164,9 +164,9 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
 ## Data
 
     cd rides
-    archdoc simulate request-refund --sample samples/refund-overcharge.json   # auto-approved: records and tables, step by step
-    archdoc simulate request-refund --sample samples/refund-large.json        # needs finance: later steps skipped
-    archdoc lineage payments.RefundRequest.amount_cents                       # from payments into trips' table
+    archdoc show request-refund --sample samples/refund-overcharge.json   # auto-approved: records and tables, step by step
+    archdoc show request-refund --sample samples/refund-large.json        # needs finance: later steps skipped
+    archdoc show payments.RefundRequest.amount_cents                       # from payments into trips' table
     archdoc show payments.Charge
 
 ## What a pull request would be told (each branch is one change)
@@ -184,10 +184,10 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
     archdoc check --base main
 
     cd payments && git checkout try/cancel-refund    # adds an RPC under a sealed contract
-    archdoc verify                                   # which facts to re-check, and what changed
-    archdoc report --base main                       # the comment asks for the same
+    archdoc check --base main                        # the fact to re-check, and what changed
+    archdoc show contract:charges#proto/charges.proto   # the fact, and its seal
     archdoc seal charges --by you                    # after checking the model still holds: reseal
-    archdoc verify && git checkout .
+    git checkout .
 
     archdoc view --base main --open                  # on any of them: the Changes tab says what the comment says
     archdoc site --base main --out /tmp/pr-site      # the same, as a static site a PR comment can link to
@@ -199,8 +199,8 @@ Go back with \`git checkout main\`.
 
     cd rides
     archdoc trace list                               # bugs traced in .archdoc/traces/
-    archdoc trace show small-refund-waits-for-finance
-    archdoc trace check
+    archdoc show small-refund-waits-for-finance
+    archdoc check
     archdoc view --open                              # the trace on the journey step it opens up
 
 ## Edit and watch
@@ -216,7 +216,7 @@ say(`Ready: ${dir}`);
 say();
 say(`  export PATH="${join(dir, "bin")}:$PATH"`);
 say(
-  `  cd ${join(here, "rides")} && archdoc simulate request-refund --sample samples/refund-overcharge.json`,
+  `  cd ${join(here, "rides")} && archdoc show request-refund --sample samples/refund-overcharge.json`,
 );
 say(`  cd ${join(here, "landscape")} && archdoc view --landscape --open`);
 say();

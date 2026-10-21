@@ -26,7 +26,9 @@ export async function site(target: string, options: SiteOptions, io: Io): Promis
     }
     const body = await modelResponse({ target, cwd: io.cwd, base: options.base });
     if (!body) {
-      io.err(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`);
+      io.err(
+        `No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`,
+      );
       return 1;
     }
     const out = resolve(io.cwd, options.out ?? "site");

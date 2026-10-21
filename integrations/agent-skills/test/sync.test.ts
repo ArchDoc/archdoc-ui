@@ -10,17 +10,13 @@ describe("agent integrations", () => {
     );
   });
 
-  it("this repo's AGENTS.md carries the shipped workflow", () => {
-    const shipped = read("../AGENTS.md");
-    const own = read("../../../AGENTS.md");
-    for (const line of [
-      "## Architecture model (ArchDoc): start here",
-      "At the start of every coding task, before grepping or reading files:",
-      "After editing:",
-    ]) {
-      expect(shipped).toContain(line);
-      expect(own).toContain(line);
-    }
+  it("this repo's AGENTS.md carries the shipped workflow, word for word", () => {
+    // The shipped snippet, without the line that says where to paste it.
+    const shipped = read("../AGENTS.md").replace(/^<!--.*-->\n\n/, "");
+    // This repo runs the CLI from its build.
+    const own = read("../../../AGENTS.md").replaceAll("pnpm -s archdoc", "archdoc");
+    expect(shipped).toContain("Every task: context, edit, check, seal.");
+    expect(own).toContain(shipped.trim());
   });
 
   it("the skill has the frontmatter Claude Code needs", () => {

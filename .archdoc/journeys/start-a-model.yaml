@@ -1,0 +1,31 @@
+journey: start-a-model
+actor: coding-agent
+goal: Start a model for a repository that has none, and get a person to accept it
+importance: high
+steps:
+  - from: coding-agent
+    to: agent-skills
+    action: Reads the "model this repository" workflow
+    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+  - from: coding-agent
+    to: mcp
+    action: Calls archdoc_init in a repository with no .archdoc/
+    code: packages/mcp/src/server.ts
+    sends: ToolCall
+  - from: mcp
+    to: analyzers
+    action: Infers elements from manifests and compose files, uses from imports, and data from schema files
+    code: packages/analyzers/src/init.ts
+    sends: CodeIndex
+  - from: analyzers
+    to: model-files
+    action: Writes .archdoc/ with every fact marked inferred
+    sends: ModelFile
+  - from: mcp
+    to: coding-agent
+    action: Returns what it found and what to add next, which the agent does with the code open, calling archdoc_check until it's clean
+    sends: ToolResult
+  - from: developer
+    to: web
+    action: Reviews the inferred and suggested facts in archdoc view, accepts them, and runs archdoc seal --all
+    code: apps/web/src/App.tsx

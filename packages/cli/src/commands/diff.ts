@@ -61,7 +61,10 @@ export async function diff(
     // Both sides as every surface reads them: schema sources and other repos' models included.
     const at = async (ref: string | undefined) => {
       const rev = await loadRevision(target, { cwd: io.cwd, ref });
-      if (!rev) throw new Error(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`);
+      if (!rev)
+        throw new Error(
+          `No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`,
+        );
       return rev.model;
     };
     const [base, head] = await Promise.all([at(sides.base), at(sides.head)]);

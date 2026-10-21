@@ -16,9 +16,25 @@ seals:
       integrations/agent-skills/mcp/cursor.mcp.json: []
   element:toolchain.analyzers:
     kind: structure
-    hash: fnv-d6dc3cefb7895247
+    hash: fnv-14ac190a3724c3dc
     files:
       packages/analyzers/package.json: []
+      packages/analyzers/src/answers.ts:
+        - Answer
+        - CheckAnswer
+        - CheckInput
+        - ContextInput
+        - InitInput
+        - SealInput
+        - ShowInput
+        - Where
+        - checkAnswer
+        - contextAnswer
+        - initAnswer
+        - readRepoFile
+        - repoPath
+        - sealAnswer
+        - showAnswer
       packages/analyzers/src/api.ts:
         - Analyzer
         - AnalyzerContext
@@ -28,6 +44,11 @@ seals:
         - CheckRepositoryResult
         - checkRepository
       packages/analyzers/src/index.ts: []
+      packages/analyzers/src/init.ts:
+        - InitResult
+        - formatInit
+        - inferModel
+        - initModel
       packages/analyzers/src/manifests.ts:
         - manifests
       packages/analyzers/src/revision.ts:
@@ -100,7 +121,7 @@ seals:
       packages/cli/tsconfig.json: []
   element:toolchain.cli.commands:
     kind: structure
-    hash: fnv-078d0f02468f72f6
+    hash: fnv-19117964ca6e5a4e
     files:
       packages/cli/src/commands/check.ts:
         - CheckOptions
@@ -132,6 +153,9 @@ seals:
         - SyncCommandOptions
         - publish
         - sync
+      packages/cli/src/commands/init.ts:
+        - InitOptions
+        - init
       packages/cli/src/commands/landscape.ts:
         - LandscapeBuildOptions
         - landscapeBuild
@@ -155,6 +179,7 @@ seals:
         - TraceAnchorOptions
         - TraceCheckOptions
         - findTrace
+        - readStdin
         - runTraceCheck
         - traceAnchor
         - traceCheck
@@ -166,6 +191,7 @@ seals:
       packages/cli/src/commands/view.ts:
         - ViewOptions
         - view
+    by: agent:claude-code
   element:toolchain.cli.view-server:
     kind: structure
     hash: fnv-2baa63e5c92cfa0d
@@ -178,7 +204,7 @@ seals:
         - startViewServer
   element:toolchain.core:
     kind: structure
-    hash: fnv-e6a5d036d7a9ad9a
+    hash: fnv-295c4310a6fadfa2
     files:
       packages/core/package.json: []
       packages/core/src/browser.ts: []
@@ -208,16 +234,7 @@ seals:
         - Target
         - describeTarget
         - nodeKey
-      packages/core/src/propose/insert.ts:
-        - insertIntoMap
-      packages/core/src/propose/propose.ts:
-        - ProposalEdit
-        - ProposalPlan
-        - planProposal
-      packages/core/src/propose/write.ts:
-        - ProposeOptions
-        - ProposeResult
-        - propose
+        - toReview
       packages/core/tsconfig.json: []
     by: agent:claude-code
   element:toolchain.core.checker:
@@ -532,8 +549,11 @@ seals:
         - splitIdentifier
   element:toolchain.core.report:
     kind: structure
-    hash: fnv-b6228315f37b1eb1
+    hash: fnv-cc9e22b07d28868e
     files:
+      packages/core/src/report/check-answer.ts:
+        - CheckAnswerOptions
+        - formatCheck
       packages/core/src/report/check-report.ts:
         - MarkedFinding
         - formatAnnotations
@@ -593,6 +613,7 @@ seals:
         - TERMS
         - Term
         - counted
+    by: agent:claude-code
   element:toolchain.core.seals:
     kind: structure
     hash: fnv-9fb57c07c6d6bb63
@@ -1128,17 +1149,6 @@ seals:
         - ContextSameJob
         - ContextStart
         - context
-  step:agent-preflight#6:
-    kind: structure
-    hash: fnv-ba39cad625fda332
-    files:
-      packages/core/src/query/impact.ts:
-        - AffectedJourney
-        - Impact
-        - ImpactConsumer
-        - ImpactResult
-        - impact
-        - rulesMentioning
   step:change-what-others-use#1:
     kind: structure
     hash: fnv-b4dba358312e9a8c
@@ -1283,17 +1293,13 @@ seals:
         - resolveAnchor
   step:explain-a-bug#7:
     kind: structure
-    hash: fnv-a95ed015cbc5bccf
+    hash: fnv-694cdb80e094fb6c
     files:
-      packages/cli/src/commands/trace.ts:
-        - TraceAnchorOptions
-        - TraceCheckOptions
-        - findTrace
-        - runTraceCheck
-        - traceAnchor
-        - traceCheck
-        - traceList
-        - traceShow
+      packages/cli/src/commands/check.ts:
+        - CheckOptions
+        - check
+        - runCheck
+    by: agent:claude-code
   step:explore-architecture#1:
     kind: structure
     hash: fnv-85bc4c589138b30c
@@ -1380,6 +1386,27 @@ seals:
         - sealableFacts
         - sealedPaths
     by: agent:claude-code
+  step:keep-the-model-true#7:
+    kind: structure
+    hash: fnv-fa8a6e0ceafafd86
+    files:
+      packages/analyzers/src/answers.ts:
+        - Answer
+        - CheckAnswer
+        - CheckInput
+        - ContextInput
+        - InitInput
+        - SealInput
+        - ShowInput
+        - Where
+        - checkAnswer
+        - contextAnswer
+        - initAnswer
+        - readRepoFile
+        - repoPath
+        - sealAnswer
+        - showAnswer
+    by: agent:claude-code
   step:publish-the-landscape#1:
     kind: structure
     hash: fnv-d54bbb8ae455620a
@@ -1432,3 +1459,35 @@ seals:
         - renderPrComment
         - stepRange
         - summarizeChange
+  step:start-a-model#1:
+    kind: structure
+    hash: fnv-341f41ac97dcb5ce
+    files:
+      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+    by: agent:claude-code
+  step:start-a-model#2:
+    kind: structure
+    hash: fnv-3c8e7a02bbae7918
+    files:
+      packages/mcp/src/server.ts:
+        - ArchdocServerOptions
+        - INSTRUCTIONS
+        - createArchdocServer
+    by: agent:claude-code
+  step:start-a-model#3:
+    kind: structure
+    hash: fnv-f3ac192702c8b351
+    files:
+      packages/analyzers/src/init.ts:
+        - InitResult
+        - formatInit
+        - inferModel
+        - initModel
+    by: agent:claude-code
+  step:start-a-model#6:
+    kind: structure
+    hash: fnv-b48ae5654113843f
+    files:
+      apps/web/src/App.tsx:
+        - App
+    by: agent:claude-code

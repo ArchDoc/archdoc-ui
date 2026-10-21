@@ -9,7 +9,7 @@ steps:
     code: integrations/agent-skills/claude-code/archdoc/SKILL.md
   - from: coding-agent
     to: mcp
-    action: Calls archdoc_verify after editing
+    action: Calls archdoc_check after editing
     code: packages/mcp/src/server.ts
     sends: ToolCall
   - from: mcp
@@ -24,13 +24,14 @@ steps:
     sends: CodeIndex
   - from: mcp
     to: coding-agent
-    action: Returns the facts to re-check, with where each is in the model
+    action: Returns the facts to re-check with what changed and where each is in the model, among the change's other findings
     sends: ToolResult
   - from: coding-agent
     to: mcp
-    action: Updates the model where it no longer describes the code, then calls archdoc_seal with the facts it checked
+    action: Updates the model where it no longer describes the code, then calls archdoc_seal with the facts it checked, which says what's left
     sends: ToolCall
-  - from: mcp
+  - from: analyzers
     to: model-files
     action: Writes the new seals to archdoc.sum, which the pull request shows
+    code: packages/analyzers/src/answers.ts
     sends: Seal

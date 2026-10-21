@@ -9,7 +9,7 @@ steps:
     code: integrations/agent-skills/claude-code/archdoc/SKILL.md
   - from: coding-agent
     to: mcp
-    action: Calls archdoc_anchor with the error
+    action: Calls archdoc_context with the error
     code: packages/mcp/src/server.ts
   - from: mcp
     to: core
@@ -21,12 +21,12 @@ steps:
     sends: ToolResult
   - from: coding-agent
     to: mcp
-    action: Writes .archdoc/traces/<id>.yaml and calls archdoc_trace_check on it
+    action: Writes .archdoc/traces/<id>.yaml and calls archdoc_check, which checks traces with the model
   - from: mcp
     to: core
     action: Checks the trace's elements, journey step, code references, and hops
     code: packages/core/src/trace/check.ts
   - from: developer
     to: cli
-    action: Reads the trace with the fix (archdoc trace show) and checks it in CI (archdoc trace check)
-    code: packages/cli/src/commands/trace.ts
+    action: Reads the trace with the fix (archdoc show <trace>), and CI's archdoc check keeps it true
+    code: packages/cli/src/commands/check.ts

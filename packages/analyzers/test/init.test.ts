@@ -56,7 +56,9 @@ function recall(found: Model, hand: Model) {
     if (a && b && a !== b) handUses.add(`${match.get(a)}->${match.get(b)}`);
   }
   const foundUses = new Set(
-    found.relationships.map((r) => `${r.from.type === "element" ? r.from.id : ""}->${r.to.id}`),
+    found.relationships.map(
+      (r) => `${"id" in r.from ? r.from.id : ""}->${"id" in r.to ? r.to.id : ""}`,
+    ),
   );
   const usesFound = [...handUses].filter((u) => foundUses.has(u)).length;
   return {
@@ -168,7 +170,9 @@ describe("archdoc init on a Go service with compose and SQL migrations", () => {
       cache: "datastore Redis",
       events: "queue Kafka",
     });
-    const uses = model.relationships.map((x) => `${x.from.id}->${x.to.id}`).sort();
+    const uses = model.relationships
+      .map((x) => `${"id" in x.from ? x.from.id : ""}->${"id" in x.to ? x.to.id : ""}`)
+      .sort();
     expect(uses).toEqual(["api->cache", "api->db", "api->events", "rides->db", "worker->events"]);
     // The compose database is the one the migrations describe.
     expect(model.elements.get("db")?.spec.stores).toEqual({ trips: { entity: "Trip" } });

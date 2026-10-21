@@ -5,7 +5,7 @@ importance: critical
 steps:
   - from: coding-agent
     to: mcp
-    action: Checks impact, then proposes model changes with the code
+    action: Edits the model with the code, marking what it adds as suggested, and checks the change
   - from: github
     to: github-action
     action: Runs on the pull request

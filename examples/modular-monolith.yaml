@@ -1,7 +1,7 @@
 # Modular monolith: a bookstore that ships as one Rails app, taken apart into
 # the components inside it. Each component points at its code, down to the
 # snippets that hold its logic, so an agent can read the right lines before
-# searching (`archdoc show bookstore.checkout --code`, or the archdoc_code MCP
+# searching (`archdoc show bookstore.checkout --code`, or the archdoc_show MCP
 # tool). Rules keep the parts apart, owners say who looks after each, and one
 # dependency an agent suggested waits for review.
 archdoc: "2.0"

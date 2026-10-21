@@ -16,7 +16,9 @@ export async function verify(options: VerifyOptions, io: Io): Promise<number> {
   try {
     const r = await sealReport(options.model ?? ".", io.cwd);
     if (!r) {
-      io.err(`No ArchDoc model at ${options.model ?? "."}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`);
+      io.err(
+        `No ArchDoc model at ${options.model ?? "."}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`,
+      );
       return 2;
     }
     if (options.format === "json") {
