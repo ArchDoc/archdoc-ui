@@ -384,7 +384,7 @@ export function formatSum(sum: SumFile): string {
     sealVersion: 1,
     seals: Object.fromEntries(keys.map((k) => [k, sum.seals[k] as Seal])),
   };
-  return `# Written by archdoc seal. Don't edit it by hand: when the code a fact points at changes, check the model, then run archdoc seal <fact>.\n${stringify(ordered, { lineWidth: 0 })}`;
+  return `# Written by archdoc seal. Don't edit it by hand: when the code a fact points at changes, check the model, then run archdoc seal <fact>.\n${stringify(ordered, { lineWidth: 0, aliasDuplicateObjects: false })}`;
 }
 
 export function parseSum(text: string): { sum?: SumFile; error?: string } {

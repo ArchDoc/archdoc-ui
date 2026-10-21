@@ -809,8 +809,13 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
   const list = s.touched
     .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id))
     .map((t) => `\`${t.id}\`${t.files ? ` (${t.files} file${t.files === 1 ? "" : "s"})` : ""}`);
+  const touches = list.length
+    ? `Touches ${list.join(", ")}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}.`
+    : s.changes
+      ? "Touches the model only."
+      : "Touches no code the model maps.";
   md.push(
-    `Touches ${list.join(", ") || "the model only"}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}. ${s.changes ? `In the model: ${summary(input.diff)}.` : "The model didn't change."}`,
+    `${touches} ${s.changes ? `In the model: ${summary(input.diff)}.` : "The model didn't change."}`,
     "",
   );
   if (s.resealed.length) {

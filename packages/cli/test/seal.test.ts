@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createProgram } from "../src/index.js";
+import { createProgram, startViewServer } from "../src/index.js";
 
 // An agent changes code under a sealed fact: check and the PR report flag it,
 // verify says what changed, and sealing it again says someone checked.
@@ -99,6 +99,25 @@ describe("seals", () => {
 
     const report = await run("report", "--base", "main");
     expect(report.out).toContain("**Code changed under the model.**");
+
+    // The explorer lists the same facts, so a reader sees what to re-check.
+    const server = await startViewServer({ target: ".", cwd: repo, webDir: repo });
+    try {
+      const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
+        seals: { total: number; facts: { key: string; element?: string; changes: string[] }[] };
+      };
+      expect(payload.seals.total).toBe(2);
+      expect(payload.seals.facts.map((f) => [f.key, f.element, f.changes])).toEqual([
+        ["element:api", "api", ["+ services/api/tax.ts"]],
+        [
+          "element:api#services/api/price.ts:price",
+          "api",
+          ["services/api/price.ts (price) changed"],
+        ],
+      ]);
+    } finally {
+      await server.close();
+    }
   });
 
   it("keeps changed facts flagged until named, and records who checked them", async () => {

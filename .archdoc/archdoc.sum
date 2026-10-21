@@ -957,7 +957,7 @@ seals:
         - roundedPath
   element:toolchain.web.model-loader:
     kind: structure
-    hash: fnv-096d572ed8f6c868
+    hash: fnv-6860947504f10307
     files:
       apps/web/src/model/compare.ts:
         - ChangeFindings
@@ -1018,9 +1018,12 @@ seals:
         - LandscapeInfo
         - ModelPayload
         - ModelState
+        - RecheckFact
         - RepoLinks
+        - SealsInfo
         - modelOf
         - useModel
+    by: agent:claude-code
   element:toolchain.web.ui:
     kind: structure
     hash: fnv-728f3161540859f7
@@ -1310,15 +1313,18 @@ seals:
         - startViewServer
   step:explore-architecture#3:
     kind: structure
-    hash: fnv-e0a20eb0e762bb42
+    hash: fnv-cf5352b3fc283e6d
     files:
       apps/web/src/model/useModel.ts:
         - LandscapeInfo
         - ModelPayload
         - ModelState
+        - RecheckFact
         - RepoLinks
+        - SealsInfo
         - modelOf
         - useModel
+    by: agent:claude-code
   step:explore-architecture#4:
     kind: structure
     hash: fnv-b48ae5654113843f

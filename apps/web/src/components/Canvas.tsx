@@ -73,6 +73,8 @@ export interface CanvasProps {
   preview?: string | undefined;
   /** How the layout runs: left to right (the default), or top to bottom. */
   direction?: "RIGHT" | "DOWN" | undefined;
+  /** Facts whose code changed since they were sealed, marked on their boxes. */
+  recheck?: readonly { element?: string | undefined }[] | undefined;
 }
 
 export function Canvas(props: CanvasProps) {
@@ -152,6 +154,12 @@ export function Canvas(props: CanvasProps) {
     return undefined;
   }, [model, view, selected]);
   const fieldRefs = useMemo(() => fieldReferences(model), [model]);
+  // Facts to re-check per element; a closed box counts the ones inside it too.
+  const recheckOf = useMemo(() => {
+    const ids = (props.recheck ?? []).flatMap((f) => (f.element ? [f.element] : []));
+    return (id: string, closed: boolean) =>
+      ids.filter((e) => e === id || (closed && e.startsWith(`${id}.`))).length;
+  }, [props.recheck]);
 
   // What the current interaction carries, and the records it writes: a step's
   // arrow carries its message, and its writer storing it carries what it stores.
@@ -400,6 +408,8 @@ export function Canvas(props: CanvasProps) {
             isGroup: n.isGroup,
             change: overlay?.nodes.get(n.id),
             changesInside: overlay?.inside.get(n.id),
+            recheck:
+              n.kind === "element" ? recheckOf(n.id.slice(8), n.hiddenChildren > 0) : undefined,
             emphasis: emphasis.get(n.id) ?? (dimming && !n.isGroup ? "dim" : "normal"),
             selected: n.id === selected,
             entered: crossings.get(at) === n.id,
@@ -450,6 +460,7 @@ export function Canvas(props: CanvasProps) {
     lines,
     props.onShowTable,
     props.onShowAll,
+    recheckOf,
   ]);
 
   const edges = useMemo<RoutedEdge[]>(() => {

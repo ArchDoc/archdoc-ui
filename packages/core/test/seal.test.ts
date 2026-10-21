@@ -186,6 +186,16 @@ describe("seals", () => {
     const text = formatSum(sum);
     expect(text.startsWith("# Written by archdoc seal.")).toBe(true);
     expect(parseSum(text).sum).toEqual(sum);
+    // Facts that share code repeat it rather than pointing at each other.
+    const shared = ["a"];
+    const twice = formatSum({
+      sealVersion: 1,
+      seals: {
+        x: { kind: "structure", hash: "1", files: { "a.ts": shared } },
+        y: { kind: "structure", hash: "2", files: { "a.ts": shared } },
+      },
+    });
+    expect(twice).not.toMatch(/[&*]a1/);
     expect(parseSum("sealVersion: 2\nseals: {}").error).toMatch(/sealVersion/);
   });
 

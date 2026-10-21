@@ -267,7 +267,7 @@ elements:
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
-            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models and sample requests for simulation.
+            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models, sample requests for simulation, and which sealed facts to re-check.
             code: [packages/cli/src/server.ts]
 
       mcp:
@@ -300,7 +300,7 @@ elements:
         elements:
           model-loader:
             kind: component
-            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, samples, the comparison, the address).
+            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, samples, the comparison, the address), with the facts whose sealed code changed.
             code: [{ path: apps/web/src/model/** }]
             uses:
               graph: Hands the model to the canvas

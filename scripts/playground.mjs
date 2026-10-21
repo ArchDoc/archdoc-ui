@@ -76,6 +76,12 @@ for (const [repo, tag] of [
   say(`  ${repo} ${tag}`);
 }
 
+// Payments seals its model: each fact that points at code or a schema gets a
+// fingerprint, so a change to that code says which facts to re-check.
+archdoc("payments", "seal", "--all", "--by", "payments-team");
+git("payments", "add", "-A");
+git("payments", "commit", "-q", "-m", "Seal the model");
+
 // 4. A branch per scenario, so trying one is a checkout away.
 const scenario = (repo, branch, message, change) => {
   git(repo, "checkout", "-q", "-b", branch);
@@ -105,6 +111,14 @@ scenario("payments", "try/looser-refunds", "Approve larger refunds automatically
     ".archdoc/data.yaml",
     "request.amount_cents <= charge.amount_cents / 2",
     "request.amount_cents <= charge.amount_cents * 3 / 4",
+  ),
+);
+scenario("payments", "try/cancel-refund", "Let support cancel a pending refund", () =>
+  edit(
+    "payments",
+    "proto/charges.proto",
+    "  rpc Refund(RefundRequest) returns (Refund);\n",
+    "  rpc Refund(RefundRequest) returns (Refund);\n  rpc CancelRefund(Refund) returns (Refund);\n",
   ),
 );
 scenario("trips", "try/rename-email", "Rename rider_email", () => {
@@ -137,7 +151,7 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
 
 | Repo | What it shows |
 |---|---|
-| payments | charges, refunds, the ledger; data read from a Prisma schema and a .proto; refund-approval logic |
+| payments | charges, refunds, the ledger; data read from a Prisma schema and a .proto; refund-approval logic; a sealed model (\`.archdoc/archdoc.sum\`) |
 | trips | trips, from a SQL migration; listens for refunds |
 | rides | the rider app and gateway; the critical request-refund journey across all three |
 | landscape | the whole org: teams, domains, org rules |
@@ -168,6 +182,12 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
 
     cd trips && git checkout try/rename-email        # a migration renames a pii column
     archdoc check --base main
+
+    cd payments && git checkout try/cancel-refund    # adds an RPC under a sealed contract
+    archdoc verify                                   # which facts to re-check, and what changed
+    archdoc report --base main                       # the comment asks for the same
+    archdoc seal charges --by you                    # after checking the model still holds: reseal
+    archdoc verify && git checkout .
 
     archdoc view --base main --open                  # on any of them: the Changes tab says what the comment says
     archdoc site --base main --out /tmp/pr-site      # the same, as a static site a PR comment can link to

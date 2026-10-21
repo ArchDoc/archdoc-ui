@@ -12,7 +12,7 @@ import {
 import type { ReactNode } from "react";
 import type { Compare } from "../model/compare.js";
 import { targetLabel } from "../model/stories.js";
-import type { LandscapeInfo } from "../model/useModel.js";
+import type { LandscapeInfo, RecheckFact } from "../model/useModel.js";
 import { type CodeContext, CodeSection } from "./code.js";
 import { DataDetails, FieldDetails } from "./DataPanels.js";
 
@@ -28,6 +28,8 @@ export interface DetailsProps {
   code: CodeContext;
   compare?: Compare | undefined;
   landscape?: LandscapeInfo | undefined;
+  /** Facts whose code changed since they were sealed, or that no one has sealed. */
+  recheck?: RecheckFact[] | undefined;
 }
 
 /** What's selected: an element, actor, other repo's element, domain, data entry, or field. */
@@ -71,6 +73,7 @@ function ElementDetails(props: DetailsProps & { id: string }) {
       />
       <ChangeNote compare={props.compare} id={el.id} />
       {el.spec.description ? <p className="lede">{el.spec.description}</p> : null}
+      <RecheckNote facts={props.recheck?.filter((f) => f.element === el.id)} />
       {el.spec.documentation ? <p>{el.spec.documentation}</p> : null}
       <Actions>
         <FocusButton {...props} />
@@ -441,4 +444,40 @@ function statusLabel(status: string | undefined) {
 function provenanceLabel(p: { source: string; by?: string | undefined } | undefined) {
   if (!p || p.source === "declared") return undefined;
   return p.by ? `${p.source} by ${p.by}` : p.source;
+}
+
+/** This element's facts whose code changed since someone checked the model against it. */
+function RecheckNote(props: { facts?: RecheckFact[] | undefined }) {
+  if (!props.facts?.length) return null;
+  return (
+    <div className="recheck-note">
+      <p className="recheck-title">
+        {props.facts.some((f) => f.state === "changed")
+          ? "The code changed since the model was checked against it"
+          : "Not checked against its code yet"}
+      </p>
+      <ul>
+        {props.facts.map((f) => (
+          <li key={f.key}>
+            <span className="mono">{f.refs.join(", ")}</span>
+            {f.changes.length ? (
+              <ul>
+                {f.changes.slice(0, 6).map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+                {f.changes.length > 6 ? <li>… and {f.changes.length - 6} more</li> : null}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <p className="muted">
+        Does the description above still hold? Update the model if not, then run{" "}
+        <code>
+          archdoc seal {props.facts.length === 1 ? props.facts[0]?.key : props.facts[0]?.element}
+        </code>
+        .
+      </p>
+    </div>
+  );
 }

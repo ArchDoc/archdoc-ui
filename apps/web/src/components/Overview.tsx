@@ -1,13 +1,15 @@
 import type { Model } from "@archdoc/core/browser";
 import { useMemo } from "react";
 import { journeyCards, journeyFacts, ownership } from "../model/stories.js";
-import type { LandscapeInfo } from "../model/useModel.js";
+import type { LandscapeInfo, SealsInfo } from "../model/useModel.js";
 
 export interface OverviewProps {
   model: Model;
   landscape?: LandscapeInfo | undefined;
   /** Journeys a comparison affects, marked on their cards. */
   affected?: ReadonlySet<string> | undefined;
+  /** With an archdoc.sum: facts whose code changed since they were sealed. */
+  seals?: SealsInfo | undefined;
   onJourney: (id: string) => void;
   /** Light a journey up on the map, or stop. */
   onPreview: (id: string | undefined) => void;
@@ -90,6 +92,8 @@ export function Overview(props: OverviewProps) {
         )}
       </section>
 
+      {props.seals ? <Recheck seals={props.seals} onSelect={props.onSelect} /> : null}
+
       {owners.length ? (
         <section className="overview-section" aria-labelledby="ov-owners">
           <h2 id="ov-owners">Who owns what</h2>
@@ -117,5 +121,69 @@ export function Overview(props: OverviewProps) {
       ) : null}
       <p className="hint">Click a box on the map to see what it uses; double-click to open it.</p>
     </div>
+  );
+}
+
+/**
+ * The facts whose code changed since someone checked the model against it,
+ * as archdoc verify lists them, or a line saying the model still matches.
+ */
+function Recheck(props: { seals: SealsInfo; onSelect: (key: string) => void }) {
+  const { seals } = props;
+  if (seals.error) {
+    return (
+      <section className="overview-section recheck" aria-labelledby="ov-recheck">
+        <h2 id="ov-recheck">Model and code</h2>
+        <p className="muted">
+          {seals.file} can't be read ({seals.error}).
+        </p>
+      </section>
+    );
+  }
+  const changed = seals.facts.filter((f) => f.state === "changed");
+  const unsealed = seals.facts.filter((f) => f.state === "unsealed");
+  if (!seals.facts.length) {
+    return (
+      <p className="recheck-ok">
+        The model matches its code: all {seals.total} facts that point at code are sealed.
+      </p>
+    );
+  }
+  return (
+    <section className="overview-section recheck" aria-labelledby="ov-recheck">
+      <h2 id="ov-recheck">To re-check against the code</h2>
+      <p className="muted">
+        {changed.length
+          ? `The code under ${changed.length} fact${changed.length === 1 ? "" : "s"} changed since someone checked the model against it.`
+          : ""}
+        {unsealed.length
+          ? ` ${unsealed.length} new fact${unsealed.length === 1 ? " hasn't" : "s haven't"} been checked yet.`
+          : ""}
+      </p>
+      <ul className="recheck-list">
+        {seals.facts.map((f) => (
+          <li key={f.key} className={`recheck-${f.state}`}>
+            {f.element ? (
+              <button
+                type="button"
+                className="link"
+                onClick={() => props.onSelect(`element:${f.element}`)}
+              >
+                {f.label}
+              </button>
+            ) : (
+              <span>{f.label}</span>
+            )}
+            <span className="recheck-what">
+              {f.state === "changed" ? f.changes.slice(0, 2).join("; ") : "not sealed yet"}
+              {f.changes.length > 2 ? `; and ${f.changes.length - 2} more` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        Check each against the model, then run <code>archdoc seal &lt;fact&gt;</code>.
+      </p>
+    </section>
   );
 }

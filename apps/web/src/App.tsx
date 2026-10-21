@@ -45,7 +45,7 @@ import {
   useRefs,
   writeHash,
 } from "./model/useCompare.js";
-import { type LandscapeInfo, type RepoLinks, useModel } from "./model/useModel.js";
+import { type LandscapeInfo, type RepoLinks, type SealsInfo, useModel } from "./model/useModel.js";
 
 export function App() {
   const state = useModel();
@@ -123,6 +123,7 @@ export function App() {
         landscape={state.landscape}
         samples={samples}
         traces={shown.traces}
+        seals={branch ? undefined : state.seals}
       />
     </ReactFlowProvider>
   );
@@ -157,6 +158,8 @@ interface ExplorerProps {
   samples: { path: string; text: string }[];
   /** Trace files beside the model. */
   traces: { path: string; text: string }[];
+  /** The working tree's facts to re-check, when the repository keeps an archdoc.sum. */
+  seals?: SealsInfo | undefined;
 }
 
 const EXAMPLE = "";
@@ -176,6 +179,7 @@ function Explorer({
   landscape,
   samples,
   traces,
+  seals,
 }: ExplorerProps) {
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   // What the open journey runs on: example data ("") or a sample's path, so it reruns when the model reloads.
@@ -559,6 +563,7 @@ function Explorer({
       code={code}
       compare={compare}
       landscape={landscape}
+      recheck={seals?.facts}
     />
   ) : null;
   const canvas = (
@@ -583,6 +588,7 @@ function Explorer({
       onShowAll={(id) => setShowAll((prev) => new Set([...prev, id]))}
       compare={compare}
       preview={tab === "overview" ? preview : undefined}
+      recheck={seals?.facts}
       direction={journeyOnMap ? "RIGHT" : "DOWN"}
     />
   );
@@ -596,6 +602,7 @@ function Explorer({
         model={model}
         landscape={landscape}
         affected={changes?.compare?.journeys}
+        seals={seals}
         onJourney={openJourney}
         onPreview={setPreview}
         onSelect={select}
