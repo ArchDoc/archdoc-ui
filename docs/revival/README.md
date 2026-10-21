@@ -11,6 +11,8 @@ A review of the existing ArchDoc codebase (`archdoc-ui` + `ArchDoc.github.io`) a
 | [02 — Strategy Options](./02-strategy-options.md) | Mission decomposition, competitive landscape, nine key decisions with options and recommendations, risks |
 | [03 — Target Architecture](./03-target-architecture.md) | Proposed monorepo, spec v2 (actors, elements, journeys, data, code mapping, provenance, rules, tours), multi-repo federation, core API, CLI, MCP tools, PR Action, explorer |
 | [04 — Roadmap](./04-roadmap.md) | Phased plan with exit criteria, plus a suggested first vertical slice |
+| [05 — Surfaces plan](./05-surfaces-plan.md) | Explorer, PR comment, and agent tools that answer the reader's question; traces (done) |
+| [06 — Agent surface plan](./06-agent-surface-plan.md) | Five MCP tools instead of 21, one per question, and `archdoc init` for a repository without a model |
 | [archdoc.v2.example.yaml](./archdoc.v2.example.yaml) | ArchDoc's own target architecture, written in the proposed spec v2 (dogfooding) |
 | [landscape.example.yaml](./landscape.example.yaml) | A fictional multi-repo company: two product repos and the landscape repo that composes them |
 
