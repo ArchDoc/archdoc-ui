@@ -1,6 +1,6 @@
 import { journeyBranches } from "../data/branches.js";
 import type { ModelDiff, RelationshipView, StepChange } from "../diff/diff.js";
-import { type Model, nodeKey, type Target } from "../model.js";
+import { type Model, nodeKey, type Target, toReview } from "../model.js";
 
 /** How a box or arrow in a change diagram reads. */
 type Mark = "added" | "removed" | "changed" | "context";
@@ -176,10 +176,7 @@ export function changeDiagram(input: ChangeDiagramInput): string | undefined {
     const to = targetBox(r.to, "context");
     if (from.key === to.key) return;
     const key = `${from.key}->${to.key}`;
-    const suggested =
-      mark === "added" &&
-      (r as RelationshipView & { provenance?: { source?: string } }).provenance?.source ===
-        "suggested";
+    const suggested = mark === "added" && toReview(r) !== undefined;
     const prev = arrows.get(key);
     if (prev) {
       prev.all.push(mark);

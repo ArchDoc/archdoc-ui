@@ -5,6 +5,7 @@ import {
   type Model,
   type ModelDiff,
   type Simulation,
+  toReview,
 } from "@archdoc/core/browser";
 import { Background, Controls, MarkerType, ReactFlow, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -526,8 +527,7 @@ export function Canvas(props: CanvasProps) {
       const className = [
         "rel",
         e.planned ? "is-planned" : "",
-        e.relationships.length > 0 &&
-        e.relationships.every((r) => r.provenance?.source === "suggested")
+        e.relationships.length > 0 && e.relationships.every((r) => toReview(r) !== undefined)
           ? "is-suggested"
           : "",
         overlay?.edges.get(e.id) ? `change-${overlay.edges.get(e.id)}` : "",
@@ -821,7 +821,7 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
       kind: a?.spec.kind ?? "actor",
       detail: a?.spec.segment,
       status: a?.spec.status,
-      suggested: a?.spec.provenance?.source === "suggested",
+      suggested: toReview(a?.spec) !== undefined,
     };
   }
   if (key.startsWith("element:")) {
@@ -846,7 +846,7 @@ export function describe(model: Model, key: string, grouping?: Grouping) {
       kind,
       detail: e?.spec.technology,
       status: e?.spec.status,
-      suggested: e?.spec.provenance?.source === "suggested",
+      suggested: toReview(e?.spec) !== undefined,
     };
   }
   // Another repo's element: its name there, and the repo it's in.

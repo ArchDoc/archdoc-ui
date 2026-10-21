@@ -8,6 +8,7 @@ import {
   type ModelDiff,
   type RelationshipView,
   summarizeChange,
+  toReview,
 } from "@archdoc/core/browser";
 
 /** What the Changes tab shows: the model at one ref against another. */
@@ -205,9 +206,7 @@ function dataItems(model: Model, report: ChangeSummary, diff: ModelDiff): Change
 
 function suggestedItems(diff: ModelDiff): ChangeItem[] {
   const suggested = (c: { kind: string; after?: unknown }) =>
-    c.kind !== "removed" &&
-    (c.after as { provenance?: { source?: string } } | undefined)?.provenance?.source ===
-      "suggested";
+    c.kind !== "removed" && toReview(c.after) !== undefined;
   return [
     ...diff.elements.filter(suggested).map((c) => ({
       key: `element:${c.id}`,

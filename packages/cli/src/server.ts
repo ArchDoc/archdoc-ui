@@ -92,7 +92,7 @@ export async function startViewServer(options: ViewServerOptions): Promise<ViewS
         const body = await modelResponse({ target: options.target, cwd, base: options.base });
         if (!body) {
           return json(res, 404, {
-            error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml.`,
+            error: `No ArchDoc model found at ${options.target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`,
           });
         }
         return json(res, 200, { ...body, watch: watching });

@@ -55,7 +55,7 @@ export async function checkRepository(
   const target = options.model ?? ".";
   const head = await loadRevision(target, { cwd, ref: options.head, code: options.code });
   if (!head) {
-    throw new Error(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml.`);
+    throw new Error(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`);
   }
   const { model } = head;
   const headObserved = options.code === false ? [] : await analyze(contextOf(head.snapshot));

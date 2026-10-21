@@ -31,16 +31,17 @@ describe("archdoc MCP server", () => {
     expect(INSTRUCTIONS.length).toBeLessThan(1200);
   });
 
-  it("has one tool per question, read-only except seal", async () => {
+  it("has one tool per question, read-only except seal and init", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "archdoc_check",
       "archdoc_context",
+      "archdoc_init",
       "archdoc_seal",
       "archdoc_show",
     ]);
     const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);
-    expect(writers).toEqual(["archdoc_seal"]);
+    expect(writers.sort()).toEqual(["archdoc_init", "archdoc_seal"]);
     expect(tools.find((t) => t.name === "archdoc_seal")?.annotations?.destructiveHint).toBe(false);
     // Every agent session reads this list, so it stays small.
     expect(JSON.stringify(tools).length).toBeLessThan(6000);
@@ -132,6 +133,12 @@ describe("archdoc MCP server", () => {
     expect(comment.text).toMatch(/^(⛔|⚠️|ℹ️|✅) \*\*ArchDoc:\*\* /);
     expect(comment.text).not.toContain("<!--");
   }, 60_000);
+
+  it("never starts a model over one", async () => {
+    const r = await call("archdoc_init");
+    expect(r.isError).toBe(true);
+    expect(r.text).toContain("already has .archdoc/");
+  });
 
   it("returns unknown IDs as tool errors, with what's close", async () => {
     const r = await call("archdoc_show", { id: "nope" });

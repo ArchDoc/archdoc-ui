@@ -2,6 +2,7 @@ import {
   type Answer,
   checkAnswer,
   contextAnswer,
+  initAnswer,
   sealAnswer,
   showAnswer,
   type Where,
@@ -17,7 +18,7 @@ export interface ArchdocServerOptions {
   version?: string;
 }
 
-export const INSTRUCTIONS = `This repository's architecture is modeled in .archdoc/: actors, elements mapped to code, journeys, and data. People own it. Use it before you grep.
+export const INSTRUCTIONS = `This repository's architecture is modeled in .archdoc/: actors, elements mapped to code, journeys, and data. People own it. Use it before you grep. With no .archdoc/ yet, archdoc_init starts one.
 
 - archdoc_context: start every task here, with the task in words, the files you'll change, or an error. It says which files and functions to open, what else does the same job, the journeys, data, rules, tests, owners, and who uses it. Name the affected journeys in your plan; ask before changing a critical one.
 - archdoc_show: one thing by ID (element, actor, journey, data entry, Entry.field, trace, or a fact like element:<id>).
@@ -108,6 +109,26 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
       },
     },
     (input) => respond(sealAnswer(where, { ...input, requireSum: true })),
+  );
+
+  server.registerTool(
+    "archdoc_init",
+    {
+      title: "Start a model",
+      description:
+        "Only for a repository with no .archdoc/: writes a starting model from its packages, compose services, imports, and schema files, all marked inferred, and says what to add (descriptions, actors, journeys). Never writes over a model.",
+      inputSchema: {
+        name: z.string().optional().describe("The namespace; defaults to the root package's name"),
+        dryRun: z.boolean().optional().describe("Return the model without writing it"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    (input) => respond(initAnswer(where, input)),
   );
 
   return server;

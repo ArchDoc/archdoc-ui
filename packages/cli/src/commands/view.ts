@@ -39,7 +39,7 @@ export async function view(
     return { code: 1 };
   }
   if (!server.source) {
-    io.err(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml.`);
+    io.err(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`);
     await server.close();
     return { code: 1 };
   }

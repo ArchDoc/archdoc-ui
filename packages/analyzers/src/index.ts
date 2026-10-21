@@ -5,6 +5,8 @@ export {
   type ContextInput,
   checkAnswer,
   contextAnswer,
+  type InitInput,
+  initAnswer,
   readRepoFile,
   repoPath,
   type SealInput,
@@ -19,6 +21,7 @@ export {
   type CheckRepositoryResult,
   checkRepository,
 } from "./check.js";
+export { formatInit, type InitResult, inferModel, initModel } from "./init.js";
 export { manifests } from "./manifests.js";
 export {
   contextOf,

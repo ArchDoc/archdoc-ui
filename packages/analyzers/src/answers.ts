@@ -39,6 +39,7 @@ import {
 } from "@archdoc/core";
 import { parse } from "yaml";
 import { checkRepository } from "./check.js";
+import { formatInit, initModel } from "./init.js";
 import { resealedSince, sealReport } from "./seals.js";
 import { indexRepository } from "./symbols.js";
 
@@ -417,4 +418,21 @@ function ok(text: string): Answer {
 
 function fail(text: string): Answer {
   return { ok: false, text };
+}
+
+export interface InitInput {
+  /** The namespace; defaults to the root package's name or the directory's. */
+  name?: string | undefined;
+  dryRun?: boolean | undefined;
+}
+
+/**
+ * A starting model for a repository without one, from its manifests, compose
+ * files, imports, and schema files, every fact marked inferred; and what only
+ * a person or an agent reading the code can add.
+ */
+export async function initAnswer(where: Where, input: InitInput = {}): Promise<Answer> {
+  const root = resolve(where.cwd, where.model ?? ".");
+  const r = await initModel(root, input);
+  return { ok: !r.refused && !r.problems.length, text: formatInit(r) };
 }

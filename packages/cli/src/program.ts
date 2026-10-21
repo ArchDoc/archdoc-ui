@@ -7,6 +7,7 @@ import { context, evalCommand } from "./commands/context.js";
 import { lineageCommand, simulateCommand } from "./commands/data.js";
 import { diff } from "./commands/diff.js";
 import { publish, sync } from "./commands/federation.js";
+import { init } from "./commands/init.js";
 import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
@@ -42,6 +43,19 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       writeOut: (s) => io.out(s.trimEnd()),
       writeErr: (s) => io.err(s.trimEnd()),
     });
+
+  program
+    .command("init")
+    .description(
+      "Start a model from what the repository declares: packages, compose services, imports, and schema files, all marked inferred",
+    )
+    .argument("[path]", "the repository", ".")
+    .option("--name <namespace>", "the model's namespace (default: the root package or directory)")
+    .option("--dry-run", "print the model without writing it")
+    .option("--json", "print the result as JSON")
+    .action((path: string, opts: { name?: string; dryRun?: boolean; json?: boolean }) =>
+      run(init(path, opts, io)),
+    );
 
   program
     .command("validate")
