@@ -64,6 +64,8 @@ uses:
     provenance: { source: suggested, by: agent:claude-code }
 ```
 
+4. **Re-check the facts whose code you changed.** If the repository keeps `.archdoc/archdoc.sum`, call `archdoc_verify` (or run `archdoc verify`). It lists each model fact whose code your change touched (an element's files and exports, a snippet, a decision, a journey step's entry file, a data entry's schema fields) with what changed and where the fact is in the model. For each one, check that the model still describes the code and update it where it doesn't. Then call `archdoc_seal` with the facts you checked (or run `archdoc seal <fact> --by agent:<your-name>`). Without facts, it seals only new facts you added. Sealing is your word that the model is right, and reviewers see it in the PR, so never seal a fact you haven't checked.
+
 Then call `archdoc_validate` (or run `archdoc validate`) and `archdoc_check` again.
 
 ## In the PR description

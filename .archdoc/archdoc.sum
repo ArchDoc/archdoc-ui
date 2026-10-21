@@ -1,0 +1,1428 @@
+# Written by archdoc seal. Don't edit it by hand: when the code a fact points at changes, check the model, then run archdoc seal <fact>.
+sealVersion: 1
+seals:
+  element:toolchain.agent-skills:
+    kind: structure
+    hash: fnv-b9bc1dd10b81d90f
+    files:
+      .claude/skills/archdoc/SKILL.md: []
+      .mcp.json: []
+      AGENTS.md: []
+      CLAUDE.md: []
+      integrations/agent-skills/AGENTS.md: []
+      integrations/agent-skills/README.md: []
+      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/agent-skills/mcp/claude-code.mcp.json: []
+      integrations/agent-skills/mcp/cursor.mcp.json: []
+  element:toolchain.analyzers:
+    kind: structure
+    hash: fnv-d6dc3cefb7895247
+    files:
+      packages/analyzers/package.json: []
+      packages/analyzers/src/api.ts:
+        - Analyzer
+        - AnalyzerContext
+        - contextFor
+      packages/analyzers/src/check.ts:
+        - CheckRepositoryOptions
+        - CheckRepositoryResult
+        - checkRepository
+      packages/analyzers/src/index.ts: []
+      packages/analyzers/src/manifests.ts:
+        - manifests
+      packages/analyzers/src/revision.ts:
+        - LoadRevisionOptions
+        - Revision
+        - Snapshot
+        - SnapshotOptions
+        - contextOf
+        - loadRevision
+        - revisionOf
+        - snapshot
+      packages/analyzers/src/run.ts:
+        - analyze
+        - builtinAnalyzers
+      packages/analyzers/src/schemas/api.ts:
+        - ImportedType
+        - SchemaImporter
+        - block
+        - readSource
+        - stripComments
+      packages/analyzers/src/schemas/index.ts:
+        - builtinImporters
+        - importSchemas
+      packages/analyzers/src/schemas/openapi.ts:
+        - jsonschema
+        - openapi
+      packages/analyzers/src/schemas/prisma.ts:
+        - prisma
+      packages/analyzers/src/schemas/proto.ts:
+        - proto
+      packages/analyzers/src/schemas/sql.ts:
+        - sql
+      packages/analyzers/src/seals.ts:
+        - SealReport
+        - readSealedFiles
+        - readSumFile
+        - resealedSince
+        - sealReport
+      packages/analyzers/src/symbols.ts:
+        - indexCode
+        - indexRepository
+        - indexSource
+      packages/analyzers/src/ts-imports.ts:
+        - resolveSpecifier
+        - tsImports
+      packages/analyzers/src/workspace.ts:
+        - WorkspacePackage
+        - packageNameOf
+        - workspacePackages
+      packages/analyzers/tsconfig.json: []
+    by: agent:claude-code
+  element:toolchain.cli:
+    kind: structure
+    hash: fnv-70dbc685a222deed
+    files:
+      packages/cli/package.json: []
+      packages/cli/src/bin.ts: []
+      packages/cli/src/index.ts: []
+      packages/cli/src/io.ts:
+        - Io
+        - processIo
+      packages/cli/src/landscape.ts:
+        - LandscapePayload
+        - landscapePayload
+        - loadLandscape
+      packages/cli/src/model-path.ts:
+        - isModelPath
+      packages/cli/src/program.ts:
+        - createProgram
+      packages/cli/tsconfig.json: []
+  element:toolchain.cli.commands:
+    kind: structure
+    hash: fnv-078d0f02468f72f6
+    files:
+      packages/cli/src/commands/check.ts:
+        - CheckOptions
+        - check
+        - runCheck
+      packages/cli/src/commands/code.ts:
+        - ModelOptions
+        - impact
+        - load
+        - locate
+        - map
+        - readRepoFile
+        - search
+        - show
+      packages/cli/src/commands/context.ts:
+        - ContextOptions
+        - EvalOptions
+        - context
+        - evalCommand
+      packages/cli/src/commands/data.ts:
+        - DataOptions
+        - lineageCommand
+        - simulateCommand
+      packages/cli/src/commands/diff.ts:
+        - DiffOptions
+        - diff
+      packages/cli/src/commands/federation.ts:
+        - PublishCommandOptions
+        - SyncCommandOptions
+        - publish
+        - sync
+      packages/cli/src/commands/landscape.ts:
+        - LandscapeBuildOptions
+        - landscapeBuild
+      packages/cli/src/commands/migrate.ts:
+        - MigrateOptions
+        - migrate
+      packages/cli/src/commands/report.ts:
+        - ReportOptions
+        - report
+      packages/cli/src/commands/schema.ts:
+        - schema
+      packages/cli/src/commands/seal.ts:
+        - SealCommandOptions
+        - VerifyOptions
+        - seal
+        - verify
+      packages/cli/src/commands/site.ts:
+        - SiteOptions
+        - site
+      packages/cli/src/commands/trace.ts:
+        - TraceAnchorOptions
+        - TraceCheckOptions
+        - findTrace
+        - runTraceCheck
+        - traceAnchor
+        - traceCheck
+        - traceList
+        - traceShow
+      packages/cli/src/commands/validate.ts:
+        - ValidateOptions
+        - validate
+      packages/cli/src/commands/view.ts:
+        - ViewOptions
+        - view
+  element:toolchain.cli.view-server:
+    kind: structure
+    hash: fnv-2baa63e5c92cfa0d
+    files:
+      packages/cli/src/server.ts:
+        - ViewServer
+        - ViewServerOptions
+        - findWebDir
+        - modelResponse
+        - startViewServer
+  element:toolchain.core:
+    kind: structure
+    hash: fnv-e6a5d036d7a9ad9a
+    files:
+      packages/core/package.json: []
+      packages/core/src/browser.ts: []
+      packages/core/src/diagnostics.ts:
+        - Diagnostic
+        - Severity
+        - SourceLocation
+        - formatDiagnostic
+        - hasErrors
+      packages/core/src/index.ts: []
+      packages/core/src/model.ts:
+        - ActorNode
+        - CodeRef
+        - DataNode
+        - DomainNode
+        - ElementNode
+        - ExternalRef
+        - ImportedModel
+        - JourneyNode
+        - JourneyStep
+        - Landscape
+        - LogicNode
+        - MappingNode
+        - Model
+        - NodeRef
+        - Relationship
+        - Target
+        - describeTarget
+        - nodeKey
+      packages/core/src/propose/insert.ts:
+        - insertIntoMap
+      packages/core/src/propose/propose.ts:
+        - ProposalEdit
+        - ProposalPlan
+        - planProposal
+      packages/core/src/propose/write.ts:
+        - ProposeOptions
+        - ProposeResult
+        - propose
+      packages/core/tsconfig.json: []
+    by: agent:claude-code
+  element:toolchain.core.checker:
+    kind: structure
+    hash: fnv-a6d687ffe6086bd1
+    files:
+      packages/core/src/check/check.ts:
+        - CheckOptions
+        - CheckResult
+        - Finding
+        - ObservedEdge
+        - check
+        - observedEdges
+      packages/core/src/check/journeys.ts:
+        - validateJourneys
+      packages/core/src/check/observed.ts:
+        - ObservedDependency
+        - evidenceOf
+      packages/core/src/check/rules.ts:
+        - RuleEdge
+        - RuleViolation
+        - evaluateRules
+        - selectorMatcher
+  element:toolchain.core.codemap:
+    kind: structure
+    hash: fnv-a32807dda91ce405
+    files:
+      packages/core/src/codemap/codemap.ts:
+        - CodeMap
+        - CodeMatch
+        - Located
+        - filesUnder
+        - locate
+        - resolveCodeMap
+      packages/core/src/codemap/files.ts:
+        - RepoInfo
+        - listRepoFiles
+        - repoInfo
+        - webUrlOf
+      packages/core/src/codemap/glob.ts:
+        - compileGlob
+        - literalPrefix
+        - normalizePath
+      packages/core/src/codemap/snippet.ts:
+        - Snippet
+        - SnippetPlace
+        - findSnippet
+        - formatCode
+        - isSnippet
+        - resolveSnippets
+        - snippetKey
+        - snippetLabel
+  element:toolchain.core.codemap#packages/core/src/codemap/codemap.ts:locate:
+    kind: content
+    hash: fnv-48ed92805e36b56a
+    refs:
+      packages/core/src/codemap/codemap.ts (locate):
+        hash: fnv-4f1b9bb51323ce8f
+        lines: 22
+  element:toolchain.core.codemap#packages/core/src/codemap/snippet.ts:findSnippet:
+    kind: content
+    hash: fnv-36dcc78dff055a71
+    refs:
+      packages/core/src/codemap/snippet.ts (findSnippet):
+        hash: fnv-df8fd219dc323417
+        lines: 22
+  element:toolchain.core.data:
+    kind: structure
+    hash: fnv-5fc1d2831eeaa16b
+    files:
+      packages/core/src/data/branches.ts:
+        - BranchOutcome
+        - JourneyItem
+        - journeyBranches
+      packages/core/src/data/cel.ts:
+        - CelDouble
+        - FieldRef
+        - SIMULATED_NOW
+        - compile
+        - evaluate
+      packages/core/src/data/changes.ts:
+        - NewSensitiveFlow
+        - NewSensitiveStore
+        - SensitiveField
+        - sensitiveDataChanges
+      packages/core/src/data/check.ts:
+        - checkData
+      packages/core/src/data/flows.ts:
+        - DataFlow
+        - DataStore
+        - StepMessage
+        - StepStore
+        - Subscription
+        - dataFlows
+        - dataStores
+        - stepMessage
+        - stepStores
+        - subscriptionOf
+      packages/core/src/data/lineage.ts:
+        - FieldId
+        - Lineage
+        - LineageEdge
+        - lineage
+        - lineageEdges
+      packages/core/src/data/logic.ts:
+        - checkLogic
+        - outcomesOf
+      packages/core/src/data/references.ts:
+        - FieldReference
+        - checkReferences
+        - fieldReferences
+        - referenceFromSchema
+        - resolveReference
+      packages/core/src/data/registry.ts:
+        - DataRegistry
+        - Owned
+        - StoredIn
+      packages/core/src/data/resolve.ts:
+        - DataResolution
+        - Lifecycle
+        - classifiedFields
+        - elementOf
+        - findContract
+        - isImportedData
+        - namespaceOf
+        - parseChange
+        - parseStates
+        - providesOf
+        - qualifyData
+        - resolveData
+        - splitField
+      packages/core/src/data/rules.ts:
+        - DataRuleViolation
+        - describeFlow
+        - evaluateDataRules
+      packages/core/src/data/schemas.ts:
+        - ImportedField
+        - ImportedSchema
+        - applySchemas
+        - normalizeType
+        - parseSourceRef
+        - schemaDrift
+      packages/core/src/data/simulate.ts:
+        - DataRecord
+        - RecordEvent
+        - SimulatedDecision
+        - SimulatedStep
+        - Simulation
+        - simulate
+  element:toolchain.core.data#packages/core/src/data/flows.ts:stepMessage:
+    kind: content
+    hash: fnv-2a26a3f780cfde67
+    refs:
+      packages/core/src/data/flows.ts (stepMessage):
+        hash: fnv-6332a0c6c42b1e7c
+        lines: 5
+  element:toolchain.core.data#packages/core/src/data/simulate.ts:simulate:
+    kind: content
+    hash: fnv-e4dcabd563d159bf
+    refs:
+      packages/core/src/data/simulate.ts (simulate):
+        hash: fnv-7e2311dcd96803dc
+        lines: 5
+  element:toolchain.core.differ:
+    kind: structure
+    hash: fnv-08c07b4acf9c6e2a
+    files:
+      packages/core/src/diff/diff.ts:
+        - Change
+        - ChangeKind
+        - ModelDiff
+        - RelationshipView
+        - StepChange
+        - countChanges
+        - diffModels
+        - isEmptyDiff
+  element:toolchain.core.imports:
+    kind: structure
+    hash: fnv-ba24317aaad5fd50
+    files:
+      packages/core/src/federation/bundle.ts:
+        - BundleMeta
+        - bundleSchemas
+        - createBundle
+        - modelFromBundle
+        - parseBundle
+        - serializeBundle
+      packages/core/src/federation/consumers.ts:
+        - Elsewhere
+        - RemoteConsumer
+        - RemoteJourney
+        - consumersElsewhere
+        - otherModels
+      packages/core/src/federation/federate.ts:
+        - FederationInput
+        - VendoredBundle
+        - federate
+        - lookupImported
+      packages/core/src/federation/landscape.ts:
+        - ComposedLandscape
+        - LandscapeDomain
+        - LandscapeRepo
+        - composeLandscape
+      packages/core/src/federation/vendor.ts:
+        - federationDir
+        - integrityOf
+        - readFederationInput
+  element:toolchain.core.loader:
+    kind: structure
+    hash: fnv-de32a50681386a68
+    files:
+      packages/core/src/load/build.ts:
+        - BuildOptions
+        - LANDSCAPE
+        - ModelSource
+        - buildModel
+        - contractDiagnostic
+        - contractName
+        - isEventContract
+        - normalizeCode
+        - schemaDiagnostics
+      packages/core/src/load/fs.ts:
+        - LoadOptions
+        - LoadedModel
+        - MODEL_DIR
+        - ModelSources
+        - loadModel
+        - readModelSources
+        - readTraceSources
+      packages/core/src/load/git.ts:
+        - SourcesAtRef
+        - changedFiles
+        - listBranches
+        - listFilesAtRef
+        - loadModelAtRef
+        - mergeBase
+        - readFileAtRef
+        - readModelSourcesAtRef
+        - resolveRef
+      packages/core/src/load/history.ts:
+        - CommitFiles
+        - recentCommits
+      packages/core/src/load/resolve.ts:
+        - Resolution
+        - Resolver
+        - parentOf
+      packages/core/src/load/yaml.ts:
+        - ParsedFile
+        - YamlPath
+        - parseYaml
+  element:toolchain.core.query:
+    kind: structure
+    hash: fnv-f83627f617790886
+    files:
+      packages/core/src/query/code-index.ts:
+        - CodeIndex
+        - IndexView
+        - IndexedImport
+        - IndexedSource
+        - IndexedSymbol
+        - RankedFile
+        - SymbolKind
+        - fileStem
+        - filesNamed
+        - isCodeFile
+        - isTestFile
+        - journeyEntryPoints
+        - mainSymbol
+        - pointAt
+        - rankFiles
+        - rawTokens
+        - stepCodePath
+        - viewOf
+      packages/core/src/query/context.ts:
+        - ContextBrief
+        - ContextCallSite
+        - ContextInputs
+        - ContextJourney
+        - ContextSameJob
+        - ContextStart
+        - context
+      packages/core/src/query/eval.ts:
+        - EvalCase
+        - EvalCommit
+        - EvalReport
+        - evaluate
+        - isEvalSource
+        - subjectQuery
+      packages/core/src/query/impact.ts:
+        - AffectedJourney
+        - Impact
+        - ImpactConsumer
+        - ImpactResult
+        - impact
+        - rulesMentioning
+      packages/core/src/query/index.ts:
+        - ActorView
+        - ElementView
+        - Overview
+        - getActor
+        - getElement
+        - overview
+        - resolveRef
+      packages/core/src/query/search.ts:
+        - SearchHit
+        - search
+      packages/core/src/query/terms.ts:
+        - STOP
+        - queryTerms
+        - sameWord
+        - singular
+        - splitIdentifier
+  element:toolchain.core.report:
+    kind: structure
+    hash: fnv-b6228315f37b1eb1
+    files:
+      packages/core/src/report/check-report.ts:
+        - MarkedFinding
+        - formatAnnotations
+        - formatFindings
+      packages/core/src/report/context-report.ts:
+        - formatContext
+        - formatEval
+      packages/core/src/report/diff-report.ts:
+        - DiffFormat
+        - blockChanges
+        - describeChange
+        - formatDiff
+        - summary
+      packages/core/src/report/mermaid.ts:
+        - CHANGE_LEGEND
+        - CHANGE_LEGEND_SHORT
+        - ChangeDiagramInput
+        - JourneyDiagramInput
+        - RemoteUse
+        - changeDiagram
+        - journeyDiagram
+      packages/core/src/report/pr-report.ts:
+        - Ask
+        - ChangeSummary
+        - Concern
+        - PrReport
+        - PrReportInput
+        - REPORT_MARKER
+        - VERDICT_MARKER
+        - Verdict
+        - prReport
+        - renderPrComment
+        - stepRange
+        - summarizeChange
+      packages/core/src/report/report.ts:
+        - formatActor
+        - formatData
+        - formatDiagnostics
+        - formatElement
+        - formatImpact
+        - formatJourney
+        - formatLineage
+        - formatLocate
+        - formatOverview
+        - formatSearch
+        - formatSimulation
+        - impactToJSON
+        - locatedToJSON
+      packages/core/src/report/seal-report.ts:
+        - formatSealStatus
+      packages/core/src/report/trace-report.ts:
+        - formatAnchors
+        - formatTrace
+        - formatTraceChecks
+        - formatTraceList
+      packages/core/src/report/words.ts:
+        - TERMS
+        - Term
+        - counted
+  element:toolchain.core.seals:
+    kind: structure
+    hash: fnv-9fb57c07c6d6bb63
+    files:
+      packages/core/src/seal/seal.ts:
+        - Fingerprint
+        - FingerprintInputs
+        - SealOptions
+        - SealState
+        - SealStatus
+        - SealedFact
+        - describeChanges
+        - fingerprints
+        - formatSum
+        - hash
+        - normalize
+        - parseSum
+        - sealFindings
+        - sealStatuses
+        - sealSum
+        - sealableFacts
+        - sealedPaths
+  element:toolchain.core.seals#packages/core/src/seal/seal.ts:fingerprints:
+    kind: content
+    hash: fnv-1657759770083f41
+    refs:
+      packages/core/src/seal/seal.ts (fingerprints):
+        hash: fnv-8a058d12e0453afe
+        lines: 70
+  element:toolchain.core.traces:
+    kind: structure
+    hash: fnv-a1cbd238dac5550e
+    files:
+      packages/core/src/trace/anchor.ts:
+        - AnchorCandidate
+        - AnchorElement
+        - AnchorOptions
+        - AnchorResult
+        - ErrorEvidence
+        - anchorError
+        - describeEvidence
+        - traceSkeleton
+      packages/core/src/trace/change.ts:
+        - TraceInChange
+        - tracesInChange
+      packages/core/src/trace/check.ts:
+        - CheckTraceOptions
+        - TraceAnchorView
+        - TraceCheck
+        - TraceCodeView
+        - TraceFinding
+        - TraceStepView
+        - TraceView
+        - checkTrace
+        - resolveAnchor
+      packages/core/src/trace/hops.ts:
+        - HopKind
+        - TraceEnd
+        - TraceHop
+        - classifyHop
+        - covers
+        - endOfTarget
+        - localId
+        - qualified
+        - related
+        - resolveTraceEnd
+      packages/core/src/trace/trace.ts:
+        - ParsedTraces
+        - Trace
+        - TraceCodeRef
+        - TraceSpec
+        - loadTraces
+        - parseExpands
+        - parseTrace
+        - traceCodeLabel
+        - traceCodeRefs
+        - traceEvidenceOf
+        - traceRoleOf
+  element:toolchain.core.traces#packages/core/src/trace/anchor.ts:anchorError:
+    kind: content
+    hash: fnv-cb0529e4a82b2750
+    refs:
+      packages/core/src/trace/anchor.ts (anchorError):
+        hash: fnv-d370adb1659a022d
+        lines: 111
+  element:toolchain.core.traces#packages/core/src/trace/check.ts:checkTrace:
+    kind: content
+    hash: fnv-cbf544208ddc32aa
+    refs:
+      packages/core/src/trace/check.ts (checkTrace):
+        hash: fnv-8b5b995329777313
+        lines: 5
+  element:toolchain.federation:
+    kind: structure
+    hash: fnv-7138e44155bf4699
+    files:
+      packages/federation/package.json: []
+      packages/federation/src/git.ts:
+        - RemoteModel
+        - Tag
+        - git
+        - gitUrl
+        - listTags
+        - readRemoteModel
+        - resolveVersion
+      packages/federation/src/index.ts: []
+      packages/federation/src/publish.ts:
+        - PublishOptions
+        - PublishResult
+        - publish
+      packages/federation/src/sync.ts:
+        - SyncChange
+        - SyncOptions
+        - SyncResult
+        - formatLock
+        - sync
+      packages/federation/tsconfig.json: []
+  element:toolchain.github-action:
+    kind: structure
+    hash: fnv-7c220eee6070ac9c
+    files:
+      integrations/github-action/README.md: []
+      integrations/github-action/action.yml: []
+  element:toolchain.landscape-template:
+    kind: structure
+    hash: fnv-2b34291f645e4e07
+    files:
+      integrations/landscape-template/README.md: []
+      integrations/landscape-template/workflows/archdoc-landscape.yml: []
+  element:toolchain.mcp:
+    kind: structure
+    hash: fnv-24789448eccde85c
+    files:
+      packages/mcp/package.json: []
+      packages/mcp/src/bin.ts: []
+      packages/mcp/src/index.ts:
+        - runStdio
+      packages/mcp/src/server.ts:
+        - ArchdocServerOptions
+        - INSTRUCTIONS
+        - createArchdocServer
+      packages/mcp/tsconfig.json: []
+  element:toolchain.model-files:
+    kind: structure
+    hash: fnv-5465b825e0d4f889
+    files: {}
+  element:toolchain.spec:
+    kind: structure
+    hash: fnv-0d85084553271519
+    files:
+      packages/spec/package.json: []
+      packages/spec/schema/archdoc.v2.schema.json: []
+      packages/spec/src/federation.ts:
+        - Bundle
+        - BundleSchema
+        - IncludedBundle
+        - IncludedBundleSchema
+        - LOCK_FILE
+        - Lock
+        - LockEntry
+        - LockEntrySchema
+        - LockSchema
+        - VENDOR_DIR
+        - importRange
+        - importSource
+      packages/spec/src/index.ts: []
+      packages/spec/src/seals.ts:
+        - SUM_FILE
+        - Seal
+        - SealKind
+        - SealKindSchema
+        - SealSchema
+        - SumFile
+        - SumFileSchema
+      packages/spec/src/trace.ts:
+        - MissingHopSchema
+        - MissingHopSpec
+        - TRACES_DIR
+        - TraceCodeSchema
+        - TraceCodeSpec
+        - TraceEvidence
+        - TraceEvidenceSchema
+        - TraceFile
+        - TraceFileSchema
+        - TraceRole
+        - TraceRoleSchema
+        - TraceStepSchema
+        - TraceStepSpec
+        - WorksInSchema
+        - WorksInSpec
+      packages/spec/tsconfig.json: []
+  element:toolchain.spec.migrator:
+    kind: structure
+    hash: fnv-d2cc8b300bab293c
+    files:
+      packages/spec/src/migrate.ts:
+        - MigrateOptions
+        - MigrateResult
+        - V1Model
+        - V1ModelSchema
+        - isV1Model
+        - migrateV1
+  element:toolchain.spec.schema:
+    kind: structure
+    hash: fnv-2b0b7d43299bcbd3
+    files:
+      packages/spec/src/json-schema.ts:
+        - JSON_SCHEMA_ID
+        - archdocJsonSchema
+      packages/spec/src/schema.ts:
+        - ActorKind
+        - ActorKindSchema
+        - ActorSchema
+        - ActorSpec
+        - BranchSchema
+        - BranchSpec
+        - ChangesSchema
+        - CodeRefSchema
+        - CodeRefSpec
+        - CodeSchema
+        - CodeSpec
+        - CreatesSchema
+        - DataEntrySchema
+        - DataEntrySpec
+        - DataFieldSchema
+        - DataFieldSpec
+        - DataRuleSchema
+        - DataRuleSpec
+        - DomainSchema
+        - DomainSpec
+        - ElementKind
+        - ElementKindSchema
+        - ElementSchema
+        - ElementSpec
+        - IdSchema
+        - ImportSchema
+        - ImportSpec
+        - Importance
+        - ImportanceSchema
+        - JourneyFile
+        - JourneyFileSchema
+        - JourneySchema
+        - JourneySpec
+        - JourneyStepSchema
+        - JourneyStepSpec
+        - LinkSchema
+        - LogicRuleSchema
+        - LogicRuleSpec
+        - LogicSchema
+        - LogicSpec
+        - MappingSchema
+        - MappingSpec
+        - ModelFile
+        - ModelFileSchema
+        - NamespaceSchema
+        - Provenance
+        - ProvenanceSchema
+        - ProvideSchema
+        - ProvideSpec
+        - RefSchema
+        - RelationshipSchema
+        - RelationshipSpec
+        - RuleSchema
+        - RuleSpec
+        - SPEC_VERSION
+        - Status
+        - StatusSchema
+        - StoreSchema
+        - UsesSchema
+        - UsesSpec
+  element:toolchain.web:
+    kind: structure
+    hash: fnv-5aaec34a89f7491c
+    files:
+      apps/web/index.html: []
+      apps/web/package.json: []
+      apps/web/public/favicon.svg: []
+      apps/web/src/main.tsx: []
+      apps/web/tsconfig.json: []
+      apps/web/vite.config.ts:
+        - default
+  element:toolchain.web.graph:
+    kind: structure
+    hash: fnv-d9a335b4da1203b2
+    files:
+      apps/web/src/graph/data.ts:
+        - DataFocus
+        - FieldInfo
+        - Interaction
+        - Involvement
+        - LineageFocus
+        - StepData
+        - StepWrite
+        - dataFocus
+        - dataPlaces
+        - exampleValue
+        - hasData
+        - interactionRows
+        - journeyInteractions
+        - journeyInvolvement
+        - journeyRows
+        - journeyStores
+        - lineageFocus
+        - nodeKey
+        - sampleSkeleton
+        - sensitivity
+        - stepData
+      apps/web/src/graph/diff.ts:
+        - ChangeKind
+        - DiffGraph
+        - buildDiffGraph
+      apps/web/src/graph/graph.ts:
+        - Graph
+        - GraphEdge
+        - GraphNode
+        - GraphNodeKind
+        - JourneyEdge
+        - OTHERS_LISTED
+        - ROWS_BADGE
+        - ROWS_COLUMNS
+        - ROWS_HEADER
+        - ROWS_LINE
+        - RowInfo
+        - TABLE_WIDTH
+        - TableInfo
+        - ViewState
+        - ancestorsOf
+        - buildGraph
+        - defaultExpanded
+        - journeyEdges
+        - journeyExpansion
+        - liftKey
+        - reorderRows
+        - rowColumnWidths
+        - rowColumns
+        - rowKey
+        - rowTableSize
+        - showValue
+        - tableKey
+      apps/web/src/graph/groups.ts:
+        - Group
+        - GroupBy
+        - Grouping
+        - LandscapeView
+        - boundaryKey
+        - boundaryLabel
+        - boundaryOf
+        - crossingOf
+        - groupLandscape
+      apps/web/src/graph/layout.ts:
+        - Box
+        - GROUP_HEADER
+        - Layout
+        - NODE_HEIGHT
+        - NODE_WIDTH
+        - Point
+        - UntangledLayout
+        - layoutGraph
+      apps/web/src/graph/route.ts:
+        - countCrossings
+        - pointAlong
+        - roundedPath
+  element:toolchain.web.model-loader:
+    kind: structure
+    hash: fnv-096d572ed8f6c868
+    files:
+      apps/web/src/model/compare.ts:
+        - ChangeFindings
+        - ChangeGroups
+        - ChangeItem
+        - Compare
+        - compareModels
+      apps/web/src/model/samples.ts:
+        - SampleFile
+        - matchingSample
+        - parseSample
+        - sampleName
+        - samplesFor
+      apps/web/src/model/stories.ts:
+        - IMPORTANCE
+        - JourneyCard
+        - Lane
+        - LaneBand
+        - LaneBranch
+        - LaneBranches
+        - LaneDecision
+        - LaneRow
+        - LaneStep
+        - Lanes
+        - journeyCards
+        - journeyFacts
+        - journeyLanes
+        - journeyPath
+        - journeysByImportance
+        - ownership
+        - repoName
+        - repoOf
+        - stepUses
+        - targetLabel
+      apps/web/src/model/traces.ts:
+        - Traces
+        - anchorChip
+        - endLabel
+        - firstCause
+        - hopText
+        - observedExpected
+        - readTraces
+        - traceChips
+        - traceLanes
+      apps/web/src/model/useCompare.ts:
+        - Compared
+        - HashState
+        - Head
+        - Pair
+        - Refs
+        - Tab
+        - hashOf
+        - readHash
+        - useCompared
+        - useRefs
+        - writeHash
+      apps/web/src/model/useModel.ts:
+        - LandscapeInfo
+        - ModelPayload
+        - ModelState
+        - RepoLinks
+        - modelOf
+        - useModel
+  element:toolchain.web.ui:
+    kind: structure
+    hash: fnv-728f3161540859f7
+    files:
+      apps/web/src/App.tsx:
+        - App
+      apps/web/src/components/Canvas.tsx:
+        - Canvas
+        - CanvasProps
+        - describe
+      apps/web/src/components/DataPanels.tsx:
+        - DataDetails
+        - FieldDetails
+        - dataEntryOf
+      apps/web/src/components/Details.tsx:
+        - Details
+        - DetailsProps
+      apps/web/src/components/Lanes.tsx:
+        - Lanes
+        - LanesProps
+      apps/web/src/components/Overview.tsx:
+        - Overview
+        - OverviewProps
+      apps/web/src/components/Payload.tsx:
+        - Payload
+        - PayloadEntry
+      apps/web/src/components/Sidebar.tsx:
+        - ChangesList
+        - DataList
+        - JourneyList
+        - SearchBox
+        - dataGroups
+        - search
+      apps/web/src/components/StepPanel.tsx:
+        - SampleChoice
+        - StepPanel
+        - StepPanelProps
+      apps/web/src/components/Traces.tsx:
+        - TraceList
+        - TraceStepPanel
+        - TraceStory
+      apps/web/src/components/code.tsx:
+        - CodeContext
+        - CodeSection
+        - PathLinks
+        - StepCode
+        - editorLink
+        - linkTarget
+        - webLink
+      apps/web/src/components/edges.tsx:
+        - Routed
+        - RoutedData
+        - RoutedEdge
+        - edgeTypes
+      apps/web/src/components/nodes.tsx:
+        - Card
+        - CardData
+        - CardNode
+        - Emphasis
+        - Others
+        - OthersData
+        - OthersNode
+        - RowTable
+        - RowTableData
+        - RowTableNode
+        - Shape
+        - Table
+        - TableData
+        - TableNode
+        - nodeTypes
+      apps/web/src/styles.css: []
+  step:agent-preflight#1:
+    kind: structure
+    hash: fnv-341f41ac97dcb5ce
+    files:
+      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+  step:agent-preflight#2:
+    kind: structure
+    hash: fnv-3c8e7a02bbae7918
+    files:
+      packages/mcp/src/server.ts:
+        - ArchdocServerOptions
+        - INSTRUCTIONS
+        - createArchdocServer
+  step:agent-preflight#3:
+    kind: structure
+    hash: fnv-38dcc918f371bd5c
+    files:
+      packages/analyzers/src/symbols.ts:
+        - indexCode
+        - indexRepository
+        - indexSource
+  step:agent-preflight#4:
+    kind: structure
+    hash: fnv-8154775968509975
+    files:
+      packages/core/src/query/context.ts:
+        - ContextBrief
+        - ContextCallSite
+        - ContextInputs
+        - ContextJourney
+        - ContextSameJob
+        - ContextStart
+        - context
+  step:agent-preflight#6:
+    kind: structure
+    hash: fnv-ba39cad625fda332
+    files:
+      packages/core/src/query/impact.ts:
+        - AffectedJourney
+        - Impact
+        - ImpactConsumer
+        - ImpactResult
+        - impact
+        - rulesMentioning
+  step:change-what-others-use#1:
+    kind: structure
+    hash: fnv-b4dba358312e9a8c
+    files:
+      packages/cli/src/commands/federation.ts:
+        - PublishCommandOptions
+        - SyncCommandOptions
+        - publish
+        - sync
+  step:change-what-others-use#2:
+    kind: structure
+    hash: fnv-58ab253d99dbc535
+    files:
+      packages/federation/src/sync.ts:
+        - SyncChange
+        - SyncOptions
+        - SyncResult
+        - formatLock
+        - sync
+  step:change-what-others-use#6:
+    kind: structure
+    hash: fnv-443be4498a9727cb
+    files:
+      packages/core/src/federation/consumers.ts:
+        - Elsewhere
+        - RemoteConsumer
+        - RemoteJourney
+        - consumersElsewhere
+        - otherModels
+  step:check-model#1:
+    kind: structure
+    hash: fnv-23d2cd63641325cf
+    files:
+      packages/cli/src/commands/validate.ts:
+        - ValidateOptions
+        - validate
+  step:check-model#3:
+    kind: structure
+    hash: fnv-3747d46c6b568818
+    files:
+      packages/core/src/load/fs.ts:
+        - LoadOptions
+        - LoadedModel
+        - MODEL_DIR
+        - ModelSources
+        - loadModel
+        - readModelSources
+        - readTraceSources
+  step:check-model#4:
+    kind: structure
+    hash: fnv-337b8a3120948b0f
+    files:
+      packages/core/src/load/build.ts:
+        - BuildOptions
+        - LANDSCAPE
+        - ModelSource
+        - buildModel
+        - contractDiagnostic
+        - contractName
+        - isEventContract
+        - normalizeCode
+        - schemaDiagnostics
+  step:depend-on-another-repo#1:
+    kind: structure
+    hash: fnv-b4dba358312e9a8c
+    files:
+      packages/cli/src/commands/federation.ts:
+        - PublishCommandOptions
+        - SyncCommandOptions
+        - publish
+        - sync
+  step:depend-on-another-repo#2:
+    kind: structure
+    hash: fnv-58ab253d99dbc535
+    files:
+      packages/federation/src/sync.ts:
+        - SyncChange
+        - SyncOptions
+        - SyncResult
+        - formatLock
+        - sync
+  step:depend-on-another-repo#3:
+    kind: structure
+    hash: fnv-ce52a105177ca609
+    files:
+      packages/federation/src/git.ts:
+        - RemoteModel
+        - Tag
+        - git
+        - gitUrl
+        - listTags
+        - readRemoteModel
+        - resolveVersion
+  step:depend-on-another-repo#6:
+    kind: structure
+    hash: fnv-e6f6cfebc3a5f19d
+    files:
+      packages/core/src/federation/federate.ts:
+        - FederationInput
+        - VendoredBundle
+        - federate
+        - lookupImported
+  step:explain-a-bug#1:
+    kind: structure
+    hash: fnv-341f41ac97dcb5ce
+    files:
+      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+  step:explain-a-bug#2:
+    kind: structure
+    hash: fnv-3c8e7a02bbae7918
+    files:
+      packages/mcp/src/server.ts:
+        - ArchdocServerOptions
+        - INSTRUCTIONS
+        - createArchdocServer
+  step:explain-a-bug#3:
+    kind: structure
+    hash: fnv-f03526d4ddf9fa0a
+    files:
+      packages/core/src/trace/anchor.ts:
+        - AnchorCandidate
+        - AnchorElement
+        - AnchorOptions
+        - AnchorResult
+        - ErrorEvidence
+        - anchorError
+        - describeEvidence
+        - traceSkeleton
+  step:explain-a-bug#6:
+    kind: structure
+    hash: fnv-dc9bdcedd8fd24cf
+    files:
+      packages/core/src/trace/check.ts:
+        - CheckTraceOptions
+        - TraceAnchorView
+        - TraceCheck
+        - TraceCodeView
+        - TraceFinding
+        - TraceStepView
+        - TraceView
+        - checkTrace
+        - resolveAnchor
+  step:explain-a-bug#7:
+    kind: structure
+    hash: fnv-a95ed015cbc5bccf
+    files:
+      packages/cli/src/commands/trace.ts:
+        - TraceAnchorOptions
+        - TraceCheckOptions
+        - findTrace
+        - runTraceCheck
+        - traceAnchor
+        - traceCheck
+        - traceList
+        - traceShow
+  step:explore-architecture#1:
+    kind: structure
+    hash: fnv-85bc4c589138b30c
+    files:
+      packages/cli/src/commands/view.ts:
+        - ViewOptions
+        - view
+  step:explore-architecture#2:
+    kind: structure
+    hash: fnv-2baa63e5c92cfa0d
+    files:
+      packages/cli/src/server.ts:
+        - ViewServer
+        - ViewServerOptions
+        - findWebDir
+        - modelResponse
+        - startViewServer
+  step:explore-architecture#3:
+    kind: structure
+    hash: fnv-e0a20eb0e762bb42
+    files:
+      apps/web/src/model/useModel.ts:
+        - LandscapeInfo
+        - ModelPayload
+        - ModelState
+        - RepoLinks
+        - modelOf
+        - useModel
+  step:explore-architecture#4:
+    kind: structure
+    hash: fnv-b48ae5654113843f
+    files:
+      apps/web/src/App.tsx:
+        - App
+  step:keep-the-model-true#1:
+    kind: structure
+    hash: fnv-341f41ac97dcb5ce
+    files:
+      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+    by: agent:claude-code
+  step:keep-the-model-true#2:
+    kind: structure
+    hash: fnv-3c8e7a02bbae7918
+    files:
+      packages/mcp/src/server.ts:
+        - ArchdocServerOptions
+        - INSTRUCTIONS
+        - createArchdocServer
+    by: agent:claude-code
+  step:keep-the-model-true#3:
+    kind: structure
+    hash: fnv-2a1472304503fb48
+    files:
+      packages/analyzers/src/seals.ts:
+        - SealReport
+        - readSealedFiles
+        - readSumFile
+        - resealedSince
+        - sealReport
+    by: agent:claude-code
+  step:keep-the-model-true#4:
+    kind: structure
+    hash: fnv-9fb57c07c6d6bb63
+    files:
+      packages/core/src/seal/seal.ts:
+        - Fingerprint
+        - FingerprintInputs
+        - SealOptions
+        - SealState
+        - SealStatus
+        - SealedFact
+        - describeChanges
+        - fingerprints
+        - formatSum
+        - hash
+        - normalize
+        - parseSum
+        - sealFindings
+        - sealStatuses
+        - sealSum
+        - sealableFacts
+        - sealedPaths
+    by: agent:claude-code
+  step:publish-the-landscape#1:
+    kind: structure
+    hash: fnv-d54bbb8ae455620a
+    files:
+      packages/cli/src/commands/landscape.ts:
+        - LandscapeBuildOptions
+        - landscapeBuild
+  step:publish-the-landscape#2:
+    kind: structure
+    hash: fnv-2ec3e98281aa866a
+    files:
+      packages/core/src/federation/landscape.ts:
+        - ComposedLandscape
+        - LandscapeDomain
+        - LandscapeRepo
+        - composeLandscape
+  step:publish-the-landscape#4:
+    kind: structure
+    hash: fnv-65c8f37988a0119d
+    files:
+      apps/web/src/graph/groups.ts:
+        - Group
+        - GroupBy
+        - Grouping
+        - LandscapeView
+        - boundaryKey
+        - boundaryLabel
+        - boundaryOf
+        - crossingOf
+        - groupLandscape
+  step:review-ai-change#3:
+    kind: structure
+    hash: fnv-6adb32320513fbde
+    files:
+      integrations/github-action/action.yml: []
+  step:review-ai-change#4:
+    kind: structure
+    hash: fnv-f69539858d14536f
+    files:
+      packages/core/src/report/pr-report.ts:
+        - Ask
+        - ChangeSummary
+        - Concern
+        - PrReport
+        - PrReportInput
+        - REPORT_MARKER
+        - VERDICT_MARKER
+        - Verdict
+        - prReport
+        - renderPrComment
+        - stepRange
+        - summarizeChange

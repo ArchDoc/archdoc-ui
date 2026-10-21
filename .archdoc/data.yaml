@@ -118,6 +118,16 @@ data:
       steps: { type: json, description: "Hops in journey step syntax, with role, evidence, observed, expected, and missing" }
       fix: { type: string }
 
+  Seal:
+    kind: entity
+    description: A fingerprint of the code one model fact points at, in archdoc.sum beside the model. When the code changes, someone checks the model and seals the fact again. Written by archdoc seal and archdoc_seal; never part of the model.
+    provenance: { source: suggested, by: agent:claude-code }
+    fields:
+      fact: { type: string, description: "element:<id>, element:<id>#<path>:<symbol>, step:<journey>#<n>, logic:<id>, mapping:<id>, data:<id>, or contract:<element>#<api>" }
+      kind: { type: enum, values: [structure, content, schema] }
+      hash: { type: string }
+      by: { type: string, description: "Who last checked the model against it" }
+
   Lock:
     kind: entity
     description: archdoc.lock, the version and integrity each import is pinned at.

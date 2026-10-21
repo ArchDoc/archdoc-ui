@@ -97,6 +97,8 @@ pnpm archdoc map                            # how the repo's files map onto the 
 pnpm archdoc check                          # drift: imports the model doesn't declare, broken rules
 pnpm archdoc check --base main --format github   # the same, as annotations on the diff in CI
 pnpm archdoc diff main                      # what changed in the model since main
+pnpm archdoc verify                         # which model facts' code changed since they were sealed
+pnpm archdoc seal toolchain.cli --by agent:me   # record that you checked them
 pnpm archdoc report --base main             # what the PR comment will say about your branch
 pnpm archdoc site --base main --out site     # the explorer as a static site, opened on your branch's change
 pnpm archdoc trace anchor --file error.log  # which journey step an error showed up in, and a trace to start
@@ -120,6 +122,20 @@ pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
 ## Keep the model honest
 
 `archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it checks the merge base the same way, marks what your change introduced (what the base didn't have), and fails only on that, so it works as a CI gate from day one.
+
+### Seals: know which facts to re-check when code changes
+
+A model drifts quietly: code moves, names change, a decision's threshold changes, a schema grows a field, and nobody remembers which parts of the model described them. Seals catch that. `archdoc seal --all` records a fingerprint of the code each model fact points at in `.archdoc/archdoc.sum` (commit it, like a lockfile). From then on, `archdoc check` and `archdoc verify` say which facts' code changed since someone last checked them, and what changed:
+
+| Fact | Fingerprint | Breaks when |
+|---|---|---|
+| An element's `code:` paths | the files it owns and the names they export | a file is added or removed, an export is renamed or added; not when a function body changes |
+| A snippet (`symbol:` or `lines:`), a decision's or a mapping's `code:` | the exact lines, without comments and whitespace | the lines change |
+| A journey step's `code:` | its entry file's exports | the entry point is renamed or gone |
+| A data entry's `source:` | the schema's fields and types | a field is added, removed, or retyped |
+| A contract (`provides: api: proto/charges.proto`) | the spec file | the spec changes |
+
+The agent that changed the code (or you) reads what changed, updates the model where it no longer describes the code, and runs `archdoc seal <fact> --by agent:<name>`, or `archdoc seal <element-id>` for all of an element's facts. `archdoc seal` without facts seals only new facts and keeps changed ones flagged. With `--base`, only the facts a pull request touched count, and the PR comment lists them under "To check", then which facts the change sealed again and who did. Seals are opt-in: nothing happens until a repository has an `archdoc.sum`.
 
 `archdoc diff` shows what changed in the model itself, by element, use, actor, journey, data entry, and decision rather than by line. Both sides are read the same way, with what their schema sources say. `diff`, `report --base`, and `view --base` also take another model file in place of a git ref, to compare two versions side by side.
 
