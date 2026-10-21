@@ -529,9 +529,9 @@ describe("data in diffs and the PR report", () => {
       "returns charges → app Refund: card_last4",
     ]);
     expect(r.markdown).toContain("<details><summary>Data</summary>");
-    expect(r.markdown).toContain(
-      "> [!CAUTION]\n> This change sends sensitive data to an external element",
-    );
+    // To check already says it, so the Data fold doesn't repeat it as a callout.
+    expect(r.markdown).toContain("- **Sends sensitive data outside the system.** app now sends");
+    expect(r.markdown).not.toContain("This change sends sensitive data to an external element");
     expect(r.attention.filter((c) => c.code === "data/sensitive").map((c) => c.title)).toEqual([
       "Sends sensitive data outside the system",
       "Sends sensitive data outside the system",
@@ -541,6 +541,7 @@ describe("data in diffs and the PR report", () => {
     expect(r.markdown).toContain(
       "| `RefundRequest` | rider_email (pii), phone (pii) | `app` → `analytics` (external) | sends |",
     );
-    expect(r.markdown).toContain("- RefundRequest (message): fields +phone (pii)");
+    // Data entries are listed once, under Model changes.
+    expect(r.markdown.match(/RefundRequest \(message\): fields \+phone \(pii\)/g)).toHaveLength(1);
   });
 });

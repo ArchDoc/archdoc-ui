@@ -84,7 +84,7 @@ describe("comparing two model files", () => {
       "--no-diagrams",
     );
     expect(dropped.out).toContain("| check-out: Buy what's in the cart | **critical** | shopper |");
-    expect(dropped.out).toContain("journey/broken-step");
+    expect(dropped.out).toContain("> [!CAUTION]\n> **A broken journey**");
   });
 });
 

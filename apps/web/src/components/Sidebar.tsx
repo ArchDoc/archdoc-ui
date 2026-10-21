@@ -1,4 +1,4 @@
-import { DataRegistry, type Model } from "@archdoc/core/browser";
+import { ASKED_CONCERNS, DataRegistry, type Model } from "@archdoc/core/browser";
 import { forwardRef, type ReactNode, useMemo, useState } from "react";
 import { sensitivity } from "../graph/data.js";
 import type { ChangeItem, Compare } from "../model/compare.js";
@@ -165,7 +165,9 @@ export function ChangesList(props: {
     if (i.key.startsWith("journey:")) props.onJourney(i.key.slice(8));
     else props.onSelect(i.key);
   };
-  const attention = summary.attention.filter((a) => a.code !== "model/suggested");
+  const attention = summary.attention.filter(
+    (a) => a.code !== "model/suggested" && !ASKED_CONCERNS.has(a.code),
+  );
   const verb = { approve: "approves", inform: "knows", verify: "still works" };
   const other = c.diff.mappings.length + c.diff.logic.length + c.diff.rules.length;
   const list = (title: string, items: ChangeItem[]) =>

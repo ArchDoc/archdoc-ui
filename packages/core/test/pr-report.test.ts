@@ -95,10 +95,9 @@ describe("prReport", () => {
     expect(r.findings.introduced).toHaveLength(1);
     expect(r.findings.existing).toHaveLength(1);
     expect(r.markdown.startsWith(REPORT_MARKER)).toBe(true);
-    expect(r.markdown).toMatch(
-      /<details><summary>Drift and rules \(1 error, 0 warnings from this change\)<\/summary>/,
-    );
-    expect(r.markdown).toContain("app depends on api.secret");
+    // The one introduced finding is the blocking issue above, so no fold repeats it.
+    expect(r.markdown).not.toContain("More drift and rules");
+    expect(r.markdown.match(/app depends on api\.secret/g)).toHaveLength(1);
     expect(r.markdown).toMatch(
       /<details><summary>Already on the base \(1 finding, not from this change\)<\/summary>[\s\S]*old drift/,
     );
@@ -108,20 +107,70 @@ describe("prReport", () => {
 
   it("leads with the verdict, what blocks the merge, and who to ask", () => {
     expect(r.verdict).toBe("blocking");
-    expect(r.headline).toEqual(["1 blocking issue", "1 critical journey", "1 team to ask"]);
+    expect(r.headline).toEqual(["1 blocking issue"]);
     const lines = r.markdown.split("\n");
-    expect(lines[1]).toBe("⛔ **ArchDoc:** 1 blocking issue · 1 critical journey · 1 team to ask");
+    expect(lines[1]).toBe("⛔ **ArchDoc:** 1 blocking issue");
     expect(r.markdown).toMatch(/> \[!CAUTION\]\n> \*\*A dependency the model doesn't declare\*\*/);
-    expect(r.asks).toEqual([
+    // One team owns everything it touches, and book's steps didn't change: nobody extra to ask.
+    expect(r.asks).toEqual([]);
+    expect(r.markdown).not.toContain("Before merging");
+    expect(r.attention.map((c) => c.code)).toEqual(["model/suggested"]);
+    expect(r.markdown).toContain(
+      "- **2 facts an agent suggested.** Accept or reject them before merging.\n  - actor ops\n  - app → cache: Caches trips",
+    );
+    expect(r.markdown).not.toContain("Suggested facts to review");
+  });
+
+  it("asks for each team when a change spans teams, and checks critical journeys whose steps changed", () => {
+    const changed = model({
+      "archdoc.yaml": root(`
+        actors:
+          rider: { kind: person, uses: { app: Books } }
+        elements:
+          app: { kind: container, code: apps/mobile/**, owners: [mobile-team], uses: { api: Calls } }
+          api: { kind: container, code: services/api/**, owners: [api-team] }
+          docs: { kind: container, code: docs/** }
+        journeys:
+          book:
+            actor: rider
+            goal: Book a ride
+            importance: critical
+            steps: [{ from: rider, to: app }, { from: app, to: api, action: Books it }]
+          browse:
+            actor: rider
+            goal: Browse
+            steps: [{ from: rider, to: app }]
+      `),
+    });
+    const x = prReport({
+      model: changed,
+      changedFiles: ["apps/mobile/x.ts", "services/api/y.ts"],
+      diff: diffModels(before, changed),
+      findings: [],
+    });
+    expect(x.verdict).toBe("attention");
+    expect(x.headline).toEqual(["1 critical journey changed", "2 teams to ask"]);
+    // Before merging asks about the journey, so To check doesn't repeat it.
+    expect(x.markdown).not.toContain("**To check**");
+    expect(x.markdown).toContain("- [ ] **book** still works");
+    expect(x.attention.map((c) => c.code)).toEqual(["journey/critical-changed"]);
+    expect(x.asks).toEqual([
       { kind: "approve", who: "mobile-team", why: "owns app" },
+      { kind: "approve", who: "api-team", why: "owns api" },
       { kind: "verify", who: "book", why: "Book a ride; critical, steps 1–2" },
     ]);
-    expect(r.markdown).toContain("- [ ] **mobile-team** approves · owns app");
-    expect(r.markdown).toContain("- [ ] **book** still works · Book a ride; critical, steps 1–2");
-    // The blocking issue comes before the checklist, and both before the folds.
-    expect(r.markdown.indexOf("[!CAUTION]")).toBeLessThan(r.markdown.indexOf("Before merging"));
-    expect(r.markdown.indexOf("Before merging")).toBeLessThan(r.markdown.indexOf("<details>"));
-    expect(r.attention.map((c) => c.code)).toEqual(["model/suggested"]);
+  });
+
+  it("is only info when it touches mapped code and there's nothing to check", () => {
+    const info = prReport({
+      model: before,
+      changedFiles: ["apps/mobile/x.ts"],
+      diff: diffModels(before, before),
+      findings: [],
+    });
+    expect(info.verdict).toBe("info");
+    expect(info.asks).toEqual([]);
+    expect(info.headline).toEqual(["Touches app"]);
   });
 
   it("draws the change and the most important journeys", () => {

@@ -96,7 +96,7 @@ describe("seals", () => {
     const c = await run("check", "--base", "main");
     expect(c.out).toMatch(/To check \(2\)/);
     expect(c.out).toContain(
-      "! Code changed under the model: The code element api points at changed",
+      "! Code changed under the model: The code behind element api changed since it was sealed",
     );
 
     const report = await run("report", "--base", "main");

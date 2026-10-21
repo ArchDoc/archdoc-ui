@@ -207,6 +207,7 @@ export {
   journeyDiagram,
 } from "./report/mermaid.js";
 export {
+  ASKED_CONCERNS,
   type Ask,
   type ChangeSummary,
   type Concern,

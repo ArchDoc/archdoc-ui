@@ -36,7 +36,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 2. Repo name and the Action's address
 
-- [ ] Rename `ArchDoc/archdoc-ui` to `ArchDoc/archdoc`. *(needs a maintainer)* The README, the Action's README, and the report's footer already link to `ArchDoc/archdoc`; until the rename, `uses: ArchDoc/archdoc/integrations/github-action@main` doesn't resolve.
+- [x] Rename `ArchDoc/archdoc-ui` to `ArchDoc/archdoc`. Done: pushes to the old name redirect. Update local remotes with `git remote set-url origin https://github.com/ArchDoc/archdoc.git`.
 - [ ] Tag the Action `v1`, and have its docs use `@v1` instead of `@main`.
 
 ## 3. Freeze the model format
@@ -91,11 +91,11 @@ What the review found:
 
 `comment: quiet` only skips the comment when the verdict is `none`, and touching code that a critical journey passes through is already "attention". With 261 of 354 files mapped in this repo, nearly every PR gets a comment, so the blocking ones get skipped too.
 
-- [ ] Comment only when there's a finding. Touching a critical journey alone is `info`: job summary, no comment.
-- [ ] No "Before merging" checklist by default. An owner line only for a team other than the one that owns everything the PR touches; critical journeys only when the model changed their steps.
-- [ ] Show each finding once: not in the callout, then "To check", then again in the folded "Drift and rules".
-- [ ] When an undeclared dependency also breaks a rule, report one finding whose fix is to remove the import or change the rule, never "add it to uses".
-- [ ] Copy fixes:
+- [x] Comment only when there's a finding. Touching a critical journey alone is `info`: job summary, no comment.
+- [x] No "Before merging" checklist by default. Owners only when the change spans more than one team; critical journeys only when the model changed their steps.
+- [x] Show each finding once: the folds list only findings not shown above, the Data fold drops its callout and the data entries Model changes already lists, and what Before merging asks about isn't repeated under To check.
+- [x] When an undeclared dependency also breaks a rule, report one finding whose fix is to remove the import or change the rule, never "add it to uses". (A rule that's only a warning keeps both, so the error isn't hidden.)
+- [x] Copy fixes:
   - the `seal/changed` sentence ("The code contract proto/charges.proto of charges points at changed since it was sealed");
   - "Touches no code the model maps" on a PR that changed a mapped contract;
   - `type string → undefined` in data changes when a schema field is removed;

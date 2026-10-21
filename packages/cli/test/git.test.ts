@@ -83,8 +83,9 @@ describe("against a git history", () => {
     );
     const r = await run("check", "--base", "main");
     expect(r.code).toBe(1);
-    expect(r.out).toContain("Blocks the merge (2)");
-    expect(r.out).toContain("web depends on billing, but the model doesn't declare it");
+    // The import is undeclared and the rule forbids it: one finding, the rule's.
+    expect(r.out).toContain("Blocks the merge (1)");
+    expect(r.out).not.toContain("web depends on billing, but the model doesn't declare it");
     expect(r.out).toContain('breaks rule "web-never-bills"');
     expect(r.out).toContain("apps/web/src/pay.ts:1 (@shop/billing)");
     expect((await run("check", "--base", "main", "--fail-on", "never")).code).toBe(0);
@@ -103,13 +104,16 @@ describe("against a git history", () => {
   it("report names the touched elements, the critical journey, and the drift", async () => {
     const r = await run("report", "--base", "main");
     expect(r.code).toBe(0);
-    expect(r.out.startsWith("<!-- archdoc-report -->\n⛔ **ArchDoc:** 2 blocking issues")).toBe(
+    expect(r.out.startsWith("<!-- archdoc-report -->\n⛔ **ArchDoc:** 1 blocking issue")).toBe(
       true,
     );
+    expect(r.out).toContain("Remove the dependency from the code.");
     expect(r.out).toContain("Touches `web` (1 file), `search`");
     expect(r.out).toContain("| checkout: Buy something | **critical** | buyer | 1, 2 |");
-    expect(r.out).toContain("Drift and rules (2 errors");
-    expect(r.out).toContain("<summary>Suggested facts to review (1)</summary>");
+    expect(r.out).not.toContain("More drift and rules");
+    expect(r.out).toContain(
+      "- **1 fact an agent suggested.** Accept or reject them before merging.\n  - element search",
+    );
     const sha = git("rev-parse", "main").trim();
     expect((await run("report", "--base", sha)).out).toContain(`for ${sha.slice(0, 7)}...HEAD.`);
     expect(r.out).toContain("```mermaid\nflowchart TB");

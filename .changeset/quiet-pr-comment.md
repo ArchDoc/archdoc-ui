@@ -1,0 +1,5 @@
+---
+"@archdoc/core": minor
+---
+
+The pull request comment only asks for attention when there's something to fix or check. Touching code that a critical journey passes through is now `info`, so the Action's `comment: quiet` writes it to the job summary instead of commenting. "Before merging" asks owners to approve only when a change spans more than one team, and asks whether a critical journey still works only when the change edits its steps (which is also a new thing to check, `journey/critical-changed`). Each finding shows once: the folds skip what's already above, and To check skips what Before merging asks. An import that the model doesn't declare and a rule forbids is one finding, the rule's, whose fix is to remove the import. A contract's spec file counts as touching the element that provides it. Copy fixes: "The code behind … changed since it was sealed", `type string → none` for a field a schema no longer has, suggested facts as a list, and "Touches" lists six elements and a count.

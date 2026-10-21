@@ -99,7 +99,9 @@ describe("the loop: context, edit, check, seal", () => {
     );
     const r = await call("archdoc_check", { base: "main" });
     expect(r.text).not.toContain("doesn't declare");
-    expect(r.text).toContain("1 fact an agent suggested: web → billing");
+    expect(r.text).toContain(
+      "1 fact an agent suggested: Accept or reject them before merging.\n    web → billing: Charges at checkout",
+    );
     expect(r.text).toContain("Model: 1 use added");
     const comment = await call("archdoc_check", { base: "main", format: "markdown" });
     expect(comment.text).toContain("**ArchDoc:**");

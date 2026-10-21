@@ -201,9 +201,7 @@ describe("the landscape", () => {
       'The model says charges sends RefundRequest (rider_email (pii)) to fraud-scoring, which breaks rule "acme/no-pii-to-external": Personal data never leaves for a third party.',
     );
     const report = await run("payments", "report", "--base", "main");
-    expect(report.out).toContain(
-      "> [!CAUTION]\n> This change sends sensitive data to an external element: `RefundRequest` (rider_email (pii)) to `fraud-scoring`.",
-    );
+    expect(report.out).toContain("> [!CAUTION]\n> **Breaks rule acme/no-pii-to-external**");
     expect(report.out).toContain(
       "| `RefundRequest` | rider_email (pii) | `charges` → `fraud-scoring` (external) | sends |",
     );

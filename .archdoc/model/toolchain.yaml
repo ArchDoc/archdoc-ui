@@ -325,7 +325,7 @@ elements:
       github-action:
         kind: container
         technology: GitHub Actions (composite), actions/github-script
-        description: Posts a pull request comment that leads with a verdict (what blocks the merge, what to check, who to involve), stays quiet when nothing changes the architecture, puts introduced findings on their lines, and fails on drift the pull request introduces.
+        description: Posts a pull request comment that leads with a verdict (what blocks the merge, what to check, who to involve) only when there is something to fix or check, otherwise writes the report to the job summary; puts introduced findings on their lines, and fails on drift the pull request introduces.
         code: [{ path: integrations/github-action/** }]
         uses:
           cli:
