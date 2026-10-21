@@ -25,7 +25,7 @@ export function formatTraceChecks(
   for (const d of problems) out.push(`${ICON[d.severity]} ${formatDiagnostic(d)}`);
   if (problems.length) out.push("");
   if (checks.length === 0 && problems.length === 0) {
-    return "No traces. Write one in .archdoc/traces/<id>.yaml when you explain or fix a bug (archdoc trace anchor helps you start).";
+    return "No traces. Write one in .archdoc/traces/<id>.yaml when you explain or fix a bug (archdoc context --error helps you start).";
   }
   for (const c of checks) {
     const v = c.view;

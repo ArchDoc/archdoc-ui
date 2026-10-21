@@ -121,7 +121,7 @@ seals:
       packages/cli/tsconfig.json: []
   element:toolchain.cli.commands:
     kind: structure
-    hash: fnv-19117964ca6e5a4e
+    hash: fnv-5f772fd37b17d2f9
     files:
       packages/cli/src/commands/check.ts:
         - CheckOptions
@@ -129,22 +129,15 @@ seals:
         - runCheck
       packages/cli/src/commands/code.ts:
         - ModelOptions
-        - impact
         - load
-        - locate
         - map
         - readRepoFile
-        - search
         - show
       packages/cli/src/commands/context.ts:
         - ContextOptions
         - EvalOptions
         - context
         - evalCommand
-      packages/cli/src/commands/data.ts:
-        - DataOptions
-        - lineageCommand
-        - simulateCommand
       packages/cli/src/commands/diff.ts:
         - DiffOptions
         - diff
@@ -168,23 +161,16 @@ seals:
       packages/cli/src/commands/schema.ts:
         - schema
       packages/cli/src/commands/seal.ts:
+        - CheckSealsOptions
         - SealCommandOptions
-        - VerifyOptions
+        - checkSeals
         - seal
-        - verify
       packages/cli/src/commands/site.ts:
         - SiteOptions
         - site
       packages/cli/src/commands/trace.ts:
-        - TraceAnchorOptions
-        - TraceCheckOptions
-        - findTrace
         - readStdin
-        - runTraceCheck
-        - traceAnchor
-        - traceCheck
         - traceList
-        - traceShow
       packages/cli/src/commands/validate.ts:
         - ValidateOptions
         - validate

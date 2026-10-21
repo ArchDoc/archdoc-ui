@@ -60,11 +60,12 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 - [ ] Move `sync`, `publish`, and `landscape` under `archdoc experimental` (or hide them from `--help`), with one docs page for all of them.
 - [ ] Lead the README and website without federation; the playground's cross-repo scenarios say they show an experimental feature.
 - [ ] Cross-repo findings keep working for repos that already use `imports`.
+- [ ] `context` lists journeys in other repos that pass through what a path touches. `impact` did; `context` names the other repos' consumers but not their journeys.
 
 ## 6. Cut the CLI surface
 
-- [ ] Remove the aliases kept "for a release" that never happened: `search`, `locate`, `impact`, `lineage`, `simulate`, `verify`, and `trace anchor`, `trace check`, `trace show`.
-- [ ] Hide maintainer commands from `--help`: `eval`, `migrate`.
+- [x] Remove the aliases kept "for a release" that never happened: `search`, `locate`, `impact`, `lineage`, `simulate`, `verify`, and `trace anchor`, `trace check`, `trace show`.
+- [x] Hide maintainer commands from `--help`: `eval`, `migrate`.
 
 **Exit:** `archdoc --help` lists `init`, `context`, `show`, `check`, `seal`, `validate`, `view`, `site`, `map`, `diff`, `report`, `trace list`, `mcp`, and `schema`, plus the experimental group.
 

@@ -53,7 +53,7 @@ export interface ModelPayload {
   schemas?: ImportedSchema[];
 }
 
-/** A model fact to re-check, as `archdoc verify` lists it. */
+/** A model fact to re-check, as `archdoc check --seals` lists it. */
 export interface RecheckFact {
   key: string;
   label: string;

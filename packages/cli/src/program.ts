@@ -2,9 +2,8 @@ import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
 import { Command } from "commander";
 import { check } from "./commands/check.js";
-import { impact, locate, map, search, show } from "./commands/code.js";
+import { map, show } from "./commands/code.js";
 import { context, evalCommand } from "./commands/context.js";
-import { lineageCommand, simulateCommand } from "./commands/data.js";
 import { diff } from "./commands/diff.js";
 import { publish, sync } from "./commands/federation.js";
 import { init } from "./commands/init.js";
@@ -12,9 +11,9 @@ import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
-import { seal, verify } from "./commands/seal.js";
+import { seal } from "./commands/seal.js";
 import { site } from "./commands/site.js";
-import { traceAnchor, traceCheck, traceList, traceShow } from "./commands/trace.js";
+import { traceList } from "./commands/trace.js";
 import { validate } from "./commands/validate.js";
 import { view } from "./commands/view.js";
 import { type Io, processIo } from "./io.js";
@@ -30,11 +29,6 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     code.then((c) => {
       program.exitCode = c;
     });
-  /** A command that's now part of another: it still works, for one more release. */
-  const moved = (from: string, to: string) =>
-    io.err(
-      `note: "archdoc ${from}" is part of "archdoc ${to}" now, and will go in a later release.`,
-    );
 
   program
     .description("An architecture control plane for AI-assisted development.")
@@ -109,17 +103,6 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action((path: string, opts: { out?: string; base?: string }) => run(site(path, opts, io)));
 
   program
-    .command("search")
-    .description("Find the elements, actors, and journeys for an area, with their code paths")
-    .argument("<words...>", "a few words, such as: cli command")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the result as JSON")
-    .action((words: string[], opts: { model?: string; json?: boolean }) => {
-      moved("search", "context <words>");
-      return run(search(words, opts, io));
-    });
-
-  program
     .command("context")
     .description(
       "Where to start: files and symbols to open first, other code that does the same job, data, rules, journeys, tests, owners, and who uses it. With --error, where an error showed up; with nothing, an overview",
@@ -138,7 +121,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     );
 
   program
-    .command("eval")
+    .command("eval", { hidden: true })
     .description(
       "Replay recent commits through archdoc context: how many of the files each changed the brief pointed at",
     )
@@ -160,28 +143,6 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
         },
       ) => run(evalCommand(ref, opts, io)),
     );
-
-  program
-    .command("locate")
-    .description("Which element owns these files? (They don't need to exist yet.)")
-    .argument("<paths...>", "files or directories")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the result as JSON")
-    .action((paths: string[], opts: { model?: string; json?: boolean }) => {
-      moved("locate", "context <paths>");
-      return run(locate(paths, opts, io));
-    });
-
-  program
-    .command("impact")
-    .description("What a change affects: consumers, actors, journeys, owners, and rules")
-    .argument("<target>", "element, actor, or file path")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the result as JSON")
-    .action((target: string, opts: { model?: string; json?: boolean }) => {
-      moved("impact", "context <paths>");
-      return run(impact(target, opts, io));
-    });
 
   program
     .command("show")
@@ -218,92 +179,17 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       await runStdio({ model: opts.model, cwd: io.cwd, version });
     });
 
-  program
-    .command("lineage")
-    .description(
-      "Where a field's value comes from and where it goes, through mappings across repos, and the tables it lands in",
-    )
-    .argument("<field>", "Entry.field, such as Refund.amount_cents or payments.Refund.amount_cents")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the result as JSON")
-    .action((field: string, opts: { model?: string; json?: boolean }) => {
-      moved("lineage", "show <Entry.field>");
-      return run(lineageCommand(field, opts, io));
-    });
-
-  program
-    .command("simulate")
-    .description(
-      "Run a journey against a sample request: the branch its logic picks, the records each step creates and changes, and the tables they land in",
-    )
-    .argument("<journey>", "journey ID")
-    .option(
-      "-s, --sample <file>",
-      "JSON or YAML records that exist when the journey starts, by data entry, such as { RefundRequest: {...} }",
-    )
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the result as JSON")
-    .action((journey: string, opts: { model?: string; json?: boolean; sample?: string }) => {
-      moved("simulate", "show <journey> --sample <file>");
-      return run(simulateCommand(journey, opts, io));
-    });
-
   const trace = program
     .command("trace")
     .description(
       "Traces: the path a failing request took, attached to the journey step where the error showed up (.archdoc/traces/)",
     );
   trace
-    .command("anchor")
-    .description(
-      "Where an error belongs: the journey steps and elements its stack frames and paths point at, best first, and a trace to start from",
-    )
-    .argument("[text...]", "the error, a log line, or a stack trace; - reads stdin")
-    .option("-f, --file <file>", "read the error from a file")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("-n, --limit <n>", "how many journey steps to list", "5")
-    .option("--no-skeleton", "leave out the suggested trace")
-    .option("--json", "print the result as JSON")
-    .action(
-      (
-        words: string[],
-        opts: { file?: string; model?: string; limit?: string; skeleton?: boolean; json?: boolean },
-      ) => {
-        moved("trace anchor", "context --error <file>");
-        return run(traceAnchor(words, opts, io));
-      },
-    );
-  trace
-    .command("check")
-    .description(
-      "Check traces against the model and the code: elements, the journey step, code references, and hops the model doesn't declare",
-    )
-    .argument("[files...]", "trace files (default: every .archdoc/traces/*.yaml)")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("-f, --format <format>", "text or json", "text")
-    .action((files: string[], opts: { model?: string; format?: string }) => {
-      moved("trace check", "check");
-      return run(traceCheck(files, opts, io));
-    });
-  trace
     .command("list")
     .description("List the traces in .archdoc/traces/")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
     .action((opts: { model?: string; json?: boolean }) => run(traceList(opts, io)));
-  trace
-    .command("show")
-    .description(
-      "Print a trace: the symptom, the journey step, every hop with its evidence, and the fix",
-    )
-    .argument("<id>", "trace ID or file")
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("--json", "print the resolved trace as JSON")
-    .action((id: string, opts: { model?: string; json?: boolean }) => {
-      moved("trace show", "show <trace>");
-      return run(traceShow(id, opts, io));
-    });
-
   program
     .command("check")
     .description(
@@ -334,18 +220,6 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
         seals?: boolean;
       }) => run(check(opts, io)),
     );
-
-  program
-    .command("verify")
-    .description(
-      "Which model facts point at code that changed since they were sealed, and what changed",
-    )
-    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
-    .option("-f, --format <format>", "text or json", "text")
-    .action((opts: { model?: string; format?: string }) => {
-      moved("verify", "check --seals");
-      return run(verify(opts, io));
-    });
 
   program
     .command("seal")
@@ -443,7 +317,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     );
 
   program
-    .command("migrate")
+    .command("migrate", { hidden: true })
     .description("Convert a v1 model (users/components) to spec v2")
     .argument("<file>", "v1 model file")
     .option("-n, --namespace <namespace>", "namespace for the model (default: from the file name)")

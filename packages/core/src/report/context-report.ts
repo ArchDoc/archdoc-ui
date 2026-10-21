@@ -107,7 +107,7 @@ export function formatEval(r: EvalReport, verbose = false): string {
     `Recall: ${pct(r.recall)} (${r.covered}/${r.changed}) of changed files are in Start here or under the brief's elements.`,
     `Start-here recall: ${pct(r.startRecall)} (${r.named}/${r.changed}) are named in Start here.`,
     `Median scope: ${r.medianScope} files.`,
-    `For comparison, archdoc search (top 3 hits' code paths): recall ${pct(r.baseline.recall)} (${r.baseline.covered}/${r.changed}), median scope ${r.baseline.medianScope} files.`,
+    `For comparison, word search alone (top 3 hits' code paths): recall ${pct(r.baseline.recall)} (${r.baseline.covered}/${r.changed}), median scope ${r.baseline.medianScope} files.`,
     "",
     "Each commit is asked with its subject, using the model and code as they are now.",
   );

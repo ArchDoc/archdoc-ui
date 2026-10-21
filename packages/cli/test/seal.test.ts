@@ -58,7 +58,7 @@ afterAll(() => rm(repo, { recursive: true, force: true }));
 
 describe("seals", () => {
   it("does nothing until a repository starts sealing", async () => {
-    const r = await run("verify");
+    const r = await run("check", "--seals");
     expect(r.out).toContain("no .archdoc/archdoc.sum yet");
     expect(r.code).toBe(0);
     expect((await run("check")).out).not.toContain("seal/");
@@ -72,16 +72,12 @@ describe("seals", () => {
     const sum = await readFile(join(repo, ".archdoc/archdoc.sum"), "utf8");
     expect(sum).toContain("element:api#services/api/price.ts:price:");
     expect((await run("check", "--seals")).out).toBe("✓ 2 of 2 facts still match their seal.");
-    // verify still works, for one more release.
-    const v = await run("verify");
-    expect(v.out).toBe("✓ 2 of 2 facts still match their seal.");
-    expect(v.err).toContain('"archdoc verify" is part of "archdoc check --seals" now');
     git("add", "-A");
     git("commit", "-q", "-m", "seal");
     git("checkout", "-q", "-b", "feature");
   });
 
-  it("flags facts whose code a change touched, in verify, check, and the report", async () => {
+  it("flags facts whose code a change touched, in check --seals, check, and the report", async () => {
     await write(
       "services/api/price.ts",
       "export function price(cents: number) {\n  return Math.round(cents * 1.2);\n}\n",

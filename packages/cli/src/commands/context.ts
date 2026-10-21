@@ -60,6 +60,10 @@ export async function context(
   if (!format) return 2;
   // An error to place, or nothing (the overview): what archdoc_context answers.
   if (options.error !== undefined || !args.length) {
+    if (format === "json") {
+      io.err("--format json works with a task or paths, not with --error or no arguments.");
+      return 2;
+    }
     let error: string | undefined;
     try {
       if (options.error !== undefined) {

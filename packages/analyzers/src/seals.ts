@@ -42,7 +42,7 @@ export interface SealReport {
 
 /**
  * Every fact that points at code in the working tree, and how its code
- * compares with its seal in archdoc.sum. For `archdoc verify`, `archdoc seal`,
+ * compares with its seal in archdoc.sum. For `archdoc check --seals`, `archdoc seal`,
  * and their MCP tools.
  */
 export async function sealReport(target: string, cwd: string): Promise<SealReport | undefined> {

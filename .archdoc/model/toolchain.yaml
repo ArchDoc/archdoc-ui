@@ -240,7 +240,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, eval, trace list, sync, publish, landscape build, mcp, migrate, and schema. search, locate, impact, lineage, simulate, verify, and trace anchor/check/show still work for a release, with a note naming the command they're part of."
+        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, sync, publish, landscape build, mcp, and schema. eval and migrate are hidden maintainer commands."
         code: [{ path: packages/cli/** }]
         uses:
           core:
