@@ -1,0 +1,36 @@
+journey: keep-the-model-true
+actor: coding-agent
+goal: Know which parts of the model to re-check after changing code, without knowing the whole model
+importance: high
+steps:
+  - from: coding-agent
+    to: agent-skills
+    action: Reads that after changing code it checks the facts whose code changed
+    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+  - from: coding-agent
+    to: mcp
+    action: Calls archdoc_verify after editing
+    code: packages/mcp/src/server.ts
+    sends: ToolCall
+  - from: mcp
+    to: analyzers
+    action: Indexes the code's exports and reads archdoc.sum
+    code: packages/analyzers/src/seals.ts
+    sends: CodeIndex
+  - from: mcp
+    to: core
+    action: Fingerprints the code each fact points at and says which seals broke, and what changed
+    code: packages/core/src/seal/seal.ts
+    sends: CodeIndex
+  - from: mcp
+    to: coding-agent
+    action: Returns the facts to re-check, with where each is in the model
+    sends: ToolResult
+  - from: coding-agent
+    to: mcp
+    action: Updates the model where it no longer describes the code, then calls archdoc_seal with the facts it checked
+    sends: ToolCall
+  - from: mcp
+    to: model-files
+    action: Writes the new seals to archdoc.sum, which the pull request shows
+    sends: Seal

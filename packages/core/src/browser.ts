@@ -221,6 +221,7 @@ export {
   type Verdict,
 } from "./report/pr-report.js";
 export * from "./report/report.js";
+export { formatSealStatus } from "./report/seal-report.js";
 export {
   formatAnchors,
   formatTrace,
@@ -228,6 +229,28 @@ export {
   formatTraceList,
 } from "./report/trace-report.js";
 export { counted, TERMS, type Term } from "./report/words.js";
+export {
+  describeChanges,
+  type Fingerprint,
+  type FingerprintInputs,
+  fingerprints,
+  formatSum,
+  hash as fingerprintHash,
+  normalize as normalizeForSeal,
+  parseSum,
+  type Seal,
+  type SealedFact,
+  type SealOptions,
+  type SealState,
+  type SealStatus,
+  SUM_FILE,
+  type SumFile,
+  sealableFacts,
+  sealedPaths,
+  sealFindings,
+  sealStatuses,
+  sealSum,
+} from "./seal/seal.js";
 export {
   type AnchorCandidate,
   type AnchorElement,

@@ -5,6 +5,8 @@ import { type ImportedSchema, schemaDrift } from "../data/schemas.js";
 import type { Severity, SourceLocation } from "../diagnostics.js";
 import type { ElementNode, Model } from "../model.js";
 import { nodeKey } from "../model.js";
+import type { CodeIndex } from "../query/code-index.js";
+import { fingerprints, parseSum, sealFindings, sealStatuses } from "../seal/seal.js";
 import { evidenceOf, type ObservedDependency } from "./observed.js";
 import { evaluateRules, type RuleEdge } from "./rules.js";
 
@@ -42,6 +44,11 @@ export interface CheckOptions {
   read?: (path: string) => string | undefined;
   /** What schema importers read for data entries' sources, for schema drift. */
   schemas?: readonly ImportedSchema[];
+  /**
+   * The repository's archdoc.sum, for facts whose code changed since they were
+   * sealed. `text` is undefined when the repository doesn't keep one.
+   */
+  seals?: { file: string; text: string | undefined; index?: CodeIndex | undefined } | undefined;
 }
 
 export interface CheckResult {
@@ -192,6 +199,28 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
   }
 
   findings.push(...schemaDrift(model, options.schemas ?? []));
+
+  // Seals: facts whose code changed since someone checked the model against it.
+  if (options.seals?.text !== undefined) {
+    const parsed = parseSum(options.seals.text);
+    if (!parsed.sum) {
+      findings.push({
+        severity: "error",
+        code: "seal/invalid",
+        message: `${options.seals.file} isn't a valid seal file (${parsed.error}). Run archdoc seal --all to write it again.`,
+        evidence: [],
+        files: [options.seals.file],
+      });
+    } else {
+      const current = fingerprints(model, {
+        files: options.files ?? [],
+        read: options.read ?? (() => undefined),
+        index: options.seals.index,
+        schemas: options.schemas,
+      });
+      findings.push(...sealFindings(sealStatuses(current, parsed.sum), options.seals.file));
+    }
+  }
 
   for (const e of orphans(model)) {
     findings.push({

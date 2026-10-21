@@ -47,8 +47,29 @@ export interface ModelPayload {
   samples?: { path: string; text: string }[];
   /** Bug traces beside the model (.archdoc/traces/*.yaml), for the trace view. Never part of the model. */
   traces?: { path: string; text: string }[];
+  /** With an archdoc.sum: the facts whose code changed since they were sealed, and new ones. */
+  seals?: SealsInfo | undefined;
   /** What data entries' schema sources say, to fill in what the model leaves out. */
   schemas?: ImportedSchema[];
+}
+
+/** A model fact to re-check, as `archdoc verify` lists it. */
+export interface RecheckFact {
+  key: string;
+  label: string;
+  state: "changed" | "unsealed";
+  element?: string | undefined;
+  refs: string[];
+  changes: string[];
+  location?: { file: string; line: number } | undefined;
+}
+
+export interface SealsInfo {
+  file: string;
+  error?: string | undefined;
+  /** Facts that point at code, sealed or not. */
+  total: number;
+  facts: RecheckFact[];
 }
 
 export interface LandscapeInfo {
@@ -86,6 +107,7 @@ export type ModelState =
       landscape?: LandscapeInfo | undefined;
       samples: { path: string; text: string }[];
       traces: { path: string; text: string }[];
+      seals?: SealsInfo | undefined;
       loadedAt: number;
       reloads: number;
     };
@@ -148,6 +170,7 @@ export function useModel(): ModelState {
         landscape: payload.landscape,
         samples: payload.samples ?? [],
         traces: payload.traces ?? [],
+        seals: payload.seals,
         loadedAt: Date.now(),
         reloads: prev.status === "ready" ? prev.reloads + 1 : 0,
       }));

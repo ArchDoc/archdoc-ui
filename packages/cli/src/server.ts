@@ -9,6 +9,7 @@ import {
   contextOf,
   importSchemas,
   type Snapshot,
+  sealReport,
   snapshot,
 } from "@archdoc/analyzers";
 import {
@@ -243,7 +244,7 @@ export async function modelResponse(options: {
   const snap = await snapshot(options.target, { cwd: options.cwd });
   if (!snap) return undefined;
   const repo = { ...(await repoInfo(snap.baseDir)), root: snap.baseDir };
-  const body = await payloadOf(snap, repo, options.cwd);
+  const body = { ...(await payloadOf(snap, repo, options.cwd)), seals: await sealsOf(options) };
   if (!options.base) return body;
   if (isModelPath(options.cwd, options.base)) {
     // Another model file: only its files, compared with this one's.
@@ -251,6 +252,32 @@ export async function modelResponse(options: {
   }
   const compared = await comparison(options.target, options.cwd, options.base, undefined);
   return compared ? { ...body, base: compared.base, change: compared.change } : body;
+}
+
+/**
+ * The working tree's seals, for the explorer: the facts whose code changed
+ * since they were sealed, and the ones no one has sealed. Undefined when the
+ * repository doesn't keep an archdoc.sum.
+ */
+async function sealsOf(options: { target: string; cwd: string }) {
+  const r = await sealReport(options.target, options.cwd).catch(() => undefined);
+  if (!r || (!r.recorded && !r.error)) return undefined;
+  return {
+    file: r.file,
+    error: r.error,
+    total: r.statuses.length,
+    facts: r.statuses
+      .filter((s) => s.state !== "sealed")
+      .map((s) => ({
+        key: s.fact.key,
+        label: s.fact.label,
+        state: s.state,
+        element: s.fact.element,
+        refs: s.fact.refs,
+        changes: s.changes,
+        location: s.fact.location,
+      })),
+  };
 }
 
 /** The merge base of `base` and `head` (or the working tree), as a payload, and the findings the head introduced. */

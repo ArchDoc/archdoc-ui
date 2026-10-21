@@ -32,6 +32,8 @@ export interface CardData extends Record<string, unknown> {
   change?: "added" | "changed" | "removed" | undefined;
   /** How many changes are inside the box; it counts as changed. */
   changesInside?: number | undefined;
+  /** How many of the box's facts point at code that changed since they were sealed. */
+  recheck?: number | undefined;
   emphasis: Emphasis;
   selected: boolean;
   /** The box the current journey step crosses into. */
@@ -123,6 +125,14 @@ export function Card({ data }: NodeProps<CardNode>) {
             }
           >
             {data.change}
+          </span>
+        ) : null}
+        {data.recheck ? (
+          <span
+            className="card-recheck"
+            title={`The code under ${data.recheck} of its fact${data.recheck === 1 ? "" : "s"} changed since the model was checked against it`}
+          >
+            re-check
           </span>
         ) : null}
         {data.onStoreView ? (

@@ -30,7 +30,7 @@ describe("archdoc MCP server", () => {
     );
   });
 
-  it("exposes its tools, all read-only except propose", async () => {
+  it("exposes its tools, all read-only except propose and seal", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "archdoc_anchor",
@@ -48,13 +48,15 @@ describe("archdoc MCP server", () => {
       "archdoc_overview",
       "archdoc_propose",
       "archdoc_report",
+      "archdoc_seal",
       "archdoc_search",
       "archdoc_simulate",
       "archdoc_trace_check",
       "archdoc_validate",
+      "archdoc_verify",
     ]);
     const writers = tools.filter((t) => t.annotations?.readOnlyHint !== true).map((t) => t.name);
-    expect(writers).toEqual(["archdoc_propose"]);
+    expect(writers.sort()).toEqual(["archdoc_propose", "archdoc_seal"]);
     expect(tools.find((t) => t.name === "archdoc_propose")?.annotations?.destructiveHint).toBe(
       false,
     );
@@ -170,6 +172,12 @@ describe("archdoc MCP server", () => {
     expect(r.isError).toBe(false);
     expect(r.text).toMatch(/^(⛔|⚠️|ℹ️|✅) \*\*ArchDoc:\*\* /);
     expect(r.text).not.toContain("<!--");
+  });
+
+  it("lists the facts to re-check against archdoc.sum", async () => {
+    const r = await call("archdoc_verify");
+    expect(r.isError).toBe(false);
+    expect(r.text).toMatch(/facts? still match|no .*archdoc\.sum yet|to check/);
   });
 
   it("returns errors as tool errors", async () => {

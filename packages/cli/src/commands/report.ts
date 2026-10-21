@@ -1,3 +1,4 @@
+import { resealedSince } from "@archdoc/analyzers";
 import {
   check,
   diffModels,
@@ -53,6 +54,7 @@ export async function report(options: ReportOptions, io: Io): Promise<number> {
       diagrams: options.diagrams !== false,
       explorerUrl: options.explorerUrl,
       fixes: tracesInChange(changed, traces),
+      resealed: await resealedSince(options.model ?? ".", io.cwd, base.commit),
       // A commit hash, as the Action passes, reads better short.
       label: `${/^[0-9a-f]{40}$/.test(options.base) ? options.base.slice(0, 7) : options.base}...HEAD`,
     });

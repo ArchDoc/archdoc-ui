@@ -3105,3 +3105,69 @@ table.observed td.is-wrong code {
     max-height: 70vh;
   }
 }
+
+/* Seals: facts whose code changed since someone checked the model against it. */
+.card-recheck {
+  font-size: var(--fs-1);
+  font-weight: 600;
+  border-radius: 99px;
+  padding: 0 6px;
+  color: var(--changed);
+  background: var(--changed-soft);
+  border: 1px solid var(--changed);
+}
+
+.recheck-note {
+  font-size: var(--fs-2);
+  border-left: 3px solid var(--changed);
+  padding: 6px 10px;
+  background: var(--changed-soft);
+  border-radius: 0 6px 6px 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recheck-note p,
+.recheck-note ul {
+  margin: 0;
+}
+
+.recheck-note ul {
+  padding-left: 16px;
+}
+
+.recheck-title {
+  font-weight: 600;
+  color: var(--changed);
+}
+
+.recheck-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.recheck-list li {
+  display: grid;
+  gap: 2px;
+  font-size: var(--fs-2);
+  border-left: 3px solid var(--changed);
+  padding-left: 8px;
+}
+
+.recheck-list li.recheck-unsealed {
+  border-left-color: var(--line-strong);
+}
+
+.recheck-what {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.recheck-ok {
+  font-size: var(--fs-2);
+  color: var(--added);
+  margin: 0;
+}

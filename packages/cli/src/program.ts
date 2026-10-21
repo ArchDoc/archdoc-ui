@@ -11,6 +11,7 @@ import { landscapeBuild } from "./commands/landscape.js";
 import { migrate } from "./commands/migrate.js";
 import { report } from "./commands/report.js";
 import { schema } from "./commands/schema.js";
+import { seal, verify } from "./commands/seal.js";
 import { site } from "./commands/site.js";
 import { traceAnchor, traceCheck, traceList, traceShow } from "./commands/trace.js";
 import { validate } from "./commands/validate.js";
@@ -279,6 +280,30 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .action(
       (opts: { model?: string; base?: string; format?: string; failOn?: string; code?: boolean }) =>
         run(check(opts, io)),
+    );
+
+  program
+    .command("verify")
+    .description(
+      "Which model facts point at code that changed since they were sealed, and what changed",
+    )
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("-f, --format <format>", "text or json", "text")
+    .action((opts: { model?: string; format?: string }) => run(verify(opts, io)));
+
+  program
+    .command("seal")
+    .description(
+      "Record that the model still describes the code these facts point at (archdoc.sum); without facts, seal the new ones",
+    )
+    .argument("[facts...]", "facts to seal, such as element:toolchain.cli, or an element ID")
+    .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
+    .option("--all", "seal every fact, changed or not (to start, or after checking them all)")
+    .option("--by <who>", "who checked, such as agent:claude-code")
+    .option("--dry-run", "say what would be sealed without writing archdoc.sum")
+    .action(
+      (facts: string[], opts: { model?: string; all?: boolean; by?: string; dryRun?: boolean }) =>
+        run(seal(facts, opts, io)),
     );
 
   program

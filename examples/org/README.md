@@ -21,8 +21,9 @@ From the ArchDoc repo, `pnpm playground` does all of the setup below in `.playgr
 | payments | `try/break-contract` | renames the charges API rides uses | `archdoc report --base main` |
 | payments | `try/looser-refunds` | raises the auto-approve threshold | `archdoc report --base main` |
 | trips | `try/rename-email` | a migration renames `rider_email` (pii) | `archdoc check --base main` |
+| payments | `try/cancel-refund` | adds an RPC to the charges contract, under a seal | `archdoc verify`, `archdoc report --base main`, `archdoc seal charges` |
 
-It writes `PLAYGROUND.md` with every command, and an `archdoc` command in `.playground/bin`.
+On main, payments is sealed (`archdoc seal --all`): `.archdoc/archdoc.sum` fingerprints the contract and schemas its model points at, so a change to them names the facts to re-check. It writes `PLAYGROUND.md` with every command, and an `archdoc` command in `.playground/bin`.
 
 To try it by hand:
 
