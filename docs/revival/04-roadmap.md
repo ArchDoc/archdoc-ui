@@ -1,5 +1,7 @@
 # 04 — Roadmap
 
+> **2026-10-21:** the first release is scoped by [07 — MVP plan](./07-mvp-plan.md), which replaces the unfinished parts of Phases 6–8 below with a release checklist. Federation (Phase 4) and simulation (Phase 5) stay in the code as experimental.
+
 Phases are gated by **exit criteria**, not dates. Each phase ships something usable on its own. ArchDoc models itself from Phase 1 onward (`.archdoc/` in this repo). That dogfooding is the main test of the product.
 
 Sizes: **S** ≈ a few focused sessions, **M** ≈ a couple of weeks part-time, **L** ≈ a month or more part-time.
