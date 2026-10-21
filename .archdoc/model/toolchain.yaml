@@ -78,7 +78,7 @@ elements:
               - { path: packages/core/src/codemap/snippet.ts, symbol: findSnippet, description: The lines or declaration a code reference points at }
           report:
             kind: component
-            description: Text, JSON, and Mermaid answers shared by the CLI, MCP, and the explorer, so people and agents read the same words. summarizeChange is the one verdict on a change that the PR comment and the Changes tab both render; it also draws the change and its journeys, with their branches.
+            description: Text, JSON, and Mermaid answers shared by the CLI, MCP, and the explorer, so people and agents read the same words. summarizeChange is the one verdict on a change that the PR comment, the Changes tab, and archdoc check all render (formatCheck keeps it short enough for an agent); it also draws the change and its journeys, with their branches.
             code: [{ path: packages/core/src/report/** }]
             uses:
               imports:
@@ -104,7 +104,7 @@ elements:
                 description: Prints traces, trace checks, and error anchors
                 provenance: { source: suggested, by: agent:claude-code }
               seals:
-                description: Prints what archdoc verify says
+                description: Prints what archdoc check --seals says
                 provenance: { source: suggested, by: agent:claude-code }
           checker:
             kind: component
@@ -113,6 +113,9 @@ elements:
             uses:
               seals:
                 description: Reports facts whose code changed since they were sealed
+                provenance: { source: suggested, by: agent:claude-code }
+              traces:
+                description: Checks the traces in .archdoc/traces/ with the model, so check reports stale ones
                 provenance: { source: suggested, by: agent:claude-code }
               query:
                 description: Takes the code index seals fingerprint with
@@ -203,12 +206,16 @@ elements:
       analyzers:
         kind: container
         technology: TypeScript (ts.preProcessFile), yaml
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), a symbol index (exported declarations and named imports per TS/JS file) for search and context, and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf. loadRevision builds the model at any ref the way every surface reads it, and check --base checks the merge base the same way. Reads archdoc.sum and the files seals fingerprint, and finds the facts a change sealed again.
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), a symbol index (exported declarations and named imports per TS/JS file) for search and context, and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf. loadRevision builds the model at any ref the way every surface reads it, and check --base checks the merge base the same way. Reads archdoc.sum and the files seals fingerprint, and finds the facts a change sealed again. Answers the agent's questions for the CLI and MCP alike (context, show, check, seal), and init infers a starting model from manifests, compose files, imports, and schema files.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files
           core:
             description: Produces core's ObservedDependency records
+            provenance: { source: suggested, by: agent:claude-code }
+          model-files:
+            description: Writes archdoc.sum for seal, and a starting model for init
+            sends: [Seal, ModelFile]
             provenance: { source: suggested, by: agent:claude-code }
 
       federation:
@@ -233,7 +240,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command: validate, view, site, context, search, show, locate, impact, map, check, diff, report, eval, lineage, simulate, trace (anchor, check, list, show), sync, publish, landscape build, mcp, migrate, and schema."
+        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, eval, trace list, sync, publish, landscape build, mcp, migrate, and schema. search, locate, impact, lineage, simulate, verify, and trace anchor/check/show still work for a release, with a note naming the command they're part of."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -245,7 +252,7 @@ elements:
             sends: ExplorerPayload
           mcp: Starts the MCP server for `archdoc mcp`
           model-files:
-            description: Writes archdoc.sum for `archdoc seal`
+            description: Writes the lockfile and vendored models for `archdoc sync`
             sends: Seal
             provenance: { source: suggested, by: agent:claude-code }
           analyzers:
@@ -273,17 +280,14 @@ elements:
       mcp:
         kind: container
         technology: Node.js, @modelcontextprotocol/sdk (stdio)
-        description: MCP tools for agents. Read-only (context, search, overview, locate, impact, element, actor, journey, data, lineage, simulate, check, diff, validate, and anchor and trace check for bugs), plus propose, which adds suggested facts to the model.
+        description: "MCP tools for agents, one per question: archdoc_context (where to start, from a task, paths, or an error), archdoc_show (one thing by ID), archdoc_check (what's wrong or stale, and with a base, what the change does), archdoc_seal (record checked facts), and archdoc_init (start a model). Only seal and init write."
         code: [{ path: packages/mcp/** }]
         uses:
           core:
             description: Tool calls delegate to core
             sends: ModelSources
-          model-files:
-            description: Writes suggested additions and proposal notes for archdoc_propose, and archdoc.sum for archdoc_seal
-            sends: Seal
           analyzers:
-            description: Runs analyzers for archdoc_check, and builds the code index for archdoc_context and archdoc_search
+            description: Every tool is an answer analyzers gives, the same one the CLI prints
             provenance:
               source: suggested
               by: agent:claude-code
@@ -332,7 +336,7 @@ elements:
       agent-skills:
         kind: container
         technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflow. At the start of a task, get a context brief and check impact; afterwards, update the model with suggested facts and validate. For a bug, anchor the error, write a trace with evidence on every step, and check it.
+        description: Teaches coding agents the workflows. A change starts with a context brief and ends with check and seal, with the model edited alongside the code. A bug starts with context on the error, and ends with a trace with evidence on every step. A repository without a model starts with init.
         code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools

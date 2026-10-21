@@ -84,7 +84,10 @@ describe("archdoc sync and publish", () => {
     );
     const check = await run("rides", "check", "--base", "main", "--no-code");
     expect(check.code).toBe(1);
-    expect(check.out).toMatch(/^Introduced by this change \(1\)\n\n✗ error ref\/unknown-contract/);
+    expect(check.out).toMatch(/^⛔ 1 blocking issue/);
+    expect(check.out).toContain(
+      "Blocks the merge (1)\n✗ A reference that doesn't resolve: api-gateway uses payments.charges via",
+    );
     expect((await run("rides", "sync", "--frozen")).code).toBe(0);
   });
 

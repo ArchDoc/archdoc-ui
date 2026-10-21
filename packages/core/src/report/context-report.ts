@@ -12,7 +12,7 @@ export function formatContext(b: ContextBrief): string {
   if (b.start.length === 0) {
     out.push(
       "",
-      "Nothing in the model or the code matches. Try other words, a file path, or archdoc_overview.",
+      "Nothing in the model or the code matches. Try other words, or a file path; with nothing, archdoc context gives an overview.",
     );
     return out.join("\n");
   }
@@ -69,6 +69,16 @@ export function formatContext(b: ContextBrief): string {
   if (b.tests.length) {
     out.push("Tests");
     for (const t of b.tests) out.push(`  ${t.path} — ${t.why}`);
+  }
+  const users = [
+    ...b.usedBy.elements,
+    ...b.usedBy.actors.map((a) => `${a} (actor)`),
+    ...b.usedBy.elsewhere.map((x) => `${x} (another repo)`),
+  ];
+  if (users.length) {
+    out.push(
+      `Used by: ${users.slice(0, 8).join(", ")}${users.length > 8 ? `, +${users.length - 8} more` : ""}${b.usedBy.elsewhere.length ? ". Ask before removing or renaming what other repos use." : ""}`,
+    );
   }
   if (b.owners.length) out.push(`Owners: ${b.owners.join(", ")}`);
   out.push("", "Next: after editing, run archdoc check --base main");

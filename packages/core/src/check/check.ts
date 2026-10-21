@@ -2,11 +2,13 @@ import { type CodeMap, locate, resolveCodeMap } from "../codemap/codemap.js";
 import { findSnippet, isSnippet, snippetLabel } from "../codemap/snippet.js";
 import { evaluateDataRules } from "../data/rules.js";
 import { type ImportedSchema, schemaDrift } from "../data/schemas.js";
-import type { Severity, SourceLocation } from "../diagnostics.js";
+import type { Diagnostic, Severity, SourceLocation } from "../diagnostics.js";
 import type { ElementNode, Model } from "../model.js";
 import { nodeKey } from "../model.js";
 import type { CodeIndex } from "../query/code-index.js";
 import { fingerprints, parseSum, sealFindings, sealStatuses } from "../seal/seal.js";
+import { checkTrace } from "../trace/check.js";
+import type { Trace } from "../trace/trace.js";
 import { evidenceOf, type ObservedDependency } from "./observed.js";
 import { evaluateRules, type RuleEdge } from "./rules.js";
 
@@ -20,6 +22,8 @@ export interface Finding {
   rule?: string | undefined;
   /** Where the evidence is, such as packages/web/src/x.ts:12 (@archdoc/cli). */
   evidence: string[];
+  /** What the message sums up, line by line, such as what changed under a seal. */
+  details?: string[] | undefined;
   /** Repository files involved, to tell whether a change introduced the finding. */
   files: string[];
   location?: SourceLocation | undefined;
@@ -49,6 +53,8 @@ export interface CheckOptions {
    * sealed. `text` is undefined when the repository doesn't keep one.
    */
   seals?: { file: string; text: string | undefined; index?: CodeIndex | undefined } | undefined;
+  /** Traces in .archdoc/traces/, checked against the model and the code. */
+  traces?: { traces: readonly Trace[]; diagnostics: readonly Diagnostic[] } | undefined;
 }
 
 export interface CheckResult {
@@ -219,6 +225,30 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
         schemas: options.schemas,
       });
       findings.push(...sealFindings(sealStatuses(current, parsed.sum), options.seals.file));
+    }
+  }
+
+  // Traces: evidence of one run, checked like the model so a stale one shows up.
+  if (options.traces) {
+    const traceFinding = (d: Diagnostic, step?: string): Finding => ({
+      severity: d.severity,
+      code: d.code,
+      message: d.message,
+      evidence: [step ?? (d.location ? `${d.location.file}:${d.location.line}` : "")].filter(
+        Boolean,
+      ),
+      files: d.location ? [d.location.file] : [],
+      location: d.location,
+    });
+    for (const d of options.traces.diagnostics) {
+      if (d.severity !== "info") findings.push(traceFinding(d));
+    }
+    for (const t of options.traces.traces) {
+      const checked = checkTrace(model, t, { files: options.files, read: options.read });
+      for (const f of checked.findings) {
+        if (f.severity === "info") continue;
+        findings.push(traceFinding(f, f.step ? `${f.trace} step ${f.step}` : f.trace));
+      }
     }
   }
 

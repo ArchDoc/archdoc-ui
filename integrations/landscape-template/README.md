@@ -22,7 +22,7 @@ Then `archdoc sync` there. From then on:
 
 - owners resolve against the landscape's teams, so `owners: [payments-team]` needs no local copy;
 - the landscape's `scope: org` rules run in the repo's `archdoc check`;
-- `archdoc impact`, the MCP tools, and the pull request comment list consumers and journeys in other repos, and the comment says which consumers a change breaks.
+- `archdoc context`, the MCP tools, and the pull request comment list consumers and journeys in other repos, and the comment says which consumers a change breaks.
 
 Run `archdoc sync --update landscape` (or schedule it) to take a new landscape release.
 

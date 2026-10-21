@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -69,77 +69,62 @@ afterAll(async () => {
   await rm(repo, { recursive: true, force: true });
 });
 
-describe("the check, propose, diff loop", () => {
-  it("check finds an import the change introduced and points at propose", async () => {
+describe("the loop: context, edit, check, seal", () => {
+  it("starts where the task is, with who uses it", async () => {
+    const r = await call("archdoc_context", { paths: ["apps/web/src/pay.ts"] });
+    expect(r.isError).toBe(false);
+    expect(r.text).toContain("Used by: buyer (actor)");
+  });
+
+  it("check finds an import the change introduced, and says how to fix it", async () => {
     await write(
       "apps/web/src/pay.ts",
       'import { charge } from "@shop/billing";\nexport const pay = charge;\n',
     );
     const r = await call("archdoc_check", { base: "main" });
-    expect(r.text).toContain("web depends on billing, but the model doesn't declare it");
-    expect(r.text).toContain("call archdoc_propose");
-  });
-
-  it("propose refuses changes and writes nothing on a dry run", async () => {
-    const refused = await call("archdoc_propose", {
-      edits: [{ op: "add-relationship", from: "web", to: "api", description: "Again" }],
-      rationale: "Test",
-    });
-    expect(refused).toMatchObject({ isError: true });
-    expect(refused.text).toContain("Nothing was written.");
-    expect(refused.text).toContain("Existing relationships aren't changed.");
-
-    const dry = await call("archdoc_propose", {
-      edits: [{ op: "add-relationship", from: "web", to: "billing", description: "Charges" }],
-      rationale: "Test",
-      dryRun: true,
-    });
-    expect(dry.text).toContain("Dry run: nothing was written.");
-    expect(await readFile(join(repo, ".archdoc/archdoc.yaml"), "utf8")).toBe(modelYaml);
-  });
-
-  it("propose adds suggestions and a note, keeping the file's formatting", async () => {
-    const r = await call("archdoc_propose", {
-      edits: [
-        { op: "add-relationship", from: "web", to: "billing", description: "Charges at checkout" },
-        {
-          op: "add-element",
-          id: "ledger",
-          parent: "billing",
-          kind: "component",
-          description: "Records charges",
-          code: ["services/billing/src/ledger/**"],
-        },
-      ],
-      rationale: "The web app now charges directly.",
-      by: "agent:test",
-    });
     expect(r.isError).toBe(false);
-    expect(r.text).toContain("Added relationship web → billing.");
-    expect(r.text).toContain("Changed: .archdoc/archdoc.yaml");
-
-    const after = await readFile(join(repo, ".archdoc/archdoc.yaml"), "utf8");
-    expect(after).toContain(
-      "# Who shops\nactors:\n  buyer: { kind: person, uses: { web: Shops } }\n",
-    );
-    expect(after).toContain("      api: Calls\n      billing:\n");
-    expect(after).toContain("by: agent:test");
-
-    const notes = await readdir(join(repo, ".archdoc/proposals"));
-    expect(notes).toHaveLength(1);
-    const note = await readFile(join(repo, ".archdoc/proposals", notes[0] ?? ""), "utf8");
-    expect(note).toContain("The web app now charges directly.");
-
-    expect((await call("archdoc_validate")).text).toBe("The model is valid.");
-    const check = await call("archdoc_check", { base: "main" });
-    expect(check.text).not.toContain("doesn't declare");
+    expect(r.text).toMatch(/^⛔ 1 blocking issue/);
+    expect(r.text).toContain("web depends on billing, but the model doesn't declare it");
+    expect(r.text).toContain("apps/web/src/pay.ts:1 (@shop/billing)");
+    expect((await call("archdoc_check", { base: "nope" })).isError).toBe(true);
   });
 
-  it("diff describes the model changes", async () => {
-    const r = await call("archdoc_diff", { base: "main" });
-    expect(r.text).toContain("main → working tree");
-    expect(r.text).toContain("billing.ledger");
-    expect(r.text).toContain("web → billing");
-    expect((await call("archdoc_diff", { base: "nope" })).isError).toBe(true);
+  it("after the agent edits the model, check lists the suggestion and the model change", async () => {
+    await write(
+      ".archdoc/archdoc.yaml",
+      modelYaml.replace(
+        "      api: Calls\n",
+        "      api: Calls\n      billing: { description: Charges at checkout, provenance: { source: suggested, by: agent:test } }\n",
+      ),
+    );
+    const r = await call("archdoc_check", { base: "main" });
+    expect(r.text).not.toContain("doesn't declare");
+    expect(r.text).toContain("1 fact an agent suggested: web → billing");
+    expect(r.text).toContain("Model: 1 use added");
+    const comment = await call("archdoc_check", { base: "main", format: "markdown" });
+    expect(comment.text).toContain("**ArchDoc:**");
+  });
+
+  it("seals what the agent checked, and says what's left", async () => {
+    // Sealing starts with a person, or with facts named.
+    const none = await call("archdoc_seal");
+    expect(none.isError).toBe(true);
+    expect(none.text).toContain("no .archdoc/archdoc.sum yet");
+
+    const first = await call("archdoc_seal", { facts: ["web"], by: "agent:test" });
+    expect(first.text).toMatch(/^✓ Sealed 1 fact in \.archdoc\/archdoc\.sum: element:web\./);
+    expect(first.text).toContain("2 new facts no one has sealed.");
+
+    // The code under a sealed fact changes: check names it, and sealing it again clears it.
+    await write("apps/web/src/refund.ts", "export const refund = () => 0;\n");
+    const check = await call("archdoc_check", { base: "main" });
+    expect(check.text).toContain("Code changed under the model");
+    const fact = await call("archdoc_show", { id: "element:web" });
+    expect(fact.text).toContain("+ apps/web/src/refund.ts");
+    const again = await call("archdoc_seal", { facts: ["element:web"], by: "agent:test" });
+    expect(again.text).toContain("✓ Sealed 1 fact");
+    expect(again.text).not.toContain("still to check");
+    const unknown = await call("archdoc_seal", { facts: ["nope"] });
+    expect(unknown.isError).toBe(true);
   });
 });

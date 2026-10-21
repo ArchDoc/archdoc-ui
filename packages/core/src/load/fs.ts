@@ -67,7 +67,7 @@ export async function loadModel(target = ".", options: LoadOptions = {}): Promis
     empty.diagnostics.splice(0, empty.diagnostics.length, {
       severity: "error",
       code: "model/not-found",
-      message: `No ArchDoc model at ${relative(cwd, absolute) || "."}. Expected ${MODEL_DIR}/archdoc.yaml.`,
+      message: `No ArchDoc model at ${relative(cwd, absolute) || "."}. Expected ${MODEL_DIR}/archdoc.yaml. Run archdoc init to start one.`,
     });
     return { ...empty, source: absolute, baseDir: absolute };
   }

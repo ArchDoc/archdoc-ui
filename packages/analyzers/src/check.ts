@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import {
   type CheckResult,
   changedFiles,
@@ -7,12 +7,15 @@ import {
   type Finding,
   isSnippet,
   type LoadedModel,
+  loadTraces,
   type MarkedFinding,
   mergeBase,
   resolveGitRef,
   sealedPaths,
+  TRACES_DIR,
+  traceCodeRefs,
 } from "@archdoc/core";
-import { contextOf, loadRevision, type Revision } from "./revision.js";
+import { contextOf, loadRevision, type Revision, type Snapshot } from "./revision.js";
 import { analyze } from "./run.js";
 import { readSealedFiles, readSumFile } from "./seals.js";
 import { indexCode } from "./symbols.js";
@@ -52,7 +55,9 @@ export async function checkRepository(
   const target = options.model ?? ".";
   const head = await loadRevision(target, { cwd, ref: options.head, code: options.code });
   if (!head) {
-    throw new Error(`No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml.`);
+    throw new Error(
+      `No ArchDoc model at ${target}. Expected .archdoc/archdoc.yaml. Run archdoc init to start one.`,
+    );
   }
   const { model } = head;
   const headObserved = options.code === false ? [] : await analyze(contextOf(head.snapshot));
@@ -117,11 +122,20 @@ async function checkRevision(
   if (sum.text !== undefined) {
     for (const [p, t] of await readSealedFiles(snap, sealedPaths(rev.model))) texts.set(p, t);
   }
+  // Traces, and the code they point at.
+  const traces = await readTraces(snap);
+  const traced = traces.traces.flatMap((t) =>
+    [...(t.spec.steps ?? []).map((s) => s.code), t.spec["works-in"]?.code].flatMap((c) =>
+      traceCodeRefs(c).map((r) => r.path),
+    ),
+  );
+  for (const [p, t] of await readSealedFiles(snap, traced)) if (!texts.has(p)) texts.set(p, t);
   return checkModel(rev.model, {
     observed,
     files: snap.files,
     schemas: code === false ? [] : rev.schemas,
     read: (path) => (inRepo.has(path) ? texts.get(path) : undefined),
+    traces,
     seals: {
       file: sum.file,
       text: sum.text,
@@ -136,4 +150,16 @@ function readWorkingFile(baseDir: string, path: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** The traces in .archdoc/traces/ at the snapshot, parsed. */
+async function readTraces(snap: Snapshot) {
+  const dir = `${relative(snap.baseDir, join(snap.fedDir, TRACES_DIR)).replace(/\\/g, "/")}/`;
+  const sources: { path: string; text: string }[] = [];
+  for (const path of snap.files) {
+    if (!path.startsWith(dir) || !/\.ya?ml$/.test(path)) continue;
+    const text = await snap.read(path);
+    if (text !== undefined) sources.push({ path, text });
+  }
+  return loadTraces(sources);
 }

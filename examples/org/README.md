@@ -21,7 +21,7 @@ From the ArchDoc repo, `pnpm playground` does all of the setup below in `.playgr
 | payments | `try/break-contract` | renames the charges API rides uses | `archdoc report --base main` |
 | payments | `try/looser-refunds` | raises the auto-approve threshold | `archdoc report --base main` |
 | trips | `try/rename-email` | a migration renames `rider_email` (pii) | `archdoc check --base main` |
-| payments | `try/cancel-refund` | adds an RPC to the charges contract, under a seal | `archdoc verify`, `archdoc report --base main`, `archdoc seal charges` |
+| payments | `try/cancel-refund` | adds an RPC to the charges contract, under a seal | `archdoc check --base main`, `archdoc seal charges` |
 
 On main, payments is sealed (`archdoc seal --all`): `.archdoc/archdoc.sum` fingerprints the contract and schemas its model points at, so a change to them names the facts to re-check. It writes `PLAYGROUND.md` with every command, and an `archdoc` command in `.playground/bin`.
 
@@ -40,6 +40,6 @@ The repos also carry data: payments reads its entries from a Prisma schema and a
 
 ```bash
 cd rides
-archdoc simulate request-refund --sample samples/refund-overcharge.json   # the branch, records, and tables
-archdoc lineage payments.RefundRequest.amount_cents                       # where the amount goes, across repos
+archdoc show request-refund --sample samples/refund-overcharge.json   # the branch, records, and tables
+archdoc show payments.RefundRequest.amount_cents                       # where the amount goes, across repos
 ```

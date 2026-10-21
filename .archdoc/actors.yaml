@@ -44,7 +44,7 @@ actors:
         description: Reads the workflow from the skill or AGENTS.md
         sends: AgentInstructions
       mcp:
-        description: Locates code in the architecture, checks impact, proposes model changes
+        description: Finds where a task starts and what it affects, checks its change, and updates the model with it
         technology: MCP (stdio)
         sends: ToolCall
       cli:

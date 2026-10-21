@@ -4,8 +4,8 @@
 # continues as a review journey, and mappings say field by field how one
 # record becomes another. authorize-purchase.sample.json runs when the journey
 # opens; try a frozen card, a bigger amount, or a riskier score.
-#   archdoc simulate authorize-purchase --sample examples/authorize-purchase.sample.json -m examples/decisions.yaml
-#   archdoc lineage AuthRequest.amount_cents -m examples/decisions.yaml
+#   archdoc show authorize-purchase --sample examples/authorize-purchase.sample.json -m examples/decisions.yaml
+#   archdoc show AuthRequest.amount_cents -m examples/decisions.yaml
 archdoc: "2.0"
 namespace: issuer
 name: Card issuer

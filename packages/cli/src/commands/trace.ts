@@ -186,7 +186,7 @@ export async function traceAnchor(
   return result.anchors.length || result.elements.length ? 0 : 1;
 }
 
-async function readStdin(): Promise<string> {
+export async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString("utf8");

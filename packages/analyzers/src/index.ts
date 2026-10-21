@@ -1,9 +1,27 @@
+export {
+  type Answer,
+  type CheckAnswer,
+  type CheckInput,
+  type ContextInput,
+  checkAnswer,
+  contextAnswer,
+  type InitInput,
+  initAnswer,
+  readRepoFile,
+  repoPath,
+  type SealInput,
+  type ShowInput,
+  sealAnswer,
+  showAnswer,
+  type Where,
+} from "./answers.js";
 export { type Analyzer, type AnalyzerContext, contextFor, type ObservedDependency } from "./api.js";
 export {
   type CheckRepositoryOptions,
   type CheckRepositoryResult,
   checkRepository,
 } from "./check.js";
+export { formatInit, type InitResult, inferModel, initModel } from "./init.js";
 export { manifests } from "./manifests.js";
 export {
   contextOf,

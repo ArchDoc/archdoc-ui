@@ -225,10 +225,10 @@ describe("the landscape", () => {
     const r = await run("trips", "check", "--base", "main");
     expect(r.code).toBe(1);
     expect(r.out).toContain(
-      "✗ error drift/schema-field-missing: The model has Trip.rider_email (pii), but migrations#trips doesn't. If it was renamed, move its classification to the new name.",
+      "✗ The model and a schema disagree: The model has Trip.rider_email (pii), but migrations#trips doesn't. If it was renamed, move its classification to the new name.",
     );
     expect(r.out).toContain(
-      "! warning drift/schema-field-unmodeled: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
+      "! The model and a schema disagree: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
     );
   });
   it("simulates Refund a fare: the branch a sample takes, and the records and tables it writes across repos", async () => {

@@ -315,6 +315,8 @@ export function sealFindings(statuses: SealStatus[], sumFile: string): Finding[]
         message: `The code ${s.fact.label} points at changed since it was sealed (${s.changes.slice(0, 3).join("; ")}${s.changes.length > 3 ? `; and ${s.changes.length - 3} more` : ""}). Check that the model still describes it, update it if not, then run archdoc seal ${s.fact.key}.`,
         element: s.fact.element,
         evidence: s.fact.refs,
+        details:
+          s.changes.length > 3 || s.problems.length ? [...s.changes, ...s.problems] : undefined,
         files,
         location: s.fact.location,
       });

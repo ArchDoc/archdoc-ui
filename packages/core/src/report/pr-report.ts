@@ -8,7 +8,7 @@ import {
 import { countChanges, type ModelDiff, type RelationshipView } from "../diff/diff.js";
 import { consumersElsewhere, otherModels } from "../federation/consumers.js";
 import { contractName } from "../load/build.js";
-import type { JourneyNode, Model } from "../model.js";
+import { type JourneyNode, type Model, toReview } from "../model.js";
 import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
@@ -56,6 +56,10 @@ export interface Concern {
   fix?: string | undefined;
   /** file:line, when there is one. */
   where?: string | undefined;
+  /** What the detail sums up, line by line, such as what changed under a seal. */
+  details?: string[] | undefined;
+  /** Where in the code it shows, such as apps/web/pay.ts:1 (@shop/billing). */
+  evidence?: string[] | undefined;
   element?: string | undefined;
   rule?: string | undefined;
 }
@@ -292,32 +296,17 @@ export function summarizeChange(input: PrReportInput): ChangeSummary {
       a.id.localeCompare(b.id),
   );
 
+  const pending = (c: { kind: string; after?: unknown }) =>
+    c.kind !== "removed" && toReview(c.after) !== undefined;
+  const inferred = (c: { after?: unknown }) =>
+    toReview(c.after) === "inferred" ? " (inferred)" : "";
   const suggested = [
-    ...diff.elements
-      .filter(
-        (c) =>
-          c.kind !== "removed" &&
-          (c.after as { provenance?: { source?: string } })?.provenance?.source === "suggested",
-      )
-      .map((c) => `element \`${c.id}\``),
-    ...diff.actors
-      .filter(
-        (c) =>
-          c.kind !== "removed" &&
-          (c.after as { provenance?: { source?: string } })?.provenance?.source === "suggested",
-      )
-      .map((c) => `actor \`${c.id}\``),
-    ...diff.relationships
-      .filter(
-        (c) =>
-          c.kind !== "removed" &&
-          (c.after as RelationshipView & { provenance?: { source?: string } })?.provenance
-            ?.source === "suggested",
-      )
-      .map((c) => {
-        const r = c.after as RelationshipView;
-        return `\`${ref(r.from)}\` → \`${ref(r.to)}\`${r.description ? `: ${r.description}` : ""}`;
-      }),
+    ...diff.elements.filter(pending).map((c) => `element \`${c.id}\`${inferred(c)}`),
+    ...diff.actors.filter(pending).map((c) => `actor \`${c.id}\`${inferred(c)}`),
+    ...diff.relationships.filter(pending).map((c) => {
+      const r = c.after as RelationshipView;
+      return `\`${ref(r.from)}\` → \`${ref(r.to)}\`${r.description ? `: ${r.description}` : ""}${inferred(c)}`;
+    }),
   ];
 
   const introduced = input.findings.filter((f) => f.introduced);
@@ -508,7 +497,7 @@ const FIX: [RegExp, string][] = [
   [/^rule\//, "Change it so it follows the rule, or ask the rule's owners for an exception."],
   [
     /^drift\/undeclared-dependency$/,
-    "If the dependency is intended, add it to the model (archdoc_propose); if not, remove the import.",
+    "If the dependency is intended, add it to the element's uses in .archdoc/; if not, remove the import.",
   ],
   [/^drift\/stale-/, "Update the element's code paths or snippets."],
   [/^journey\//, "Update the journey's steps to match the model."],
@@ -517,7 +506,7 @@ const FIX: [RegExp, string][] = [
   [/^data\//, "Fix the data entry or what sends it."],
   [
     /^seal\/(changed|unsealed)$/,
-    "Check that the model still describes the code (archdoc verify says what changed), update it if not, then archdoc seal the fact.",
+    "Check that the model still describes the code (archdoc check says what changed), update it if not, then archdoc seal the fact.",
   ],
 ];
 
@@ -546,6 +535,8 @@ function concernOf(f: MarkedFinding): Concern {
     detail: f.message,
     fix: FIX.find(([re]) => re.test(f.code))?.[1],
     where,
+    details: f.details,
+    evidence: f.evidence.length ? f.evidence : undefined,
     element: f.element,
     rule: f.rule,
   };
@@ -619,7 +610,9 @@ function judge(s: ChangeSummary): ChangeSummary {
   if (s.suggested.length) {
     s.attention.push({
       code: "model/suggested",
-      title: `${plural(s.suggested.length, "fact")} an agent suggested`,
+      title: s.suggested.some((x) => x.endsWith("(inferred)"))
+        ? `${plural(s.suggested.length, "fact")} to review`
+        : `${plural(s.suggested.length, "fact")} an agent suggested`,
       detail: s.suggested.join("; ").replace(/`/g, ""),
       fix: "Accept them by removing their provenance block, or delete them.",
     });
@@ -916,7 +909,7 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
   }
   if (s.suggested.length) {
     fold(`Suggested facts to review (${s.suggested.length})`, [
-      "An agent added these. Accept them by removing their `provenance` block, or reject them by deleting them.",
+      "An agent suggested these, or archdoc init inferred them (marked). Accept them by removing their `provenance` block, or reject them by deleting them.",
       "",
       ...s.suggested.map((x) => `- ${x}`),
     ]);

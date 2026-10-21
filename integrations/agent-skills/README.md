@@ -4,7 +4,7 @@ ArchDoc is most useful when your coding agent starts each task with the architec
 
 | File | What it's for |
 |---|---|
-| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflow: get a context brief, check impact, edit, check drift, propose model changes |
+| [`claude-code/archdoc/SKILL.md`](./claude-code/archdoc/SKILL.md) | A Claude Code skill with the workflows: a change (context, edit code and model, check, seal), a bug (context on the error, a trace), and a repository with no model (init) |
 | [`AGENTS.md`](./AGENTS.md) | The same workflow as a snippet for `AGENTS.md`, read by Codex, Cursor, Copilot, and others |
 | [`mcp/claude-code.mcp.json`](./mcp/claude-code.mcp.json) | MCP server config for Claude Code (`.mcp.json` at the repository root) |
 | [`mcp/cursor.mcp.json`](./mcp/cursor.mcp.json) | MCP server config for Cursor (`.cursor/mcp.json`) |
@@ -22,21 +22,14 @@ ArchDoc is most useful when your coding agent starts each task with the architec
 
 ## MCP tools
 
-Every tool reloads the model on every call. All of them are read-only except `archdoc_propose`, which only adds.
+One tool per question. Every tool reloads the model on every call, and the CLI command of the same name prints the same answer. All of them are read-only except `archdoc_seal`, which writes only `.archdoc/archdoc.sum`, and `archdoc_init`, which writes `.archdoc/` only when there's none.
 
 | Tool | Answers |
 |---|---|
-| `archdoc_context` | Where do I start? For a task in words or the files to change: files and functions to open first, other callers of the same functions, data, rules, the journeys whose steps name the files, tests, owners |
-| `archdoc_search` | Where does this live? Elements, actors, journeys, and files (by path and exported names) for a few words, with code paths |
-| `archdoc_overview` | What is this system? Actors, elements, journeys |
-| `archdoc_locate` | Which element owns these files? |
-| `archdoc_impact` | What does changing this affect? Consumers, actors, journeys, owners, rules |
-| `archdoc_get_element` | Everything about one element |
-| `archdoc_get_actor` | What an actor uses, owns, and takes part in |
-| `archdoc_journey` | The steps of a journey, with code entry points |
-| `archdoc_validate` | Is the model valid? Problems with file and line |
-| `archdoc_check` | Did my change drift? Undeclared imports, broken rules and journeys, stale paths; with `base`, what the change introduced |
-| `archdoc_diff` | What changed in the model since a ref? |
-| `archdoc_propose` | Add elements and relationships as suggestions (`provenance: suggested`) with a rationale note in `.archdoc/proposals/`. Additions only: it never changes or removes what's there, never edits another repo's namespace, and writes nothing if the result wouldn't validate. `dryRun` checks without writing |
+| `archdoc_context` | Where do I start, and what does it affect? For a task in words or the files to change (even ones that don't exist yet): files and functions to open first, other callers of the same functions, data, rules, journeys, tests, owners, and who uses it, other repos included. For an error: the journey steps it showed up in, and a trace to start from. With nothing: an overview |
+| `archdoc_show` | What is this one thing? An element (with its code), actor, journey (with a sample, simulated), data entry, `Entry.field` (lineage), trace, or a sealed fact |
+| `archdoc_check` | What's wrong or stale? Model problems, undeclared imports, broken rules and journeys, stale paths, traces, and facts whose sealed code changed, each with its fix. With `base`, only what the change caused, and the verdict the PR comment will give; `format: "markdown"` returns that comment |
+| `archdoc_seal` | Record that the facts you checked still describe their code, and say what's left |
+| `archdoc_init` | Start a model in a repository without one, every fact marked inferred |
 
 For pull requests, see the [GitHub Action](../github-action).

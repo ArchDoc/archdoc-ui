@@ -594,7 +594,7 @@ describe("trace text", () => {
       [
         "! t · Broken",
         "    expands checkout#2 (web → api) · 1 step · cause at step 1 · 1 hop the model doesn't declare",
-        "    ! .archdoc/traces/t.yaml:5:9 warning trace/undeclared-hop Step 1: web → mailer isn't a relationship the model declares. If the code really does this, add it to the model (archdoc_propose) or fix the code.",
+        "    ! .archdoc/traces/t.yaml:5:9 warning trace/undeclared-hop Step 1: web → mailer isn't a relationship the model declares. If the code really does this, add it to the model or fix the code.",
         "",
         "1 trace: 0 errors, 1 warning.",
       ].join("\n"),

@@ -163,6 +163,16 @@ export interface ImportedModel {
   model: Model;
 }
 
+/**
+ * Facts a person hasn't accepted yet: suggested by an agent, or inferred by
+ * archdoc init or an analyzer. Reviewers see them as such, until someone
+ * removes the provenance block.
+ */
+export function toReview(fact: unknown): "suggested" | "inferred" | undefined {
+  const source = (fact as { provenance?: { source?: string } } | undefined)?.provenance?.source;
+  return source === "suggested" || source === "inferred" ? source : undefined;
+}
+
 export function nodeKey(ref: NodeRef | ExternalRef): string {
   return ref.type === "external" ? `external:${ref.ref}` : `${ref.type}:${ref.id}`;
 }
