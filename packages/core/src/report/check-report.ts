@@ -35,6 +35,7 @@ export function formatFindings(
           ? `- ${f.severity === "error" ? "⛔" : f.severity === "warning" ? "⚠️" : "ℹ️"} \`${f.code}\` ${f.message}`
           : `${ICON[f.severity]} ${head}`,
       );
+      for (const d of f.details ?? []) out.push(md ? `  - ${d}` : `    ${d}`);
       const shown = f.evidence.slice(0, maxEvidence);
       for (const e of shown) out.push(md ? `  - \`${e}\`` : `    ${e}`);
       if (f.evidence.length > shown.length) {

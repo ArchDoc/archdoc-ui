@@ -286,7 +286,7 @@ export function checkTrace(
       add(
         "warning",
         "trace/undeclared-hop",
-        `${from.id} → ${to.id} isn't a relationship the model declares. If the code really does this, add it to the model (archdoc_propose) or fix the code.`,
+        `${from.id} → ${to.id} isn't a relationship the model declares. If the code really does this, add it to the model or fix the code.`,
         `steps.${i}`,
         n,
       );

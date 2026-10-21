@@ -1,6 +1,5 @@
-import { writeFile } from "node:fs/promises";
-import { sealReport } from "@archdoc/analyzers";
-import { formatSealStatus, formatSum, sealSum } from "@archdoc/core";
+import { sealAnswer, sealReport } from "@archdoc/analyzers";
+import { formatSealStatus } from "@archdoc/core";
 import type { Io } from "../io.js";
 
 export interface VerifyOptions {
@@ -63,41 +62,16 @@ export interface SealCommandOptions {
  * `archdoc seal [facts…]`: records that the model still describes the code
  * these facts point at. Without facts, seals the ones no one has sealed and
  * drops the ones that left the model; changed facts stay flagged until named,
- * or until --all.
+ * or until --all. Says what's still to check.
  */
 export async function seal(facts: string[], options: SealCommandOptions, io: Io): Promise<number> {
   try {
-    const r = await sealReport(options.model ?? ".", io.cwd);
-    if (!r) {
-      io.err(`No ArchDoc model at ${options.model ?? "."}. Expected .archdoc/archdoc.yaml.`);
-      return 2;
+    const r = await sealAnswer({ model: options.model, cwd: io.cwd }, { ...options, facts });
+    if (!r.ok) {
+      io.err(r.text);
+      return r.text.startsWith("No ArchDoc model") ? 2 : 1;
     }
-    const { sum, sealed, unknown } = sealSum(r.statuses, {
-      keys: facts,
-      all: options.all || !!r.error,
-      by: options.by,
-    });
-    if (unknown.length) {
-      io.err(
-        `Not a fact that points at code: ${unknown.join(", ")}. archdoc verify lists them, such as element:<id>, step:<journey>#<n>, logic:<id>, mapping:<id>, data:<id>.`,
-      );
-      return 1;
-    }
-    const still = r.statuses.filter(
-      (s) => s.state === "changed" && !sealed.includes(s.fact.key),
-    ).length;
-    if (!options.dryRun) await writeFile(r.path, formatSum(sum));
-    io.out(
-      `${options.dryRun ? "Would seal" : "✓ Sealed"} ${sealed.length} fact${sealed.length === 1 ? "" : "s"} in ${r.file}${sealed.length && sealed.length <= 8 ? `: ${sealed.join(", ")}` : ""}.`,
-    );
-    for (const s of r.statuses.filter((x) => x.problems.length && sealed.includes(x.fact.key))) {
-      io.out(`  ! ${s.fact.label}: ${s.problems.join("; ")}`);
-    }
-    if (still) {
-      io.out(
-        `  ${still} changed fact${still === 1 ? " is" : "s are"} still flagged. Check ${still === 1 ? "it" : "them"} with archdoc verify, then seal ${still === 1 ? "it" : "them"} by name.`,
-      );
-    }
+    io.out(r.text);
     return 0;
   } catch (err) {
     io.err(err instanceof Error ? err.message : String(err));

@@ -80,9 +80,9 @@ describe("comparing revisions", () => {
   });
 
   it("marks a finding the base already had as already there, even when the model file changed", async () => {
-    const r = await run("check", "--base", "main");
-    expect(r.out).toMatch(/Already there/);
-    expect(r.out).not.toMatch(/Introduced by this change/);
+    const r = await run("check", "--base", "main", "--all");
+    expect(r.out).toMatch(/Already on the base \(\d+\)/);
+    expect(r.out).not.toMatch(/Blocks the merge|To check/);
     expect(r.out).toMatch(/reports maps "apps\/reports\/\*\*"/);
     expect(r.code).toBe(0);
   });
@@ -100,7 +100,7 @@ describe("comparing revisions", () => {
       "elements:\n  audit: { kind: container, code: services/audit/** }\n",
     );
     const r = await run("check", "--base", "main");
-    expect(r.out).toMatch(/Introduced by this change/);
+    expect(r.out).toMatch(/To check \(\d+\)/);
     expect(r.out).toMatch(/audit maps "services\/audit\/\*\*"/);
     git("checkout", "-q", "--", ".");
     git("clean", "-qfd");

@@ -1,3 +1,18 @@
+export {
+  type Answer,
+  type CheckAnswer,
+  type CheckInput,
+  type ContextInput,
+  checkAnswer,
+  contextAnswer,
+  readRepoFile,
+  repoPath,
+  type SealInput,
+  type ShowInput,
+  sealAnswer,
+  showAnswer,
+  type Where,
+} from "./answers.js";
 export { type Analyzer, type AnalyzerContext, contextFor, type ObservedDependency } from "./api.js";
 export {
   type CheckRepositoryOptions,

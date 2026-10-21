@@ -2,6 +2,7 @@
 // The explorer imports this entry point so it builds and queries the model
 // with the same engine as the CLI.
 
+export { TRACES_DIR } from "@archdoc/spec";
 export {
   type CheckOptions,
   type CheckResult,
@@ -153,8 +154,6 @@ export {
 } from "./load/build.js";
 export { type Resolution, Resolver } from "./load/resolve.js";
 export * from "./model.js";
-export { insertIntoMap } from "./propose/insert.js";
-export { type ProposalEdit, type ProposalPlan, planProposal } from "./propose/propose.js";
 export {
   type CodeIndex,
   fileStem,
@@ -196,6 +195,7 @@ export {
 export * from "./query/index.js";
 export { type SearchHit, search } from "./query/search.js";
 export { queryTerms, sameWord, splitIdentifier } from "./query/terms.js";
+export { type CheckAnswerOptions, formatCheck } from "./report/check-answer.js";
 export { formatAnnotations, formatFindings, type MarkedFinding } from "./report/check-report.js";
 export { formatContext, formatEval } from "./report/context-report.js";
 export { type DiffFormat, formatDiff, summary as diffSummary } from "./report/diff-report.js";

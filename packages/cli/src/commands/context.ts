@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
-import { indexRepository } from "@archdoc/analyzers";
+import { contextAnswer, indexRepository } from "@archdoc/analyzers";
 import {
   context as contextOf,
   evaluate,
@@ -13,11 +14,14 @@ import {
   resolveGitRef,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
+import { readStdin } from "./trace.js";
 
 export interface ContextOptions {
   model?: string;
   format?: string;
   json?: boolean;
+  /** A file with the error to place, or - for stdin. */
+  error?: string;
 }
 
 async function load(model: string | undefined, io: Io): Promise<LoadedModel | undefined> {
@@ -46,9 +50,38 @@ function formatOf(options: ContextOptions, io: Io): "text" | "json" | undefined 
  * are paths (they contain a slash, or exist) are taken relative to where the
  * command runs; the rest are the task in words.
  */
-export async function context(args: string[], options: ContextOptions, io: Io): Promise<number> {
+export async function context(
+  args: string[],
+  options: ContextOptions,
+  io: Io,
+  stdin: () => Promise<string> = readStdin,
+): Promise<number> {
   const format = formatOf(options, io);
   if (!format) return 2;
+  // An error to place, or nothing (the overview): what archdoc_context answers.
+  if (options.error !== undefined || !args.length) {
+    let error: string | undefined;
+    try {
+      if (options.error !== undefined) {
+        error =
+          options.error === "-"
+            ? await stdin()
+            : await readFile(resolve(io.cwd, options.error), "utf8");
+      }
+    } catch (err) {
+      io.err(err instanceof Error ? err.message : String(err));
+      return 2;
+    }
+    const words = args.filter(
+      (a) => !(a.includes("/") || a.includes("\\") || existsSync(resolve(io.cwd, a))),
+    );
+    const r = await contextAnswer(
+      { model: options.model, cwd: io.cwd },
+      { task: words.join(" "), paths: args.filter((a) => !words.includes(a)), error },
+    );
+    (r.ok ? io.out : io.err)(r.text);
+    return r.ok ? 0 : 1;
+  }
   const model = await load(options.model, io);
   if (!model) return 1;
   const words: string[] = [];

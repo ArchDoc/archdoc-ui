@@ -29,6 +29,11 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     code.then((c) => {
       program.exitCode = c;
     });
+  /** A command that's now part of another: it still works, for one more release. */
+  const moved = (from: string, to: string) =>
+    io.err(
+      `note: "archdoc ${from}" is part of "archdoc ${to}" now, and will go in a later release.`,
+    );
 
   program
     .description("An architecture control plane for AI-assisted development.")
@@ -95,21 +100,27 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<words...>", "a few words, such as: cli command")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
-    .action((words: string[], opts: { model?: string; json?: boolean }) =>
-      run(search(words, opts, io)),
-    );
+    .action((words: string[], opts: { model?: string; json?: boolean }) => {
+      moved("search", "context <words>");
+      return run(search(words, opts, io));
+    });
 
   program
     .command("context")
     .description(
-      "Where to start a task: files and symbols to open first, other code that does the same job, data, rules, journeys, tests, and owners",
+      "Where to start: files and symbols to open first, other code that does the same job, data, rules, journeys, tests, owners, and who uses it. With --error, where an error showed up; with nothing, an overview",
     )
-    .argument("<words-or-paths...>", "the task in a few words, files you plan to change, or both")
+    .argument("[words-or-paths...]", "the task in a few words, files you plan to change, or both")
+    .option(
+      "-e, --error <file>",
+      "an error, log, or stack trace to place, from a file or - (stdin)",
+    )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "text or json", "text")
     .option("--json", "print the result as JSON")
-    .action((args: string[], opts: { model?: string; format?: string; json?: boolean }) =>
-      run(context(args, opts, io)),
+    .action(
+      (args: string[], opts: { model?: string; format?: string; json?: boolean; error?: string }) =>
+        run(context(args, opts, io)),
     );
 
   program
@@ -142,9 +153,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<paths...>", "files or directories")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
-    .action((paths: string[], opts: { model?: string; json?: boolean }) =>
-      run(locate(paths, opts, io)),
-    );
+    .action((paths: string[], opts: { model?: string; json?: boolean }) => {
+      moved("locate", "context <paths>");
+      return run(locate(paths, opts, io));
+    });
 
   program
     .command("impact")
@@ -152,17 +164,26 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<target>", "element, actor, or file path")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
-    .action((target: string, opts: { model?: string; json?: boolean }) =>
-      run(impact(target, opts, io)),
-    );
+    .action((target: string, opts: { model?: string; json?: boolean }) => {
+      moved("impact", "context <paths>");
+      return run(impact(target, opts, io));
+    });
 
   program
     .command("show")
-    .description("Print the details of an element, actor, journey, data entry, or trace")
-    .argument("<id>", "element, actor, journey, data entry, or trace ID")
+    .description(
+      "One thing in the model: an element, actor, journey, data entry, Entry.field (its lineage), trace, or sealed fact",
+    )
+    .argument("<id>", "such as payments.charges, Refund.amount_cents, or step:refund#2")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--code", "print the code snippets an element points at")
-    .action((id: string, opts: { model?: string; code?: boolean }) => run(show(id, opts, io)));
+    .option(
+      "-s, --sample <file>",
+      "run a journey on JSON or YAML records that exist when it starts, by data entry",
+    )
+    .action((id: string, opts: { model?: string; code?: boolean; sample?: string }) =>
+      run(show(id, opts, io)),
+    );
 
   program
     .command("map")
@@ -191,9 +212,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<field>", "Entry.field, such as Refund.amount_cents or payments.Refund.amount_cents")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
-    .action((field: string, opts: { model?: string; json?: boolean }) =>
-      run(lineageCommand(field, opts, io)),
-    );
+    .action((field: string, opts: { model?: string; json?: boolean }) => {
+      moved("lineage", "show <Entry.field>");
+      return run(lineageCommand(field, opts, io));
+    });
 
   program
     .command("simulate")
@@ -207,9 +229,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the result as JSON")
-    .action((journey: string, opts: { model?: string; json?: boolean; sample?: string }) =>
-      run(simulateCommand(journey, opts, io)),
-    );
+    .action((journey: string, opts: { model?: string; json?: boolean; sample?: string }) => {
+      moved("simulate", "show <journey> --sample <file>");
+      return run(simulateCommand(journey, opts, io));
+    });
 
   const trace = program
     .command("trace")
@@ -231,7 +254,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       (
         words: string[],
         opts: { file?: string; model?: string; limit?: string; skeleton?: boolean; json?: boolean },
-      ) => run(traceAnchor(words, opts, io)),
+      ) => {
+        moved("trace anchor", "context --error <file>");
+        return run(traceAnchor(words, opts, io));
+      },
     );
   trace
     .command("check")
@@ -241,9 +267,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("[files...]", "trace files (default: every .archdoc/traces/*.yaml)")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "text or json", "text")
-    .action((files: string[], opts: { model?: string; format?: string }) =>
-      run(traceCheck(files, opts, io)),
-    );
+    .action((files: string[], opts: { model?: string; format?: string }) => {
+      moved("trace check", "check");
+      return run(traceCheck(files, opts, io));
+    });
   trace
     .command("list")
     .description("List the traces in .archdoc/traces/")
@@ -258,12 +285,15 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<id>", "trace ID or file")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--json", "print the resolved trace as JSON")
-    .action((id: string, opts: { model?: string; json?: boolean }) => run(traceShow(id, opts, io)));
+    .action((id: string, opts: { model?: string; json?: boolean }) => {
+      moved("trace show", "show <trace>");
+      return run(traceShow(id, opts, io));
+    });
 
   program
     .command("check")
     .description(
-      "Compare the model with the code and its rules: undeclared dependencies, rule violations, stale paths",
+      "What's wrong or stale: model problems, undeclared dependencies, rules, stale paths, traces, and sealed facts whose code changed. With --base, what the change does",
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option(
@@ -277,9 +307,18 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     )
     .option("--fail-on <severity>", "error, warning, or never", "error")
     .option("--no-code", "check the model only, without analyzing code")
+    .option("--all", "list every finding, not only the change's (or the first few)")
+    .option("--seals", "only facts whose sealed code changed, in full; exits 1 while there are any")
     .action(
-      (opts: { model?: string; base?: string; format?: string; failOn?: string; code?: boolean }) =>
-        run(check(opts, io)),
+      (opts: {
+        model?: string;
+        base?: string;
+        format?: string;
+        failOn?: string;
+        code?: boolean;
+        all?: boolean;
+        seals?: boolean;
+      }) => run(check(opts, io)),
     );
 
   program
@@ -289,7 +328,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     )
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("-f, --format <format>", "text or json", "text")
-    .action((opts: { model?: string; format?: string }) => run(verify(opts, io)));
+    .action((opts: { model?: string; format?: string }) => {
+      moved("verify", "check --seals");
+      return run(verify(opts, io));
+    });
 
   program
     .command("seal")

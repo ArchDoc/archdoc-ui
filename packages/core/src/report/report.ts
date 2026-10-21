@@ -295,12 +295,25 @@ export function formatOverview(model: Model, maxDepth = 1): string {
   }
   out.push("", "Journeys");
   for (const j of o.journeys) out.push(`  ${j.id} (${j.importance}) · ${j.actor}: ${j.goal}`);
+  // This repo's data, with the fields that hold sensitive data.
+  const data = [...model.data.values()];
+  if (data.length) {
+    out.push("", "Data");
+    for (const d of data) {
+      const classified = Object.entries(d.spec.fields ?? {})
+        .filter(([, f]) => f.classification)
+        .map(([n, f]) => `${n}: ${f.classification}`);
+      out.push(
+        `  ${d.id} (${d.spec.kind})${classified.length ? ` · ${classified.join(", ")}` : ""}`,
+      );
+    }
+  }
   return out.join("\n");
 }
 
 export function formatSearch(query: string, hits: SearchHit[]): string {
   if (hits.length === 0) {
-    return `Nothing in the model matches "${query}". Try other words, or call archdoc_overview.`;
+    return `Nothing in the model matches "${query}". Try other words, or archdoc context with nothing for an overview.`;
   }
   const out = [`Matches for "${query}", best first:`];
   for (const h of hits) {

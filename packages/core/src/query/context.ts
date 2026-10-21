@@ -17,7 +17,7 @@ import {
   stepCodePath,
   viewOf,
 } from "./code-index.js";
-import { rulesMentioning } from "./impact.js";
+import { impact, rulesMentioning } from "./impact.js";
 import { search } from "./search.js";
 import { queryTerms, sameWord, splitIdentifier } from "./terms.js";
 
@@ -87,6 +87,8 @@ export interface ContextBrief {
   journeysThrough: { id: string; importance: string }[];
   tests: { path: string; why: string }[];
   owners: string[];
+  /** What uses the elements directly: other elements, actors, and other repos. */
+  usedBy: { elements: string[]; actors: string[]; elsewhere: string[] };
 }
 
 const IMPORTANCE: Record<string, number> = { critical: 0, high: 1, normal: 2 };
@@ -155,7 +157,13 @@ export function context(model: Model, query: string, inputs: ContextInputs = {})
     }))
     .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
   for (const p of named) {
-    const files = index ? filesNamed(index, p).filter((f) => !isTestFile(f)) : [p];
+    const found = index ? filesNamed(index, p).filter((f) => !isTestFile(f)) : [p];
+    // A file that doesn't exist yet: where it would belong.
+    if (!found.length && ownerOf(p)) {
+      push({ path: p, element: ownerOf(p), why: "a new file" }, false);
+      continue;
+    }
+    const files = found;
     const order = (f: string) => {
       const r = byWords.findIndex((x) => x.path === f);
       return (r < 0 ? 1000 : r) - (entries.has(f) ? 0.5 : 0);
@@ -272,6 +280,34 @@ export function context(model: Model, query: string, inputs: ContextInputs = {})
         elements.flatMap((e) => [...ancestors(model, e), e].flatMap((x) => x.spec.owners ?? [])),
       ),
     ],
+    usedBy: usedBy(model, elements, chain),
+  };
+}
+
+/** Who uses the elements directly, leaving out the elements themselves and their parents. */
+function usedBy(model: Model, elements: ElementNode[], chain: Set<string>): ContextBrief["usedBy"] {
+  const out = {
+    elements: new Set<string>(),
+    actors: new Set<string>(),
+    elsewhere: new Set<string>(),
+  };
+  for (const e of elements) {
+    const r = impact(model, e.id);
+    if (!r.ok) continue;
+    for (const c of r.impact.consumers) {
+      if (c.depth !== 1) continue;
+      const from = c.relationship.from;
+      if (from.type === "actor") out.actors.add(from.id);
+      else if (from.type === "element" && !chain.has(from.id)) out.elements.add(from.id);
+    }
+    for (const c of r.impact.elsewhere.consumers) {
+      if (c.reach === "direct") out.elsewhere.add(c.from);
+    }
+  }
+  return {
+    elements: [...out.elements].sort(),
+    actors: [...out.actors].sort(),
+    elsewhere: [...out.elsewhere].sort(),
   };
 }
 

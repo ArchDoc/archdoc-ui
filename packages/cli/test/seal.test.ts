@@ -67,11 +67,15 @@ describe("seals", () => {
   it("seals every fact, and then everything matches", async () => {
     const r = await run("seal", "--all");
     expect(r.out).toBe(
-      "✓ Sealed 2 facts in .archdoc/archdoc.sum: element:api, element:api#services/api/price.ts:price.",
+      "✓ Sealed 2 facts in .archdoc/archdoc.sum: element:api, element:api#services/api/price.ts:price.\nEvery fact that points at code (2) matches its seal.",
     );
     const sum = await readFile(join(repo, ".archdoc/archdoc.sum"), "utf8");
     expect(sum).toContain("element:api#services/api/price.ts:price:");
-    expect((await run("verify")).out).toBe("✓ 2 of 2 facts still match their seal.");
+    expect((await run("check", "--seals")).out).toBe("✓ 2 of 2 facts still match their seal.");
+    // verify still works, for one more release.
+    const v = await run("verify");
+    expect(v.out).toBe("✓ 2 of 2 facts still match their seal.");
+    expect(v.err).toContain('"archdoc verify" is part of "archdoc check --seals" now');
     git("add", "-A");
     git("commit", "-q", "-m", "seal");
     git("checkout", "-q", "-b", "feature");
@@ -86,7 +90,7 @@ describe("seals", () => {
     git("add", "-A");
     git("commit", "-q", "-m", "tax");
 
-    const v = await run("verify");
+    const v = await run("check", "--seals");
     expect(v.code).toBe(1);
     expect(v.out).toContain("2 facts to check");
     expect(v.out).toContain("  + services/api/tax.ts");
@@ -94,8 +98,10 @@ describe("seals", () => {
     expect(v.out).toContain("  → archdoc seal element:api#services/api/price.ts:price");
 
     const c = await run("check", "--base", "main");
-    expect(c.out).toMatch(/Introduced by this change \(2\)/);
-    expect(c.out).toContain("seal/changed");
+    expect(c.out).toMatch(/To check \(2\)/);
+    expect(c.out).toContain(
+      "! Code changed under the model: The code element api points at changed",
+    );
 
     const report = await run("report", "--base", "main");
     expect(report.out).toContain("**Code changed under the model.**");
@@ -122,17 +128,19 @@ describe("seals", () => {
 
   it("keeps changed facts flagged until named, and records who checked them", async () => {
     const plain = await run("seal");
-    expect(plain.out).toContain("2 changed facts are still flagged");
-    expect((await run("verify")).code).toBe(1);
+    expect(plain.out).toContain("2 changed facts are still to check:\nelement:api");
+    expect(plain.out).toContain("  + services/api/tax.ts");
+    expect((await run("check", "--seals")).code).toBe(1);
 
     const named = await run("seal", "api", "--by", "agent:test");
     expect(named.out).toContain("✓ Sealed 2 facts");
-    expect((await run("verify")).code).toBe(0);
+    expect(named.out).toContain("Every fact that points at code (2) matches its seal.");
+    expect((await run("check", "--seals")).code).toBe(0);
     git("add", "-A");
     git("commit", "-q", "-m", "checked the model");
 
     const c = await run("check", "--base", "main");
-    expect(c.out).not.toContain("seal/");
+    expect(c.out).not.toContain("Code changed under the model");
     const report = await run("report", "--base", "main");
     expect(report.out).toContain(
       "Re-checked against changed code by agent:test: `element:api`, `element:api#services/api/price.ts:price`.",

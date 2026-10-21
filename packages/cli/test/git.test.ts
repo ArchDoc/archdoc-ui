@@ -72,7 +72,7 @@ afterAll(() => rm(repo, { recursive: true, force: true }));
 describe("against a git history", () => {
   it("check passes on a clean model", async () => {
     const r = await run("check");
-    expect(r.out).toBe("✓ No drift or rule problems found.");
+    expect(r.out).toBe("✓ No problems: the model is valid and matches the code.");
     expect(r.code).toBe(0);
   });
 
@@ -83,7 +83,7 @@ describe("against a git history", () => {
     );
     const r = await run("check", "--base", "main");
     expect(r.code).toBe(1);
-    expect(r.out).toContain("Introduced by this change (2)");
+    expect(r.out).toContain("Blocks the merge (2)");
     expect(r.out).toContain("web depends on billing, but the model doesn't declare it");
     expect(r.out).toContain('breaks rule "web-never-bills"');
     expect(r.out).toContain("apps/web/src/pay.ts:1 (@shop/billing)");

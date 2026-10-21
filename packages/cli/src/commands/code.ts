@@ -1,18 +1,11 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import { indexRepository } from "@archdoc/analyzers";
+import { indexRepository, showAnswer } from "@archdoc/analyzers";
 import {
   filesUnder,
-  formatActor,
-  formatCode,
-  formatData,
-  formatElement,
   formatImpact,
-  formatJourney,
   formatLocate,
   formatSearch,
-  formatTrace,
-  getElement,
   hasErrors,
   impact as impactOf,
   impactToJSON,
@@ -22,11 +15,9 @@ import {
   locatedToJSON,
   locate as locateIn,
   resolveCodeMap,
-  resolveRef,
   search as searchModel,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
-import { findTrace } from "./trace.js";
 
 export interface ModelOptions {
   /** Repository, .archdoc directory, or model file. */
@@ -156,51 +147,26 @@ export async function map(options: ModelOptions & { unmapped?: boolean }, io: Io
 }
 
 /** Prints the details of an element, actor, or journey by ID. */
+/**
+ * `archdoc show <id>`: one thing in the model, whatever kind of ID names it:
+ * an element, actor, journey (with --sample, run on it), data entry,
+ * Entry.field (its lineage), trace, or a sealed fact. What archdoc_show answers.
+ */
 export async function show(
   id: string,
-  options: ModelOptions & { code?: boolean },
+  options: ModelOptions & { code?: boolean; sample?: string },
   io: Io,
 ): Promise<number> {
-  const model = await load(options, io);
-  if (!model) return 1;
-  if (options.code) {
-    const e = getElement(model, id)?.element;
-    if (!e) {
-      io.err(`No element "${id}" in this repo.`);
-      return 1;
-    }
-    io.out(formatCode(e.id, e.code, (path) => readRepoFile(model.baseDir, path)));
-    return 0;
-  }
-  const journey = model.journeys.get(id);
-  const sections = [
-    formatElement(model, id),
-    formatActor(model, id),
-    journey ? formatJourney(model, journey) : undefined,
-    formatData(model, id),
-  ].filter((s): s is string => s !== undefined);
-
-  if (sections.length === 0) {
-    // Traces aren't part of the model, but they have IDs too.
-    const trace = await findTrace(model, id, options, io).catch(() => undefined);
-    if (trace) {
-      io.out(formatTrace(trace.view));
-      return 0;
-    }
-    const r = resolveRef(model, id);
-    if (r.status === "ambiguous") {
-      io.err(`"${id}" is ambiguous: ${r.candidates.join(", ")}.`);
-    } else {
-      io.err(`No element, actor, journey, data entry, or trace "${id}".`);
-      if (r.status === "unresolved" && r.hint) io.err(r.hint);
-      const near = searchModel(model, id.replace(/[._-]+/g, " "), 5);
-      if (near.length) io.err(`Did you mean: ${near.map((h) => h.id).join(", ")}?`);
-      io.err('Find IDs with "archdoc search <words>".');
-    }
+  const r = await showAnswer(
+    { model: options.model, cwd: io.cwd },
+    { id, code: options.code, sample: options.sample },
+  );
+  if (!r.ok) {
+    io.err(r.text);
     return 1;
   }
-  io.out(sections.join("\n\n"));
-  return 0;
+  io.out(r.text);
+  return r.failing ? 1 : 0;
 }
 
 /** A file in the repository, or undefined when there's none (or it's outside it). */

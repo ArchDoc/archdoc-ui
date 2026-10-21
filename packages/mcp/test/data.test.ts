@@ -68,36 +68,38 @@ async function call(name: string, args: Record<string, unknown> = {}) {
   return { text: content[0]?.text ?? "", isError: r.isError === true };
 }
 
-describe("data tools", () => {
-  it("list data entries with their classified fields, and show one", async () => {
-    expect((await call("archdoc_data")).text).toBe(
-      "RefundRequest (message) · email: pii\nCharge (entity)\nRefund (entity)",
+describe("data, through context and show", () => {
+  it("lists data entries with their classified fields in the overview, and shows one", async () => {
+    expect((await call("archdoc_context")).text).toContain(
+      "Data\n  RefundRequest (message) · email: pii\n  Charge (entity)\n  Refund (entity)",
     );
-    const r = await call("archdoc_data", { id: "Refund" });
+    const r = await call("archdoc_show", { id: "Refund" });
     expect(r.text).toContain("Stored in: ledger (refunds)");
-    expect((await call("archdoc_data", { id: "Nope" })).isError).toBe(true);
+    expect((await call("archdoc_show", { id: "Nope" })).isError).toBe(true);
   });
 
-  it("follow a field's lineage", async () => {
-    const r = await call("archdoc_lineage", { field: "RefundRequest.amount_cents" });
+  it("follows a field's lineage", async () => {
+    const r = await call("archdoc_show", { id: "RefundRequest.amount_cents" });
     expect(r.text).toContain(
       "payments.Refund.amount_cents = request.amount_cents  (payments.to-refund, copied) · written to payments.ledger (refunds)",
     );
   });
 
-  it("simulate a journey for a sample request", async () => {
-    const r = await call("archdoc_simulate", {
-      journey: "refund",
+  it("runs a journey on a sample request", async () => {
+    const r = await call("archdoc_show", {
+      id: "refund",
       sample: { RefundRequest: { amount_cents: 300 }, Charge: { amount_cents: 1000 } },
     });
     expect(r.text).toContain("decides payments.approval → auto (rule 1:");
     expect(r.text).toContain(
       "+ creates payments.Refund { amount_cents: 300 } via payments.to-refund",
     );
-    const manual = await call("archdoc_simulate", {
-      journey: "refund",
+    const manual = await call("archdoc_show", {
+      id: "refund",
       sample: { RefundRequest: { amount_cents: 900 }, Charge: { amount_cents: 1000 } },
     });
     expect(manual.text).toContain("skipped: runs only when auto; the decision was manual");
+    const notJourney = await call("archdoc_show", { id: "Refund", sample: {} });
+    expect(notJourney.isError).toBe(true);
   });
 });

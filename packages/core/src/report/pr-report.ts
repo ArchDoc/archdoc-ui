@@ -56,6 +56,10 @@ export interface Concern {
   fix?: string | undefined;
   /** file:line, when there is one. */
   where?: string | undefined;
+  /** What the detail sums up, line by line, such as what changed under a seal. */
+  details?: string[] | undefined;
+  /** Where in the code it shows, such as apps/web/pay.ts:1 (@shop/billing). */
+  evidence?: string[] | undefined;
   element?: string | undefined;
   rule?: string | undefined;
 }
@@ -508,7 +512,7 @@ const FIX: [RegExp, string][] = [
   [/^rule\//, "Change it so it follows the rule, or ask the rule's owners for an exception."],
   [
     /^drift\/undeclared-dependency$/,
-    "If the dependency is intended, add it to the model (archdoc_propose); if not, remove the import.",
+    "If the dependency is intended, add it to the element's uses in .archdoc/; if not, remove the import.",
   ],
   [/^drift\/stale-/, "Update the element's code paths or snippets."],
   [/^journey\//, "Update the journey's steps to match the model."],
@@ -517,7 +521,7 @@ const FIX: [RegExp, string][] = [
   [/^data\//, "Fix the data entry or what sends it."],
   [
     /^seal\/(changed|unsealed)$/,
-    "Check that the model still describes the code (archdoc verify says what changed), update it if not, then archdoc seal the fact.",
+    "Check that the model still describes the code (archdoc check says what changed), update it if not, then archdoc seal the fact.",
   ],
 ];
 
@@ -546,6 +550,8 @@ function concernOf(f: MarkedFinding): Concern {
     detail: f.message,
     fix: FIX.find(([re]) => re.test(f.code))?.[1],
     where,
+    details: f.details,
+    evidence: f.evidence.length ? f.evidence : undefined,
     element: f.element,
     rule: f.rule,
   };
