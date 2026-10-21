@@ -104,7 +104,7 @@ export interface TraceStepView {
   spec: TraceStepSpec;
 }
 
-/** A trace resolved against the model: what a UI draws and what `archdoc trace show` prints. */
+/** A trace resolved against the model: what a UI draws and what `archdoc show <trace>` prints. */
 export interface TraceView {
   id: string;
   file: string;

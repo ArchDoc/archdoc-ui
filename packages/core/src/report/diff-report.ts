@@ -201,7 +201,7 @@ function fieldDelta(before: unknown, after: unknown): string {
           x.classification !== y.classification
             ? `classification ${x.classification ?? "none"} → ${y.classification ?? "none"}`
             : "",
-          x.type !== y.type ? `type ${x.type} → ${y.type}` : "",
+          x.type !== y.type ? `type ${x.type ?? "none"} → ${y.type ?? "none"}` : "",
         ].filter(Boolean);
         return `~${k}${what.length ? ` (${what.join(", ")})` : ""}`;
       }),

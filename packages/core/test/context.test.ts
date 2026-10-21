@@ -390,6 +390,6 @@ describe("evaluate", () => {
     expect(r.startRecall).toBeCloseTo(2 / 3);
     expect(r.medianScope).toBe(c?.scope);
     expect(formatEval(r)).toMatch(/Recall: 67% \(2\/3\)/);
-    expect(formatEval(r)).toContain("For comparison, archdoc search");
+    expect(formatEval(r)).toContain("For comparison, word search alone");
   });
 });

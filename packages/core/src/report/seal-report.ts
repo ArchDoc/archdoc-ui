@@ -1,7 +1,7 @@
 import type { SealStatus } from "../seal/seal.js";
 
 /**
- * What `archdoc verify` prints: the facts whose code changed since they were
+ * What `archdoc check --seals` prints: the facts whose code changed since they were
  * sealed, with what changed and where each fact is in the model, then the
  * facts no one has sealed, then how many still hold.
  */
@@ -15,7 +15,7 @@ export function formatSealStatus(
   if (!options.hasSum) {
     return [
       `This repository has no ${options.file} yet, so nothing is sealed.`,
-      `Once the model describes the code, run archdoc seal --all to seal ${statuses.length} fact${statuses.length === 1 ? "" : "s"}. From then on, archdoc verify and archdoc check say when the code under one of them changes.`,
+      `Once the model describes the code, run archdoc seal --all to seal ${statuses.length} fact${statuses.length === 1 ? "" : "s"}. From then on, archdoc check says when the code under one of them changes.`,
     ].join("\n");
   }
   const changed = statuses.filter((s) => s.state === "changed");

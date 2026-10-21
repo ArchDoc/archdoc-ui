@@ -4,11 +4,11 @@ Shows reviewers what a pull request means for the architecture, before they merg
 
 1. Posts one comment, and keeps it up to date, that leads with a verdict:
    - **⛔ blocking**: errors the change introduces (a broken rule, an import the model doesn't declare) and consumers in other repos it breaks, each with how to fix it and the line it's about
-   - **⚠️ to check**: new warnings, sensitive data going somewhere new, a changed decision, consumers elsewhere that may be affected, facts an agent suggested
-   - **Before merging**: a checklist of who to involve. Owners approve, other repos' teams know, and critical journeys still work. Boxes reviewers tick stay ticked when the comment updates.
+   - **⚠️ to check**: new warnings, sensitive data going somewhere new, a changed decision, a critical journey whose steps changed, consumers elsewhere that may be affected, facts an agent suggested
+   - **Before merging**, only when there's someone to involve: owners when the change spans more than one team, other repos' teams, and critical journeys whose steps changed. Boxes reviewers tick stay ticked when the comment updates.
    - **What changed**: a diagram of only the elements and arrows that changed, and a link to the change in the explorer when you set `explorer-url`
    - folded below: the affected journeys as sequence diagrams (with their branches), consumers in other repos, data, drift, model changes, and findings already on the base
-2. Stays quiet when a pull request doesn't change the architecture: no new comment (one it posted earlier is updated to say so).
+2. Stays quiet unless there's something to fix or check: a pull request that only touches mapped code gets no comment, just the job summary (a comment posted earlier is updated).
 3. Puts the findings the pull request introduces on the lines they're about, in Files changed.
 4. Writes the same report to the job summary.
 5. Fails the job when the pull request introduces drift (configurable). Drift that was already there doesn't fail it.
@@ -46,7 +46,7 @@ jobs:
 | `base` | the pull request's base commit | What to compare with |
 | `model` | `.` | Repository, `.archdoc` directory, or model file |
 | `fail-on` | `error` | Fail on introduced findings at this severity or above: `error`, `warning`, or `never` |
-| `comment` | `quiet` | `quiet` comments only when the pull request changes the architecture; `true` always; `false` never |
+| `comment` | `quiet` | `quiet` comments only when there's something to fix or check; `true` always; `false` never |
 | `annotations` | `true` | Put introduced findings on their lines in Files changed |
 | `explorer-url` | | A page that shows this change in the explorer, linked from the comment |
 | `site` | `false` | Also write the explorer, opened on this change, to the directory in the `site` output |

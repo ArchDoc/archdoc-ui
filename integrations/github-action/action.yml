@@ -16,7 +16,7 @@ inputs:
     description: Fail when the pull request introduces findings at this severity or above. error, warning, or never.
     default: error
   comment:
-    description: Post the report as a pull request comment, updated on every run. true, false, or quiet (post only when the pull request changes the architecture; an earlier comment is still updated).
+    description: Post the report as a pull request comment, updated on every run. true, false, or quiet (post only when there's something to fix or check; an earlier comment is still updated). The job summary always has the report.
     default: quiet
   annotations:
     description: Put the findings the pull request introduces on the lines they're about, in Files changed. true or false.
@@ -113,8 +113,9 @@ runs:
             per_page: 100,
           });
           const previous = comments.find((c) => c.body?.startsWith(marker));
-          if (!previous && process.env.QUIET === "true" && process.env.VERDICT === "none") {
-            core.info("No architectural impact, so no comment.");
+          const quiet = ["none", "info"].includes(process.env.VERDICT);
+          if (!previous && process.env.QUIET === "true" && quiet) {
+            core.info("Nothing to fix or check, so no comment. The job summary has the report.");
             return;
           }
           if (previous) {

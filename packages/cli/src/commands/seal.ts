@@ -2,17 +2,17 @@ import { sealAnswer, sealReport } from "@archdoc/analyzers";
 import { formatSealStatus } from "@archdoc/core";
 import type { Io } from "../io.js";
 
-export interface VerifyOptions {
+export interface CheckSealsOptions {
   model?: string;
   format?: string;
 }
 
 /**
- * `archdoc verify`: the model facts whose code changed since they were sealed
+ * `archdoc check --seals`: the model facts whose code changed since they were sealed
  * (and what changed), and the facts no one has sealed. Exits 1 when there are
  * any, so an agent or CI knows the model needs a look.
  */
-export async function verify(options: VerifyOptions, io: Io): Promise<number> {
+export async function checkSeals(options: CheckSealsOptions, io: Io): Promise<number> {
   try {
     const r = await sealReport(options.model ?? ".", io.cwd);
     if (!r) {

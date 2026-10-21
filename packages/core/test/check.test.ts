@@ -66,6 +66,7 @@ describe("check", () => {
     observed: [
       dep("services/jobs/j.ts", "db/schema.ts", { specifier: "../../db/schema" }),
       dep("apps/web/w.ts", "db/client.ts", { typeOnly: true }),
+      dep("apps/web/w.ts", "services/jobs/j.ts", { typeOnly: true }),
     ],
     files: [
       "apps/web/w.ts",
@@ -85,6 +86,16 @@ describe("check", () => {
     );
     expect(f?.evidence).toEqual(["services/jobs/j.ts:1 (../../db/schema)"]);
     expect(f?.files).toEqual(["services/jobs/j.ts"]);
+  });
+
+  it("reports an import a rule forbids once, as the rule's finding", () => {
+    const web = result.findings.filter((f) => f.element === "web");
+    expect(web.map((f) => `${f.severity} ${f.code} ${f.message.split(",")[0]}`)).toEqual(
+      expect.arrayContaining(["error rule/violation The code has web → db"]),
+    );
+    expect(web.some((f) => f.message.startsWith("web depends on db"))).toBe(false);
+    // A rule that's only a warning doesn't hide the error that the import is undeclared.
+    expect(codes).toContain("error drift/undeclared-dependency jobs");
   });
 
   it("evaluates deny and allow-only rules on declared and observed relationships", () => {

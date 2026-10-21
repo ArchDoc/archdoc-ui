@@ -126,7 +126,7 @@ export function Overview(props: OverviewProps) {
 
 /**
  * The facts whose code changed since someone checked the model against it,
- * as archdoc verify lists them, or a line saying the model still matches.
+ * as archdoc check --seals lists them, or a line saying the model still matches.
  */
 function Recheck(props: { seals: SealsInfo; onSelect: (key: string) => void }) {
   const { seals } = props;

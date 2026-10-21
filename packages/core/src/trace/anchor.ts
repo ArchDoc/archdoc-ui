@@ -507,9 +507,9 @@ export function traceSkeleton(result: AnchorResult, text: string): string {
     .filter((l, i, all) => l || (i > 0 && i < all.length - 1))
     .slice(0, 8);
   const out = [
-    "# Suggested by archdoc trace anchor. Follow the code, then fix every step: say",
+    "# Suggested by archdoc context --error. Follow the code, then fix every step: say",
     "# what it does, give it evidence (reproduced, read, or inferred), and mark the",
-    `# cause. Save it as .archdoc/traces/${id}.yaml and run archdoc trace check.`,
+    `# cause. Save it as .archdoc/traces/${id}.yaml and run archdoc check.`,
     `trace: ${id}`,
     "title: TODO the bug in one line, as the user would say it",
     "symptom: |",

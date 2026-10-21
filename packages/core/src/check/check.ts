@@ -137,6 +137,26 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
       files: v.edge.files,
     });
   }
+  // An import the model doesn't declare and a rule forbids is one problem: the rule's.
+  // Declaring it in the model wouldn't fix it, so drop the undeclared-dependency finding
+  // (unless the rule is only a warning, which would hide an error).
+  const forbidden = new Set(
+    rules.violations
+      .filter((v) => v.edge.source === "observed" && v.rule.severity !== "warning")
+      .map((v) => `${v.edge.from}→${v.edge.to}`),
+  );
+  for (let i = findings.length - 1; i >= 0; i--) {
+    const f = findings[i];
+    if (f?.code !== "drift/undeclared-dependency") continue;
+    const edge = edges.find(
+      (e) =>
+        e.from === f.element &&
+        !e.declared &&
+        forbidden.has(`element:${e.from}→element:${e.to}`) &&
+        f.message.startsWith(`${e.from} depends on ${e.to}`),
+    );
+    if (edge) findings.splice(i, 1);
+  }
   const quiet = new Set(org.map((r) => r.id));
   const dataViolations = evaluateDataRules(model, [...model.rules, ...org], (rule, selector) => {
     if (!quiet.has(rule)) rules.unknownSelectors.push({ rule, selector });

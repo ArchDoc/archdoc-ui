@@ -133,15 +133,10 @@ describe("the landscape", () => {
     }
   });
 
-  it("impact and show name consumers and journeys in other repos", async () => {
-    const r = await run("payments", "impact", "charges");
-    expect(r.out).toContain("Used from other repos (2)");
+  it("context and show name consumers in other repos", async () => {
+    const r = await run("payments", "context", "services/charges/main.go");
     expect(r.out).toContain(
-      "rides.api-gateway (rides@1.0.0) uses payments.charges via proto/charges.proto: Asks for a refund",
-    );
-    expect(r.out).toContain("acme.goodwill-refund (critical) · actor support-agent · steps 2, 3");
-    expect(r.out).toContain(
-      "rides.request-refund (critical) · actor rider · steps 4, 5, 6, 7, 8, 9\n",
+      "Used by: rides.api-gateway (another repo), trips.trips-api (another repo). Ask before removing or renaming what other repos use.",
     );
     const show = await run("rides", "show", "payments.charges");
     expect(show.out).toMatch(
@@ -206,9 +201,7 @@ describe("the landscape", () => {
       'The model says charges sends RefundRequest (rider_email (pii)) to fraud-scoring, which breaks rule "acme/no-pii-to-external": Personal data never leaves for a third party.',
     );
     const report = await run("payments", "report", "--base", "main");
-    expect(report.out).toContain(
-      "> [!CAUTION]\n> This change sends sensitive data to an external element: `RefundRequest` (rider_email (pii)) to `fraud-scoring`.",
-    );
+    expect(report.out).toContain("> [!CAUTION]\n> **Breaks rule acme/no-pii-to-external**");
     expect(report.out).toContain(
       "| `RefundRequest` | rider_email (pii) | `charges` → `fraud-scoring` (external) | sends |",
     );
@@ -234,7 +227,7 @@ describe("the landscape", () => {
   it("simulates Refund a fare: the branch a sample takes, and the records and tables it writes across repos", async () => {
     const r = await run(
       "rides",
-      "simulate",
+      "show",
       "request-refund",
       "--sample",
       "samples/refund-overcharge.json",
@@ -264,29 +257,14 @@ describe("the landscape", () => {
     );
     sample["payments.RefundRequest"].amount_cents = 1000;
     await writeFile(join(org, "rides/large.json"), JSON.stringify(sample));
-    const large = await run(
-      "rides",
-      "simulate",
-      "request-refund",
-      "--sample",
-      "large.json",
-      "--json",
-    );
-    const sim = JSON.parse(large.out);
-    expect(sim.outcomes).toEqual(["needs-finance-approval"]);
-    expect(sim.records["payments.Refund"].status).toBe("pending_approval");
-    expect(sim.steps.slice(4).map((s: { skipped?: string }) => s.skipped)).toEqual([
-      "runs only when auto-approve; the decision was needs-finance-approval",
-      undefined,
-      "runs only when escalate-to-safety; the decision was needs-finance-approval",
-      "runs only when auto-approve; the decision was needs-finance-approval",
-      "runs only when auto-approve; the decision was needs-finance-approval",
-      "runs only when auto-approve; the decision was needs-finance-approval",
-    ]);
+    const large = await run("rides", "show", "request-refund", "--sample", "large.json");
+    expect(large.out).toContain("Journey request-refund · decided: needs-finance-approval");
+    expect(large.out).toContain("status: pending_approval");
+    expect(large.out).not.toContain("trips.Trip.refunded_cents");
   });
 
   it("follows a field's lineage from one repo's mappings into another's tables", async () => {
-    const r = await run("rides", "lineage", "payments.RefundRequest.amount_cents");
+    const r = await run("rides", "show", "payments.RefundRequest.amount_cents");
     expect(r.code).toBe(0);
     expect(r.out).toContain(
       "  payments.LedgerEntry.amount_cents = -refund.amount_cents  (payments.refund-to-ledger) · written to payments.ledger (ledger_entries)",

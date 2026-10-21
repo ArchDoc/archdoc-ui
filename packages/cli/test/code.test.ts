@@ -13,56 +13,32 @@ async function run(cwd: string, ...args: string[]) {
   return { code: program.exitCode ?? 0, out: out.join("\n"), err: err.join("\n") };
 }
 
-describe("archdoc search", () => {
-  it("finds elements for a few words, and fails when nothing matches", async () => {
-    const r = await run(repo, "search", "cli", "command", "--json");
-    expect(JSON.parse(r.out)[0]).toMatchObject({ id: "toolchain.cli.commands", type: "element" });
-    expect((await run(repo, "search", "kubernetes")).code).toBe(1);
-  });
-});
-
-describe("archdoc locate", () => {
+describe("archdoc context with paths", () => {
   it("finds the owning element, relative to where it runs", async () => {
     const r = await run(
       `${repo}packages/core`,
-      "locate",
+      "context",
       "src/load/fs.ts",
       "--model",
       "../..",
-      "--json",
+      "--format",
+      "json",
     );
     expect(r.code).toBe(0);
-    expect(JSON.parse(r.out)).toEqual([
-      {
-        path: "packages/core/src/load/fs.ts",
-        element: "toolchain.core.loader",
-        kind: "component",
-        pattern: "packages/core/src/load/**",
-        owners: ["maintainers"],
-        ties: [],
-      },
-    ]);
+    const brief = JSON.parse(r.out);
+    expect(brief.paths).toEqual(["packages/core/src/load/fs.ts"]);
+    expect(brief.start[0]).toMatchObject({
+      path: "packages/core/src/load/fs.ts",
+      element: "toolchain.core.loader",
+    });
   });
 
-  it("says when a path isn't mapped", async () => {
-    const r = await run(repo, "locate", "README.md");
-    expect(r.out).toContain("README.md\n  not mapped to any element");
-  });
-});
-
-describe("archdoc impact", () => {
-  it("reports journeys and actors for a file", async () => {
-    const r = await run(repo, "impact", "packages/cli/src/commands/validate.ts", "--json");
-    const result = JSON.parse(r.out);
-    expect(result.element).toBe("toolchain.cli.commands");
-    expect(result.journeys.map((j: { id: string }) => j.id)).toContain("check-model");
-    expect(result.actors.map((a: { id: string }) => a.id)).toContain("developer");
-  });
-
-  it("fails with a reason for unknown targets", async () => {
-    const r = await run(repo, "impact", "no-such-thing");
-    expect(r.code).toBe(1);
-    expect(r.err).toContain("not an element, actor, or mapped file");
+  it("names the journeys and actors a file affects", async () => {
+    const r = await run(repo, "context", "packages/cli/src/commands/validate.ts");
+    expect(r.out).toContain(
+      "check-model (high) · step 1 names packages/cli/src/commands/validate.ts",
+    );
+    expect(r.out).toContain("developer (actor)");
   });
 });
 

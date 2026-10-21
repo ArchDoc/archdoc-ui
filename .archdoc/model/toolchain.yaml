@@ -240,7 +240,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, eval, trace list, sync, publish, landscape build, mcp, migrate, and schema. search, locate, impact, lineage, simulate, verify, and trace anchor/check/show still work for a release, with a note naming the command they're part of."
+        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, sync, publish, landscape build, mcp, and schema. eval and migrate are hidden maintainer commands."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -325,7 +325,7 @@ elements:
       github-action:
         kind: container
         technology: GitHub Actions (composite), actions/github-script
-        description: Posts a pull request comment that leads with a verdict (what blocks the merge, what to check, who to involve), stays quiet when nothing changes the architecture, puts introduced findings on their lines, and fails on drift the pull request introduces.
+        description: Posts a pull request comment that leads with a verdict (what blocks the merge, what to check, who to involve) only when there is something to fix or check, otherwise writes the report to the job summary; puts introduced findings on their lines, and fails on drift the pull request introduces.
         code: [{ path: integrations/github-action/** }]
         uses:
           cli:

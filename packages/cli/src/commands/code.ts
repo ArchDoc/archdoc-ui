@@ -1,21 +1,13 @@
 import { readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
-import { indexRepository, showAnswer } from "@archdoc/analyzers";
+import { relative, resolve } from "node:path";
+import { showAnswer } from "@archdoc/analyzers";
 import {
   filesUnder,
-  formatImpact,
-  formatLocate,
-  formatSearch,
   hasErrors,
-  impact as impactOf,
-  impactToJSON,
   type LoadedModel,
   listRepoFiles,
   loadModel,
-  locatedToJSON,
-  locate as locateIn,
   resolveCodeMap,
-  search as searchModel,
 } from "@archdoc/core";
 import type { Io } from "../io.js";
 
@@ -35,58 +27,6 @@ export async function load(options: ModelOptions, io: Io): Promise<LoadedModel |
     io.err('warning: the model has errors, so answers may be incomplete. Run "archdoc validate".');
   }
   return model;
-}
-
-/** A path from the command line, relative to the repository root. */
-function repoPath(model: LoadedModel, io: Io, path: string): string {
-  const absolute = isAbsolute(path) ? path : resolve(io.cwd, path);
-  return relative(model.baseDir, absolute).replace(/\\/g, "/");
-}
-
-export async function search(words: string[], options: ModelOptions, io: Io): Promise<number> {
-  const model = await load(options, io);
-  if (!model) return 1;
-  const query = words.join(" ");
-  // File paths and the names files export count too.
-  const hits = searchModel(model, query, 10, await indexRepository(model.baseDir));
-  io.out(options.json ? JSON.stringify(hits, null, 2) : formatSearch(query, hits));
-  return hits.length ? 0 : 1;
-}
-
-export async function locate(paths: string[], options: ModelOptions, io: Io): Promise<number> {
-  const model = await load(options, io);
-  if (!model) return 1;
-  const results = paths.map((p) => locateIn(model, repoPath(model, io, p)));
-  io.out(
-    options.json
-      ? JSON.stringify(
-          results.map((r) => locatedToJSON(model, r)),
-          null,
-          2,
-        )
-      : formatLocate(model, results),
-  );
-  return 0;
-}
-
-export async function impact(target: string, options: ModelOptions, io: Io): Promise<number> {
-  const model = await load(options, io);
-  if (!model) return 1;
-  // A target that looks like a file path is taken relative to where the command runs.
-  const asPath = target.includes("/") || /\.[a-z]+$/i.test(target);
-  let result = impactOf(model, asPath ? repoPath(model, io, target) : target);
-  if (!result.ok && asPath) result = impactOf(model, target);
-  if (!result.ok) {
-    io.err(result.reason);
-    if (result.candidates) io.err(`Did you mean: ${result.candidates.join(", ")}?`);
-    return 1;
-  }
-  io.out(
-    options.json
-      ? JSON.stringify(impactToJSON(result.impact), null, 2)
-      : formatImpact(model, result.impact),
-  );
-  return 0;
 }
 
 export async function map(options: ModelOptions & { unmapped?: boolean }, io: Io): Promise<number> {

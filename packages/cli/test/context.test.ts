@@ -117,7 +117,7 @@ describe("archdoc eval", () => {
     expect(r.out).toContain("· set up");
     expect(r.out).toContain("3 commits replayed (1 with no source changes skipped)");
     expect(r.out).toMatch(/Recall: \d+% \(2\/7\)/);
-    expect(r.out).toContain("For comparison, archdoc search");
+    expect(r.out).toContain("For comparison, word search alone");
   });
 
   it("prints JSON, limits the commits, and fails below --min-recall", async () => {

@@ -1,7 +1,7 @@
 import { checkAnswer, checkRepository } from "@archdoc/analyzers";
 import { formatAnnotations, formatFindings, type MarkedFinding } from "@archdoc/core";
 import type { Io } from "../io.js";
-import { verify } from "./seal.js";
+import { checkSeals } from "./seal.js";
 
 export interface CheckOptions {
   model?: string;
@@ -29,7 +29,7 @@ export function runCheck(options: CheckOptions, cwd: string) {
  */
 export async function check(options: CheckOptions, io: Io): Promise<number> {
   if (options.seals) {
-    return verify(
+    return checkSeals(
       { model: options.model, format: options.format === "json" ? "json" : "text" },
       io,
     );

@@ -12,7 +12,7 @@ import { type JourneyNode, type Model, toReview } from "../model.js";
 import { impact } from "../query/impact.js";
 import type { MarkedFinding } from "./check-report.js";
 import { formatFindings } from "./check-report.js";
-import { blockChanges, describeChange, formatDiff, summary } from "./diff-report.js";
+import { blockChanges, formatDiff, summary } from "./diff-report.js";
 import { CHANGE_LEGEND_SHORT, changeDiagram, journeyDiagram, type RemoteUse } from "./mermaid.js";
 
 /** Marks the comment so the Action can find and update it. */
@@ -107,6 +107,8 @@ export interface ChangeSummary {
     importance: string;
     status: string;
     steps: number[];
+    /** The change edits this journey's steps in the model. */
+    stepsChanged?: boolean | undefined;
   }[];
   actors: { id: string; kind: string }[];
   owners: string[];
@@ -128,6 +130,9 @@ export interface PrReport extends ChangeSummary {
 }
 
 const IMPORTANCE: Record<string, number> = { critical: 0, high: 1, normal: 2 };
+
+/** Concerns that Before merging already asks about, so To check and the headline don't repeat them. */
+export const ASKED_CONCERNS = new Set(["journey/critical-changed", "consumer/affected"]);
 
 /**
  * The architectural impact of a change, for a pull request, as a comment that
@@ -152,6 +157,12 @@ export function summarizeChange(input: PrReportInput): ChangeSummary {
   for (const file of input.changedFiles) {
     const owner = locate(model, file).element;
     if (owner) touchedFiles.set(owner.id, (touchedFiles.get(owner.id) ?? 0) + 1);
+  }
+  // A contract's spec file (provides: api: proto/charges.proto) belongs to the element that provides it.
+  const changed = new Set(input.changedFiles);
+  for (const e of model.elements.values()) {
+    const specs = (e.spec.provides ?? []).filter((p) => changed.has(contractName(p))).length;
+    if (specs) touchedFiles.set(e.id, (touchedFiles.get(e.id) ?? 0) + specs);
   }
   for (const c of diff.elements) {
     if (c.kind !== "removed" && model.elements.has(c.id) && !touchedFiles.has(c.id))
@@ -219,16 +230,18 @@ export function summarizeChange(input: PrReportInput): ChangeSummary {
   // New and changed journeys in the model are affected too.
   for (const c of diff.journeys) {
     const j = c.kind !== "removed" ? model.journeys.get(c.id) : undefined;
-    if (j && !journeys.has(j.id)) {
-      journeys.set(j.id, {
-        id: j.id,
-        goal: j.spec.goal,
-        actor: j.spec.actor,
-        importance: j.spec.importance ?? "normal",
-        status: j.spec.status ?? "active",
-        steps: [],
-      });
-    }
+    if (!j) continue;
+    const stepsChanged = c.kind === "changed" && !!c.steps?.length;
+    const prev = journeys.get(j.id);
+    journeys.set(j.id, {
+      id: j.id,
+      goal: j.spec.goal,
+      actor: j.spec.actor,
+      importance: j.spec.importance ?? "normal",
+      status: j.spec.status ?? "active",
+      steps: prev?.steps ?? [],
+      stepsChanged,
+    });
   }
   // Other repos: who uses what this change touches or removes, and what it does to them.
   const removed = new Set(diff.elements.filter((c) => c.kind === "removed").map((c) => c.id));
@@ -348,32 +361,17 @@ export function summarizeChange(input: PrReportInput): ChangeSummary {
   };
   return judge(summary);
 }
-/** Sensitive data going somewhere new, and data entries that changed. */
+/** Sensitive data going somewhere new, and logic and mappings that changed. (Model changes lists data entries.) */
 function dataSection(
   diff: ModelDiff,
   data: { flows: NewSensitiveFlow[]; stores: NewSensitiveStore[] },
 ): string[] {
-  if (
-    !diff.data.length &&
-    !diff.mappings.length &&
-    !diff.logic.length &&
-    !data.flows.length &&
-    !data.stores.length
-  )
+  if (!diff.mappings.length && !diff.logic.length && !data.flows.length && !data.stores.length)
     return [];
   const md = ["### Data", ""];
   const name = (t: NewSensitiveFlow["flow"]["from"]) => (t.type === "external" ? t.ref : t.id);
   const fields = (list: { field: string; classification: string }[]) =>
     list.map((f) => `${f.field} (${f.classification})`).join(", ");
-  const external = data.flows.filter((f) => f.external);
-  if (external.length) {
-    md.push(
-      `> [!CAUTION]\n> This change sends sensitive data to ${new Set(external.map((f) => name(f.flow.to))).size === 1 ? "an external element" : "external elements"}: ${external
-        .map((f) => `\`${f.flow.data}\` (${fields(f.fields)}) to \`${name(f.flow.to)}\``)
-        .join("; ")}.`,
-      "",
-    );
-  }
   if (data.flows.length) {
     md.push(
       "**Sensitive data that goes somewhere new**",
@@ -419,16 +417,6 @@ function dataSection(
       for (const part of blockChanges(section, c).split("; ")) md.push(`  - ${part}`);
     }
     md.push("");
-  }
-  if (diff.data.length) {
-    md.push(
-      `**Data entries changed (${diff.data.length})**`,
-      "",
-      ...diff.data.map(
-        (c) => `- ${c.kind === "changed" ? "" : `**${c.kind}** `}${describeChange("data", c)}`,
-      ),
-      "",
-    );
   }
   return md;
 }
@@ -533,7 +521,10 @@ function concernOf(f: MarkedFinding): Concern {
     code: f.code,
     title,
     detail: f.message,
-    fix: FIX.find(([re]) => re.test(f.code))?.[1],
+    fix:
+      f.code === "rule/violation" && f.message.startsWith("The code has")
+        ? "Remove the dependency from the code. The rule doesn't allow it, so declaring it in the model won't help; ask the rule's owners if it should be allowed."
+        : FIX.find(([re]) => re.test(f.code))?.[1],
     where,
     details: f.details,
     evidence: f.evidence.length ? f.evidence : undefined,
@@ -613,7 +604,8 @@ function judge(s: ChangeSummary): ChangeSummary {
       title: s.suggested.some((x) => x.endsWith("(inferred)"))
         ? `${plural(s.suggested.length, "fact")} to review`
         : `${plural(s.suggested.length, "fact")} an agent suggested`,
-      detail: s.suggested.join("; ").replace(/`/g, ""),
+      detail: "Accept or reject them before merging.",
+      details: s.suggested.map((x) => x.replace(/`/g, "")),
       fix: "Accept them by removing their provenance block, or delete them.",
     });
   }
@@ -623,8 +615,11 @@ function judge(s: ChangeSummary): ChangeSummary {
   for (const t of s.touched) {
     for (const o of t.owners) ownedBy.set(o, [...(ownedBy.get(o) ?? []), t.id]);
   }
-  for (const [o, ids] of ownedBy) {
-    s.asks.push({ kind: "approve", who: o, why: `owns ${ids.slice(0, 3).join(", ")}` });
+  // One team owning everything is what CODEOWNERS already says; a change across teams needs each.
+  if (ownedBy.size > 1) {
+    for (const [o, ids] of ownedBy) {
+      s.asks.push({ kind: "approve", who: o, why: `owns ${ids.slice(0, 3).join(", ")}` });
+    }
   }
   const repos = new Map<string, PrReport["elsewhere"]>();
   for (const e of s.elsewhere) {
@@ -654,7 +649,15 @@ function judge(s: ChangeSummary): ChangeSummary {
       });
     }
   }
-  const critical = s.journeys.filter((j) => j.importance === "critical");
+  // Passing through a critical journey is common; changing its steps is worth a reviewer's look.
+  const critical = s.journeys.filter((j) => j.importance === "critical" && j.stepsChanged);
+  for (const j of critical) {
+    s.attention.push({
+      code: "journey/critical-changed",
+      title: `Changes the steps of critical journey ${j.id}`,
+      detail: `${j.goal ? `${j.goal}. ` : ""}Check it still works the way the model now says.`,
+    });
+  }
   for (const j of critical.slice(0, 3)) {
     s.asks.push({
       kind: "verify",
@@ -675,20 +678,21 @@ function judge(s: ChangeSummary): ChangeSummary {
     });
   }
 
+  // Only something to fix or check earns a comment; touching mapped code alone is info.
   s.verdict = s.blocking.length
     ? "blocking"
-    : s.attention.length || critical.length
+    : s.attention.length
       ? "attention"
       : s.touched.length || s.changes
         ? "info"
         : "none";
   const teams = new Set(s.asks.filter((a) => a.kind !== "verify").map((a) => a.who)).size;
   const parts: string[] = [];
+  const checks = s.attention.filter((c) => !ASKED_CONCERNS.has(c.code));
   if (s.blocking.length) parts.push(plural(s.blocking.length, "blocking issue"));
-  else if (s.attention.length)
-    parts.push(plural(s.attention.length, "thing to check", "things to check"));
-  if (critical.length) parts.push(plural(critical.length, "critical journey"));
-  else if (s.journeys.length) parts.push(plural(s.journeys.length, "journey"));
+  else if (checks.length) parts.push(plural(checks.length, "thing to check", "things to check"));
+  if (critical.length)
+    parts.push(plural(critical.length, "critical journey changed", "critical journeys changed"));
   if (teams) parts.push(plural(teams, "team to ask", "teams to ask"));
   if (!parts.length) {
     parts.push(
@@ -767,12 +771,18 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
       "",
     );
 
-  if (s.attention.length) {
+  const checks = s.attention.filter((c) => !ASKED_CONCERNS.has(c.code));
+  if (checks.length) {
     md.push("**To check**", "");
-    for (const c of s.attention.slice(0, 8)) {
+    for (const c of checks.slice(0, 8)) {
       md.push(`- **${c.title}.** ${c.detail}${c.where ? ` \`${c.where}\`` : ""}`);
+      if (c.code === "model/suggested" && c.details) {
+        for (const d of c.details.slice(0, 5)) md.push(`  - ${d}`);
+        if (c.details.length > 5)
+          md.push(`  - …and ${c.details.length - 5} more, under Suggested facts`);
+      }
     }
-    if (s.attention.length > 8) md.push(`- …and ${s.attention.length - 8} more`);
+    if (checks.length > 8) md.push(`- …and ${checks.length - 8} more`);
     md.push("");
   }
 
@@ -803,7 +813,7 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
     .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id))
     .map((t) => `\`${t.id}\`${t.files ? ` (${t.files} file${t.files === 1 ? "" : "s"})` : ""}`);
   const touches = list.length
-    ? `Touches ${list.join(", ")}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}.`
+    ? `Touches ${list.slice(0, 6).join(", ")}${list.length > 6 ? `, and ${list.length - 6} more` : ""}${s.owners.length ? `, owned by ${s.owners.join(", ")}` : ""}.`
     : s.changes
       ? "Touches the model only."
       : "Touches no code the model maps.";
@@ -891,23 +901,25 @@ export function renderPrComment(s: ChangeSummary, input: PrReportInput): string 
   }
   const data = dataSection(input.diff, s.data);
   if (data.length) fold("Data", data.slice(2));
-  if (s.findings.introduced.length) {
-    fold(
-      `Drift and rules (${s.introduced.errors} error${s.introduced.errors === 1 ? "" : "s"}, ${s.introduced.warnings} warning${s.introduced.warnings === 1 ? "" : "s"} from this change)`,
-      [
-        formatFindings(
-          s.findings.introduced.map(({ introduced: _i, ...f }) => f),
-          "markdown",
-        ),
-      ],
-    );
+  // Findings already shown above as blocking or to check aren't listed again.
+  const shown = new Set(
+    [...s.blocking.slice(0, 5), ...checks.slice(0, 8)].map((c) => `${c.code}\n${c.detail}`),
+  );
+  const more = s.findings.introduced.filter((f) => !shown.has(`${f.code}\n${f.message}`));
+  if (more.length) {
+    fold(`More drift and rules (${more.length} from this change)`, [
+      formatFindings(
+        more.map(({ introduced: _i, ...f }) => f),
+        "markdown",
+      ),
+    ]);
   }
   if (s.changes) {
     fold(`Model changes (${summary(input.diff)})`, [
       formatDiff(input.diff, "markdown").split("\n").slice(2).join("\n"),
     ]);
   }
-  if (s.suggested.length) {
+  if (s.suggested.length > 5) {
     fold(`Suggested facts to review (${s.suggested.length})`, [
       "An agent suggested these, or archdoc init inferred them (marked). Accept them by removing their `provenance` block, or reject them by deleting them.",
       "",

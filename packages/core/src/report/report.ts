@@ -330,7 +330,7 @@ export function formatSearch(query: string, hits: SearchHit[]): string {
   }
   out.push(
     "",
-    "Next: archdoc_context (or archdoc context) for the files to start in, or archdoc_impact (archdoc impact) on the element or the files you plan to change.",
+    "Next: archdoc_context (or archdoc context) with the task or the files you plan to change, for where to start and what it affects.",
   );
   return out.join("\n");
 }
