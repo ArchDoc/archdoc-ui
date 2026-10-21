@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for ArchDoc: lets coding agents ask where they are and what a change affects before they edit.",
   "license": "MIT",
   "type": "module",

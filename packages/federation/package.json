@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/federation",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Share ArchDoc models across repos: publish a bundle, and sync other repos' models into archdoc.lock.",
   "license": "MIT",
   "type": "module",

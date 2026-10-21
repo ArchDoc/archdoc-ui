@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/analyzers",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Find the dependencies that code actually has, so ArchDoc can compare them with the model.",
   "license": "MIT",
   "type": "module",
