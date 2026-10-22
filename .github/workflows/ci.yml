@@ -38,3 +38,5 @@ jobs:
         run: pnpm test
       - name: Validate ArchDoc's own model
         run: pnpm archdoc validate --strict
+      - name: Check the packed packages install and run
+        run: pnpm clean && pnpm build && pnpm smoke
