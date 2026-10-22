@@ -6,7 +6,7 @@ steps:
   - from: coding-agent
     to: agent-skills
     action: Reads the workflow from the skill, CLAUDE.md, or AGENTS.md
-    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+    code: integrations/claude-plugin/skills/archdoc/SKILL.md
   - from: coding-agent
     to: mcp
     action: Calls archdoc_context with the task in a few words, or the files it plans to change, before grepping

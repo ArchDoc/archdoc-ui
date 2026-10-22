@@ -6,7 +6,7 @@ steps:
   - from: coding-agent
     to: agent-skills
     action: Reads that after changing code it checks the facts whose code changed
-    code: integrations/agent-skills/claude-code/archdoc/SKILL.md
+    code: integrations/claude-plugin/skills/archdoc/SKILL.md
   - from: coding-agent
     to: mcp
     action: Calls archdoc_check after editing

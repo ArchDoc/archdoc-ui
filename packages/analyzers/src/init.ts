@@ -111,6 +111,17 @@ export async function inferModel(root: string, name?: string): Promise<InitResul
     }
   }
 
+  // Build, release, and maintenance scripts at the top, which no package claims.
+  for (const dir of ["scripts", "tools", "bin"]) {
+    const inside = files.filter((f) => f.startsWith(`${dir}/`) && SOURCE.test(f));
+    if (inside.length >= 2 && !inside.some((f) => ownerOf(units, f)?.dir)) {
+      add(
+        { ...(await directoryUnit(ctx, dir)), source: `the ${dir} the repository runs` },
+        dir,
+      );
+    }
+  }
+
   // 2. Datastores, queues, and dependencies, from compose files.
   await compose(ctx, units, add);
 

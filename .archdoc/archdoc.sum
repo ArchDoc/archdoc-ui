@@ -3,17 +3,22 @@ sealVersion: 1
 seals:
   element:toolchain.agent-skills:
     kind: structure
-    hash: fnv-b9bc1dd10b81d90f
+    hash: fnv-d97c99971e8ef979
     files:
+      .claude-plugin/marketplace.json: []
       .claude/skills/archdoc/SKILL.md: []
       .mcp.json: []
       AGENTS.md: []
       CLAUDE.md: []
       integrations/agent-skills/AGENTS.md: []
       integrations/agent-skills/README.md: []
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
       integrations/agent-skills/mcp/claude-code.mcp.json: []
       integrations/agent-skills/mcp/cursor.mcp.json: []
+      integrations/claude-plugin/.claude-plugin/plugin.json: []
+      integrations/claude-plugin/.mcp.json: []
+      integrations/claude-plugin/README.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   element:toolchain.analyzers:
     kind: structure
     hash: fnv-c5f014802cce4d30
@@ -1119,9 +1124,10 @@ seals:
     by: agent:claude-code
   step:agent-preflight#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   step:agent-preflight#2:
     kind: structure
     hash: fnv-3c8e7a02bbae7918
@@ -1254,9 +1260,10 @@ seals:
         - lookupImported
   step:explain-a-bug#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   step:explain-a-bug#2:
     kind: structure
     hash: fnv-3c8e7a02bbae7918
@@ -1340,9 +1347,9 @@ seals:
         - App
   step:keep-the-model-true#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
     by: agent:claude-code
   step:keep-the-model-true#2:
     kind: structure
@@ -1464,9 +1471,9 @@ seals:
     by: agent:claude-code
   step:start-a-model#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
     by: agent:claude-code
   step:start-a-model#2:
     kind: structure

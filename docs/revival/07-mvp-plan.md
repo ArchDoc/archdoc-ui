@@ -14,15 +14,16 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 | Federation (`sync`, `publish`, `landscape`, `imports`) | Experimental; stays in the code, leaves the main docs, lands after the release | A release requirement |
 | Simulation (`show --sample`, "Try a sample", samples) | Hidden until we know it's a feature people use | Shipped as stable |
 | Tours, onboarding pages, the Ask panel | Cut from the release | Phase 7 as planned |
-| Agent plugin | Its own repo, as the way people install ArchDoc; skill text stays in `integrations/agent-skills/` and the release copies it over | Skill text maintained in the plugin repo |
+| Agent plugin (revised 2026-10-22) | In this repo: the marketplace at the root (`.claude-plugin/marketplace.json`), the plugin in `integrations/claude-plugin/`, so the skill has one copy and the plugin is versioned with the CLI | Its own repo, with the skill copied over on release |
 | The PR comment | Only posts when there's a finding | Posts whenever a PR touches mapped code |
 | Languages (2026-10-22) | Python and Go import analyzers and symbol indexes, next to TS/JS | Other languages first |
 | Decision rules (2026-10-22) | Experimental, with mappings and simulation | Stable |
 | How "experimental" shows (2026-10-22) | The JSON Schema and docs mark the fields; `validate` prints a note naming them, which doesn't fail `--strict` or reach the PR comment | A warning per use |
 
+| Tagline (2026-10-22) | "Architecture your AI agents can read, and your PRs can't quietly break." | "An architecture control plane for AI-assisted development", "Software system modeling for the AI age" |
+
 ## Open decisions
 
-- **One tagline.** The README says "architecture control plane for AI-assisted development"; the newer framing is "software system modeling for the AI age". The README, the website, and the plugin should say the same thing.
 - **First version number.** `0.x` keeps room to change the format; `1.0` promises it.
 
 ## 1. Release pipeline
@@ -32,7 +33,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 - [x] Build from clean (`pnpm clean` removes every output), so a deleted source file's `.js` can't ship again (0.1.0 shipped a stale `dist/commands/data.js`).
 - [x] Turn the pending changesets into the first release's notes (0.1.0's changelogs).
 - [x] A CI step that packs every package, installs the tarballs into an empty project, and runs the CLI (`validate`, an `mcp` initialize handshake, and `site`, which needs the bundled explorer): `pnpm smoke`.
-- [ ] The first release through the workflow, to confirm `npm stage publish` works from CI the way it does in the docs.
+- [x] The first release through the workflow, to confirm `npm stage publish` works from CI the way it does in the docs. 0.1.1 and 0.3.0 were staged from CI and approved.
 
 **Exit:** on a clean machine, `npx -y @archdoc/cli mcp` starts the server and `npx -y @archdoc/cli view` opens the explorer.
 
@@ -121,12 +122,12 @@ What the review found:
 
 ## 9. Agent plugin
 
-- [ ] A new repo that is a Claude Code plugin marketplace: one plugin with the skills (a change, a bug, start a model) and an MCP config pinned to the CLI version it was tested with.
-- [ ] The release workflow copies the skill text from `integrations/agent-skills/` into the plugin repo, so the sync test keeps covering it.
-- [ ] The first run is `init`: from install to a model that `archdoc check` passes, in one session.
-- [ ] Document the MCP config and `AGENTS.md` snippet for Cursor, Codex, and other agents.
+- [x] A Claude Code plugin marketplace in this repo (`.claude-plugin/marketplace.json`), with one plugin (`integrations/claude-plugin/`): the skill (a change, a bug, start a model) and an MCP config pinned to the CLI released with it. `claude plugin validate` passes both. Install: `/plugin marketplace add ArchDoc/archdoc`, then `/plugin install archdoc@archdoc`.
+- [x] The skill has one copy, in the plugin; this repo's `.claude/skills/archdoc` must match it, and the plugin's version and CLI pin must match the CLI's (`integrations/agent-skills/test/sync.test.ts`). `pnpm version-packages` and `set-version` run `scripts/sync-plugin.mjs`. *(The release workflow has to call `pnpm version-packages` instead of `pnpm changeset version` for this; a maintainer edits the workflow.)*
+- [x] The first run is `init`. On 2026-10-22, the plugin installed from this repo, in a fresh clone of golang-gin-realworld-example-app with no `.archdoc/`, given "This repository has no architecture model yet. Start one, so that archdoc check passes.", allowed only the ArchDoc tools and file edits: 13 turns, 36 seconds, a model with 4 elements, their uses, an actor, and a critical journey with code on each step, all marked suggested. `archdoc check` passes it (0 errors, 4 warnings: the steps don't say what they send, which the agent left rather than guess).
+- [x] Document the MCP config and `AGENTS.md` snippet for Cursor, Codex, and other agents (`integrations/agent-skills/README.md`).
 
-**Exit:** on a fresh machine, someone installs the plugin, opens a repository without `.archdoc/`, and ends the session with a model that passes `archdoc check`, without cloning ArchDoc.
+**Exit:** on a fresh machine, someone installs the plugin, opens a repository without `.archdoc/`, and ends the session with a model that passes `archdoc check`, without cloning ArchDoc. *Met in a container, except that the marketplace was added from a local clone; `/plugin marketplace add ArchDoc/archdoc` works once this merges to main.*
 
 ## 10. Prove it outside this repo
 
@@ -141,7 +142,7 @@ What the review found:
 
 ## 12. Website
 
-- [ ] One tagline (see open decisions) across the README, the website, and the plugin.
+- [~] One tagline across the README, the website, and the plugin: "Architecture your AI agents can read, and your PRs can't quietly break." README and plugin done; the website is next.
 - [ ] A landing page that tells the 30-second story: the agent's brief before it edits, and the PR comment that blocks a personal-data leak. Its demo is a real explorer built with `archdoc site`, not screenshots. Installing means the plugin.
 - [ ] Docs for the stable surface; one experimental page for federation and simulation.
 - [ ] Archive `versioned_docs/version-1.0.0` (v0) so search and the version menu don't lead there.

@@ -1,10 +1,28 @@
 # ArchDoc
 
-**An architecture control plane for AI-assisted development.**
+**Architecture your AI agents can read, and your PRs can't quietly break.**
 
-ArchDoc is an interactive software modeling platform that helps engineers understand the systems AI is modifying and stay in the driver's seat. It's open source and AI-first. It analyzes the current state of a system, proposes future-state changes, and maps architectural concepts to code. Developers of any experience level can use it to explore and learn the system they're building.
+ArchDoc keeps a model of your system's architecture next to its code. Your coding agent reads it before it edits, so it knows where a change belongs and what it affects, and every pull request is checked against it, so a change that breaks a rule or sends personal data somewhere new doesn't merge unnoticed. You stay in the driver's seat. It's open source and AI-first. It analyzes the current state of a system, proposes future-state changes, and maps architectural concepts to code. Developers of any experience level can use it to explore and learn the system they're building.
 
 > **Status: v2 is under active development.** The v0 viewer (`@archdoc/archdoc-ui`) is frozen at [`v0.2.0`](https://github.com/ArchDoc/archdoc/releases/tag/v0.2.0) on the [`legacy/v0`](https://github.com/ArchDoc/archdoc/tree/legacy/v0) branch. The plan for v2 is in [`docs/revival/`](./docs/revival/README.md).
+
+## Install
+
+In Claude Code, install the plugin. It brings the skill and the MCP tools, pinned to a released CLI:
+
+```
+/plugin marketplace add ArchDoc/archdoc
+/plugin install archdoc@archdoc
+```
+
+Then open a repository and ask your agent to start an architecture model (or, where there's one, just start a task). For Cursor, Codex, and other agents, see [`integrations/agent-skills`](./integrations/agent-skills). The CLI runs anywhere with Node 22.12+:
+
+```bash
+npx -y @archdoc/cli init     # start a model in this repository
+npx -y @archdoc/cli view     # open it in the explorer
+```
+
+For pull requests, add the [GitHub Action](./integrations/github-action).
 
 ## Why
 
@@ -82,7 +100,7 @@ pnpm install && pnpm playground --open      # builds if needed, then opens the w
 
 For single systems, [`examples/`](./examples) has one model per part of the platform. They are a quickstart, a modular monolith taken apart into components with code snippets, an event-driven system, a 24-table schema, and sensitive data. Each is one file you can open with `archdoc view examples/quickstart.yaml`. Three variants of the quickstart show what a change looks like to a reviewer, compared straight from the files: `archdoc diff examples/quickstart.yaml examples/quickstart.add-reviews.yaml`. [examples/README.md](./examples/README.md) says what each one shows.
 
-The packages aren't published yet, so run the CLI from a clone:
+To work on ArchDoc itself, run the CLI from a clone, on ArchDoc's own model:
 
 ```bash
 pnpm install && pnpm build
@@ -257,7 +275,7 @@ A task is `context`, edit, `check`, `seal`: three or four calls. The agent edits
 
 `archdoc init` (or `archdoc_init`) writes `.archdoc/` for a repository that has none, from what the repository declares: a container per package or module its manifests name (`package.json`, `go.mod` with one per `cmd/` binary, `Cargo.toml`, `pyproject.toml`, Maven and Gradle) or per code directory none claims, GitHub Actions included; datastores and queues from compose images, with `depends_on` as uses; uses from imports; and data entries, the datastore that stores them, and contracts from Prisma, SQL migrations, OpenAPI, and protobuf files. It's deterministic, marks every fact `provenance: { source: inferred }` so reviewers see it as unaccepted, never writes over a model, and never seals. On ArchDoc itself it finds all 10 containers and 13 of the 17 uses between them. What it can't know (what each part is for, who uses the system, and how) it leaves to you or your agent, and says so.
 
-[`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflows: a change (context, edit code and model, check, seal), a bug (context on the error, then a trace), and a repository with no model yet (init, then describe it, add actors and journeys, and check). This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
+The [Claude Code plugin](./integrations/claude-plugin) (see [Install](#install)) and [`integrations/agent-skills`](./integrations/agent-skills), for other agents, teach the workflows: a change (context, edit code and model, check, seal), a bug (context on the error, then a trace), and a repository with no model yet (init, then describe it, add actors and journeys, and check). This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
 
 ## Roadmap
 
@@ -288,7 +306,8 @@ packages/
 apps/
   web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 integrations/
-  agent-skills/           Claude Code skill, AGENTS.md snippet, MCP configs
+  claude-plugin/          the Claude Code plugin: the skill, and MCP pinned to the CLI (marketplace in .claude-plugin/)
+  agent-skills/           AGENTS.md snippet and MCP configs for other agents
   landscape-template/     starting point for a landscape repo, with a sync-and-publish workflow
   github-action/          the pull request impact comment and drift gate
 examples/                 one model per part of the platform, the quickstart's change variants, and org/, a demo org

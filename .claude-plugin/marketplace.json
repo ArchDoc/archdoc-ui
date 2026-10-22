@@ -1,0 +1,13 @@
+{
+  "name": "archdoc",
+  "description": "ArchDoc for Claude Code: architecture your AI agents can read, and your PRs can't quietly break.",
+  "owner": { "name": "ArchDoc", "url": "https://github.com/ArchDoc" },
+  "plugins": [
+    {
+      "name": "archdoc",
+      "source": "./integrations/claude-plugin",
+      "description": "Starts every task from your repository's architecture model: where a change belongs, what it affects, and the checks it has to pass. Starts a model where there's none.",
+      "category": "development"
+    }
+  ]
+}
