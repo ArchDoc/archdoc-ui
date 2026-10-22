@@ -53,7 +53,7 @@ data:
 
   CodeIndex:
     kind: message
-    description: What the analyzers read from the code for context, search, and eval, per TS/JS file. Plain data that core ranks.
+    description: What the analyzers read from the code for context, search, and eval, per TS/JS, Python, and Go file. Plain data that core ranks.
     provenance: { source: suggested, by: agent:claude-code }
     fields:
       path: { type: string }

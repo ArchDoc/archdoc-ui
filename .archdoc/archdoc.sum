@@ -16,7 +16,7 @@ seals:
       integrations/agent-skills/mcp/cursor.mcp.json: []
   element:toolchain.analyzers:
     kind: structure
-    hash: fnv-14ac190a3724c3dc
+    hash: fnv-c5f014802cce4d30
     files:
       packages/analyzers/package.json: []
       packages/analyzers/src/answers.ts:
@@ -43,6 +43,15 @@ seals:
         - CheckRepositoryOptions
         - CheckRepositoryResult
         - checkRepository
+      packages/analyzers/src/go.ts:
+        - GoModule
+        - GoReplace
+        - goImports
+        - goModules
+        - indexGoSource
+        - isGoSource
+        - packageName
+        - resolveGoImport
       packages/analyzers/src/index.ts: []
       packages/analyzers/src/init.ts:
         - InitResult
@@ -51,6 +60,12 @@ seals:
         - initModel
       packages/analyzers/src/manifests.ts:
         - manifests
+      packages/analyzers/src/python.ts:
+        - indexPythonCode
+        - indexPythonSource
+        - pythonImports
+        - pythonRoots
+        - resolvePythonModule
       packages/analyzers/src/revision.ts:
         - LoadRevisionOptions
         - Revision

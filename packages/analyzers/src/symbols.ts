@@ -7,6 +7,8 @@ import {
 } from "@archdoc/core";
 import ts from "typescript";
 import { type AnalyzerContext, contextFor } from "./api.js";
+import { goModules, indexGoSource, isGoSource, resolveGoImport } from "./go.js";
+import { indexPythonCode } from "./python.js";
 import { resolveSpecifier } from "./ts-imports.js";
 import { workspacePackages } from "./workspace.js";
 
@@ -17,26 +19,37 @@ const MAX_LITERALS = 100;
 
 /**
  * An index of the repository's code for ranking: every file, and for each
- * TS/JS file the declarations it exports (with line numbers), the names it
+ * TS/JS, Python, and Go file the declarations it exports (with line numbers), the names it
  * imports (resolved to a repository file or workspace package, with the line
  * each name is first used on), and identifier-like string literals such as
- * tool names. Parses each file with TypeScript, without type-checking, so it
- * is deterministic and fast. Core ranks it (`search`, `context`).
+ * tool names. Parses TS/JS with TypeScript, without type-checking, and Python
+ * and Go with small parsers of their own, so it is deterministic and fast. Core ranks it (`search`, `context`).
  */
 export async function indexCode(ctx: AnalyzerContext): Promise<CodeIndex> {
   const packages = await workspacePackages(ctx);
   const files = new Set(ctx.files);
-  const sources: IndexedSource[] = [];
+  const go = ctx.files.some(isGoSource) ? await goModules(ctx) : [];
+  const sources: IndexedSource[] = await indexPythonCode(ctx);
+  const read = async (path: string) => {
+    try {
+      return await ctx.read(path);
+    } catch {
+      return undefined;
+    }
+  };
   for (const path of ctx.files) {
+    if (isGoSource(path)) {
+      const text = await read(path);
+      if (text !== undefined) {
+        sources.push(indexGoSource(path, text, (spec) => resolveGoImport(path, spec, go)));
+      }
+      continue;
+    }
     if (!SOURCE.test(path) || path.endsWith(".d.ts") || /(^|\/)node_modules\//.test(path)) {
       continue;
     }
-    let text: string;
-    try {
-      text = await ctx.read(path);
-    } catch {
-      continue;
-    }
+    const text = await read(path);
+    if (text === undefined) continue;
     sources.push(indexSource(path, text, (spec) => resolveSpecifier(path, spec, files, packages)));
   }
   return { files: [...ctx.files], sources };

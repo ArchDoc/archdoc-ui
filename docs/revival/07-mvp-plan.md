@@ -73,11 +73,23 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 7. Multi-language analysis
 
-- [ ] Import analyzers for Python and Go behind the existing plugin API, so undeclared dependencies and rule violations are found the way they are for TS/JS. Today only `ts-imports.ts` exists, so `check`'s strongest finding does nothing outside TS/JS.
-- [ ] A symbol index for the same languages, so `context` ranks files and functions there and seals fingerprint their exports.
-- [ ] `init` adds uses from those imports (it already reads `go.mod` and `pyproject.toml`).
+- [x] Import analyzers for Python and Go behind the existing plugin API (`python.ts`, `go.ts`), so undeclared dependencies and rule violations are found the way they are for TS/JS. Python resolves through project roots (`src/`, each `pyproject.toml`), packages, and relative imports, and marks `if TYPE_CHECKING:` imports type-only; Go resolves through every `go.mod`, `replace` lines, and `go.work`.
+- [x] A symbol index for the same languages, so `context` ranks files and functions there and seals fingerprint their exports. Core counts `_test.go`, `test_*.py`, and `*_test.py` as tests.
+- [x] `init` adds uses from those imports, splits a flat Go module or Python project by its packages, and skips a `pyproject.toml` that only declares a workspace.
 
 **Exit:** on one Python and one Go repository, `check --base` flags an undeclared import introduced on a branch, and `eval` recall is within reach of what it is on TS/JS.
+
+Met on 2026-10-22:
+
+| Repository | `init` | Undeclared import on a branch | `eval` recall (Start here) |
+|---|---|---|---|
+| [golang-gin-realworld-example-app](https://github.com/gothinkster/golang-gin-realworld-example-app) (Go, one module) | 3 packages, the 3 uses between them | ⛔ `common` → `articles` | 92% (18%) |
+| [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI + React, uv workspace) | frontend, emails, the backend, Postgres | ⛔ `store` → `api`, after splitting the backend into 3 components by hand | 51% (4%) |
+| ArchDoc (TS) | | | 42% (23%) |
+
+Both are `init` models with no descriptions or journeys (the template's backend split into 3 components), so recall is wide rather than sharp: on the template, most recent commits are dependency bumps and frontend changes with subjects `context` can't place. §10 picks this up with described models.
+
+Known gaps: Go package names are guessed from the import path (as `goimports` does), not read from the `package` clause; Python's dynamic imports, `sys.path` changes, and package-dir mappings aren't followed.
 
 ## 8. Make the PR comment worth reading
 

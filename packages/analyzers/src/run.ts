@@ -1,8 +1,10 @@
 import type { Analyzer, AnalyzerContext, ObservedDependency } from "./api.js";
+import { goImports } from "./go.js";
 import { manifests } from "./manifests.js";
+import { pythonImports } from "./python.js";
 import { tsImports } from "./ts-imports.js";
 
-export const builtinAnalyzers: Analyzer[] = [manifests, tsImports];
+export const builtinAnalyzers: Analyzer[] = [manifests, tsImports, pythonImports, goImports];
 
 /** Runs analyzers and returns everything they observed, sorted for stable output. */
 export async function analyze(
