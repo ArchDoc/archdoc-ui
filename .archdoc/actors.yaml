@@ -16,7 +16,7 @@ actors:
     description: Someone opening their first PR to a repo they don't know yet.
     uses:
       web:
-        description: Follows onboarding tours
+        description: Reads the explorer to learn how ArchDoc fits together
         sends: ExplorerAction
 
   maintainers:

@@ -136,7 +136,7 @@ What the review found:
 ## 11. ArchDoc's own model
 
 - [ ] Accept or reject the 65 facts still marked `provenance: suggested` (47 in `model/toolchain.yaml`, 17 in `data.yaml`, 1 in `actors.yaml`) and the open proposal in `.archdoc/proposals/`. *(a person decides)*
-- [ ] Remove the planned `onboard-contributor` journey, since tours are cut.
+- [x] Remove the planned `onboard-contributor` journey, since tours are cut. `new-contributor` stays as someone who reads the explorer.
 
 ## 12. Website
 
