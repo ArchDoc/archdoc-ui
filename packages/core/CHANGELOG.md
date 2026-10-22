@@ -1,5 +1,13 @@
 # @archdoc/core
 
+## 0.1.1
+
+### Patch Changes
+
+- a0022a8: Packages are built from clean before they're released, so they no longer ship leftover files from removed sources (0.1.0's CLI included an unused `dist/commands/data.js`). Each package now publishes as public by default.
+- Updated dependencies [a0022a8]
+  - @archdoc/spec@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes

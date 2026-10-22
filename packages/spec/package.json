@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/spec",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The ArchDoc model format: v2 schema, TypeScript types, JSON Schema, and v1 migration.",
   "license": "MIT",
   "type": "module",
