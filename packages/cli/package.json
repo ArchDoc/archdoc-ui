@@ -36,5 +36,8 @@
   },
   "scripts": {
     "prepack": "node -e \"const fs=require('node:fs');fs.rmSync('web',{recursive:true,force:true});fs.cpSync('../../apps/web/dist','web',{recursive:true})\""
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

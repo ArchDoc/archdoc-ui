@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc -b && pnpm -F @archdoc/web build",
     "typecheck": "tsc -b && tsc -p tsconfig.test.json && tsc -p apps/web",
-    "clean": "tsc -b --clean",
+    "clean": "node scripts/clean.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",
@@ -23,7 +23,9 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "archdoc": "node packages/cli/dist/bin.js",
-    "playground": "node scripts/playground.mjs"
+    "playground": "node scripts/playground.mjs",
+    "smoke": "node scripts/smoke-pack.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

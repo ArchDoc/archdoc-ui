@@ -27,10 +27,12 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 1. Release pipeline
 
-- [ ] Own the `@archdoc` npm scope. *(needs a maintainer)*
-- [ ] A Changesets release workflow that publishes `spec`, `core`, `analyzers`, `federation`, `mcp`, and `cli` with npm provenance.
-- [ ] Turn the pending changesets into the first release's notes.
-- [ ] A CI job that packs the CLI and runs the packed copy (`archdoc validate`, `archdoc mcp` handshake, `archdoc view` serving the bundled explorer), so a missing file in `files:` fails before a release does.
+- [x] Own the `@archdoc` npm scope. The `archdoc` org owns it; 0.1.0 of all six packages was published by hand on 2026-10-21.
+- [x] A Changesets release workflow that stages `spec`, `core`, `analyzers`, `federation`, `mcp`, and `cli` with trusted publishing and provenance, for a maintainer to approve (`release.yml`, `scripts/release.mjs`). Each package's trusted publisher allows staged publishing only.
+- [x] Build from clean (`pnpm clean` removes every output), so a deleted source file's `.js` can't ship again (0.1.0 shipped a stale `dist/commands/data.js`).
+- [x] Turn the pending changesets into the first release's notes (0.1.0's changelogs).
+- [x] A CI step that packs every package, installs the tarballs into an empty project, and runs the CLI (`validate`, an `mcp` initialize handshake, and `site`, which needs the bundled explorer): `pnpm smoke`.
+- [ ] The first release through the workflow, to confirm `npm stage publish` works from CI the way it does in the docs.
 
 **Exit:** on a clean machine, `npx -y @archdoc/cli mcp` starts the server and `npx -y @archdoc/cli view` opens the explorer.
 
