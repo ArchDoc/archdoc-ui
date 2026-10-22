@@ -26,7 +26,8 @@
     "playground": "node scripts/playground.mjs",
     "smoke": "node scripts/smoke-pack.mjs",
     "release": "node scripts/release.mjs",
-    "set-version": "node scripts/set-version.mjs"
+    "set-version": "node scripts/set-version.mjs",
+    "replay-prs": "node scripts/replay-prs.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

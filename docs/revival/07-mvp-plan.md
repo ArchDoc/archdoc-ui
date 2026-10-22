@@ -114,7 +114,8 @@ What the review found:
   - "Touches no code the model maps" on a PR that changed a mapped contract;
   - `type string → undefined` in data changes when a schema field is removed;
   - suggested facts as a list, not one sentence joined by semicolons.
-- [ ] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives. Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
+- [~] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives (`pnpm replay-prs [repo] --show`). Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
+  - **This repo (2026-10-22), 27 PRs with a model:** 56% would have got a comment. On 8 of the 15, the only item was facts an agent suggested, so suggested facts are now listed in the report but no longer earn a comment on their own: 37%, 2 blocks (7%). Both blocks are real: #19 and #20 added components and imports between them without declaring the uses. The other 8 change a critical journey's steps (3) or add journeys whose steps don't say what they send (5), which `check` flags today but didn't when they were written. Nearly every PR here rewrites the model, so it's a poor baseline; the §10 repos decide whether 20% holds.
 
 **Exit:** a body-only code change posts nothing, and on the scenarios that stay in the release (personal data to an external service, a renamed classified column, an undeclared import, a changed sealed contract) the comment's top fits on one screen.
 

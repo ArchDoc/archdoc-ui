@@ -679,9 +679,12 @@ function judge(s: ChangeSummary): ChangeSummary {
   }
 
   // Only something to fix or check earns a comment; touching mapped code alone is info.
+  // Suggested facts are a review aid the report lists, not a finding: alone, they don't
+  // earn a comment (replaying this repo's PRs, they were the only item on most comments).
+  const findings = s.attention.filter((c) => c.code !== "model/suggested");
   s.verdict = s.blocking.length
     ? "blocking"
-    : s.attention.length
+    : findings.length
       ? "attention"
       : s.touched.length || s.changes
         ? "info"
