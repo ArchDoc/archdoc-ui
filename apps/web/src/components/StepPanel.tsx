@@ -6,13 +6,6 @@ import type { LandscapeInfo } from "../model/useModel.js";
 import { type CodeContext, StepCode } from "./code.js";
 import { Payload, type PayloadEntry } from "./Payload.js";
 
-/** A sample the journey can run on. */
-export interface SampleChoice {
-  key: string;
-  label: string;
-  title?: string | undefined;
-}
-
 export interface StepPanelProps {
   model: Model;
   journey: JourneyNode;
@@ -22,9 +15,6 @@ export interface StepPanelProps {
   /** What the current interaction carries or writes, with the simulated values. */
   payload: PayloadEntry[];
   simulation?: Simulation | undefined;
-  samples: SampleChoice[];
-  sample?: string | undefined;
-  onSample: (key: string) => void;
   code: CodeContext;
   landscape?: LandscapeInfo | undefined;
   onSelect: (key: string) => void;
@@ -166,29 +156,6 @@ export function StepPanel(props: StepPanelProps) {
         <section className="block">
           <h3>Code</h3>
           <StepCode step={step} ctx={props.code} />
-        </section>
-      ) : null}
-
-      {props.samples.length > 1 ? (
-        <section className="block samples">
-          <h3>Try a sample</h3>
-          <div className="sample-chips">
-            {props.samples.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className={`chip-button${props.sample === s.key ? " is-on" : ""}`}
-                aria-pressed={props.sample === s.key}
-                title={s.title}
-                onClick={() => props.onSample(s.key)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <p className="muted small">
-            The journey runs on it in your browser: the model's logic picks the branch.
-          </p>
         </section>
       ) : null}
 

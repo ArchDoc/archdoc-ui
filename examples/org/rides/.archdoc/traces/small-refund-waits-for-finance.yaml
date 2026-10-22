@@ -5,7 +5,7 @@ title: A $4 refund on a $12 ride waits for finance instead of going through
 symptom: |
   refund ref-ch-81 for trip-81: status pending_approval (expected approved)
   amount_cents=40000 charge.amount_cents=1200 reason=overcharge
-reproduce: archdoc show request-refund --sample samples/refund-overcharge.json
+reproduce: 'POST /refunds { "charge_id": "ch-81", "amount": 4.00 }'   # a $4 refund on a $12 charge
 expands: request-refund#4        # api-gateway → payments.charges: asks for a refund
 diagnosis: The gateway converts the amount to cents a second time. The app already sends amount_cents, so a 400-cent refund reaches payments as 40000 and refund-approval sends it to finance.
 steps:

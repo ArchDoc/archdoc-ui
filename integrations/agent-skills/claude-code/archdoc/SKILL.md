@@ -47,7 +47,7 @@ trace: refund-waits-for-finance
 title: A $4 refund waits for finance instead of going through
 symptom: |
   refund ref-ch-81: status pending_approval (expected approved)
-reproduce: archdoc show request-refund --sample samples/refund-overcharge.json
+reproduce: 'POST /refunds { "charge_id": "ch-81", "amount": 4.00 }'
 expands: request-refund#4          # the journey step where it showed up (1-based)
 diagnosis: The gateway converts the amount to cents a second time.
 steps:

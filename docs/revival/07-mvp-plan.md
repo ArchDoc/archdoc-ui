@@ -51,17 +51,17 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 4. Hide simulation
 
-- [ ] Remove `show --sample` from the CLI and `archdoc_show`.
-- [ ] In the explorer, remove "Try a sample" and the rows a journey writes. The ERD view stays.
-- [ ] Stop loading `*.sample.json` and `samples/` in `archdoc view` and `archdoc site`.
-- [ ] Keep `simulate` in core with its tests, so it can come back.
-- [ ] Move `examples/decisions.yaml` and its sample out of the quickstart path.
+- [x] Remove `show --sample` from the CLI and `archdoc_show`.
+- [x] In the explorer, remove "Try a sample" and stop running journeys: steps show their messages' fields, and Rows show only what steps declare (`creates:`, `changes:`). The ERD view stays. Simulation is switched off in one place, `apps/web/src/App.tsx`.
+- [x] Stop loading `*.sample.json` and `samples/` in `archdoc view` and `archdoc site`.
+- [x] Keep `simulate` in core with its tests, so it can come back. The cross-repo simulation test now calls core directly.
+- [x] Move `examples/decisions.yaml` and both samples to `examples/experimental/`.
 
 ## 5. Make federation experimental
 
-- [ ] Move `sync`, `publish`, and `landscape` under `archdoc experimental` (or hide them from `--help`), with one docs page for all of them.
-- [ ] Lead the README and website without federation; the playground's cross-repo scenarios say they show an experimental feature.
-- [ ] Cross-repo findings keep working for repos that already use `imports`.
+- [x] Hide `sync`, `publish`, `landscape`, and `view --landscape` from `--help`, with a note after the command list, and one page for everything experimental: [`docs/experimental.md`](../experimental.md).
+- [x] Lead the README and website without federation; the playground and demo org say they show an experimental feature.
+- [x] Cross-repo findings keep working for repos that already use `imports` (the landscape tests still pass).
 - [ ] `context` lists journeys in other repos that pass through what a path touches. `impact` did; `context` names the other repos' consumers but not their journeys.
 
 ## 6. Cut the CLI surface

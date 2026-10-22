@@ -143,6 +143,8 @@ writeFileSync(join(dir, "bin/archdoc.cmd"), `@node "${cli}" %*\r\n`);
 
 const guide = `# ArchDoc playground
 
+The demo org shares models across repos, which is experimental: it works, but sync, publish, and landscape are left out of archdoc --help for now (docs/experimental.md).
+
 The Acme demo org: four git repos, released and synced. Put its \`archdoc\` on your PATH first:
 
     export PATH="${join(dir, "bin")}:$PATH"
@@ -159,13 +161,11 @@ Run \`pnpm playground\` in the ArchDoc repo again any time for a fresh copy.
 ## Explore
 
     cd landscape && archdoc view --landscape --open   # group by repo, team, domain; Data section; click a field for lineage
-    cd rides && archdoc view --open                    # open request-refund, press Run in Simulate, step with Next
+    cd rides && archdoc view --open                    # open request-refund and step through it with Next
 
 ## Data
 
     cd rides
-    archdoc show request-refund --sample samples/refund-overcharge.json   # auto-approved: records and tables, step by step
-    archdoc show request-refund --sample samples/refund-large.json        # needs finance: later steps skipped
     archdoc show payments.RefundRequest.amount_cents                       # from payments into trips' table
     archdoc show payments.Charge
 
@@ -215,9 +215,7 @@ say();
 say(`Ready: ${dir}`);
 say();
 say(`  export PATH="${join(dir, "bin")}:$PATH"`);
-say(
-  `  cd ${join(here, "rides")} && archdoc show request-refund --sample samples/refund-overcharge.json`,
-);
+say(`  cd ${join(here, "rides")} && archdoc show payments.RefundRequest.amount_cents`);
 say(`  cd ${join(here, "landscape")} && archdoc view --landscape --open`);
 say();
 say(`More in ${join(here, "PLAYGROUND.md")}.`);

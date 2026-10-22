@@ -27,7 +27,7 @@ One tool per question. Every tool reloads the model on every call, and the CLI c
 | Tool | Answers |
 |---|---|
 | `archdoc_context` | Where do I start, and what does it affect? For a task in words or the files to change (even ones that don't exist yet): files and functions to open first, other callers of the same functions, data, rules, journeys, tests, owners, and who uses it, other repos included. For an error: the journey steps it showed up in, and a trace to start from. With nothing: an overview |
-| `archdoc_show` | What is this one thing? An element (with its code), actor, journey (with a sample, simulated), data entry, `Entry.field` (lineage), trace, or a sealed fact |
+| `archdoc_show` | What is this one thing? An element (with its code), actor, journey, data entry, `Entry.field` (lineage), trace, or a sealed fact |
 | `archdoc_check` | What's wrong or stale? Model problems, undeclared imports, broken rules and journeys, stale paths, traces, and facts whose sealed code changed, each with its fix. With `base`, only what the change caused, and the verdict the PR comment will give; `format: "markdown"` returns that comment |
 | `archdoc_seal` | Record that the facts you checked still describe their code, and say what's left |
 | `archdoc_init` | Start a model in a repository without one, every fact marked inferred |

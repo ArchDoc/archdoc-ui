@@ -19,7 +19,9 @@ const dir = new URL("../../../examples/", import.meta.url);
 const model = buildModel([
   { path: "big-schema.yaml", text: readFileSync(new URL("big-schema.yaml", dir), "utf8") },
 ]);
-const sample = JSON.parse(readFileSync(new URL("order-to-cash.sample.json", dir), "utf8"));
+const sample = JSON.parse(
+  readFileSync(new URL("experimental/order-to-cash.sample.json", dir), "utf8"),
+);
 const journey = model.journeys.get("order-to-cash");
 if (!journey) throw new Error("no journey");
 const sim = simulate(model, "order-to-cash", sample);

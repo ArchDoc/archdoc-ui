@@ -56,18 +56,12 @@ export function createArchdocServer(options: ArchdocServerOptions = {}): McpServ
     {
       title: "One thing in the model",
       description:
-        "Everything about one ID: an element (code: true adds its snippets' text), actor, journey (sample runs it), data entry, Entry.field (its lineage), trace, or a fact archdoc_check names (element:<id>, step:<journey>#<n>).",
+        "Everything about one ID: an element (code: true adds its snippets' text), actor, journey, data entry, Entry.field (its lineage), trace, or a fact archdoc_check names (element:<id>, step:<journey>#<n>).",
       inputSchema: {
         id: z
           .string()
           .describe("An ID, such as payments.charges, Refund.amount_cents, or step:refund#2"),
         code: z.boolean().optional().describe("For an element: include its code snippets"),
-        sample: z
-          .union([z.string(), z.record(z.string(), z.unknown())])
-          .optional()
-          .describe(
-            'For a journey: records by data entry, such as { "RefundRequest": { "amount_cents": 400 } }, or a sample file',
-          ),
       },
       annotations: READ_ONLY,
     },

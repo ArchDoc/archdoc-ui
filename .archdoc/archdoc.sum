@@ -965,7 +965,7 @@ seals:
         - roundedPath
   element:toolchain.web.model-loader:
     kind: structure
-    hash: fnv-6860947504f10307
+    hash: fnv-ec21bedb05a35305
     files:
       apps/web/src/model/compare.ts:
         - ChangeFindings
@@ -973,12 +973,6 @@ seals:
         - ChangeItem
         - Compare
         - compareModels
-      apps/web/src/model/samples.ts:
-        - SampleFile
-        - matchingSample
-        - parseSample
-        - sampleName
-        - samplesFor
       apps/web/src/model/stories.ts:
         - IMPORTANCE
         - JourneyCard
@@ -1034,7 +1028,7 @@ seals:
     by: agent:claude-code
   element:toolchain.web.ui:
     kind: structure
-    hash: fnv-728f3161540859f7
+    hash: fnv-f45ea09e0a899082
     files:
       apps/web/src/App.tsx:
         - App
@@ -1066,7 +1060,6 @@ seals:
         - dataGroups
         - search
       apps/web/src/components/StepPanel.tsx:
-        - SampleChoice
         - StepPanel
         - StepPanelProps
       apps/web/src/components/Traces.tsx:
@@ -1103,6 +1096,7 @@ seals:
         - TableNode
         - nodeTypes
       apps/web/src/styles.css: []
+    by: agent:claude-code
   step:agent-preflight#1:
     kind: structure
     hash: fnv-341f41ac97dcb5ce

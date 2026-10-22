@@ -2,10 +2,9 @@
 # the request, the account, the card, and a fraud score) picks the path a
 # purchase takes: each outcome writes its own records, a held purchase
 # continues as a review journey, and mappings say field by field how one
-# record becomes another. authorize-purchase.sample.json runs when the journey
-# opens; try a frozen card, a bigger amount, or a riskier score.
-#   archdoc show authorize-purchase --sample examples/authorize-purchase.sample.json -m examples/decisions.yaml
-#   archdoc show AuthRequest.amount_cents -m examples/decisions.yaml
+# record becomes another. Simulation is experimental and hidden from the CLI
+# and explorer; core's simulate() runs authorize-purchase.sample.json in tests.
+#   archdoc show AuthRequest.amount_cents -m examples/experimental/decisions.yaml
 archdoc: "2.0"
 namespace: issuer
 name: Card issuer

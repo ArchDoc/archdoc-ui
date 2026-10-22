@@ -104,9 +104,6 @@ export function Payload(props: {
         </div>
       ) : (
         <table className="payload-fields">
-          {e.record ? null : (
-            <caption className="muted">Not in the sample: the fields, without values.</caption>
-          )}
           <tbody>
             {e.fields.map((f) => (
               <tr key={f.name} className={e.changed?.has(f.name) ? "is-changed" : undefined}>

@@ -1954,12 +1954,6 @@ table.observed td.is-wrong code {
   font-size: var(--fs-2);
 }
 
-.sample-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .chip-button {
   padding: 2px 10px;
   border: 1px solid var(--line);

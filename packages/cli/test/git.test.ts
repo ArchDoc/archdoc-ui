@@ -162,7 +162,6 @@ describe("against a git history", () => {
           repo: { commit: string; root?: string };
           federation: object;
           schemas: unknown[];
-          samples: unknown[];
         };
       };
       const pair = (await (
@@ -175,7 +174,6 @@ describe("against a git history", () => {
         repo: { commit: git("rev-parse", "feature").trim() },
         federation: expect.any(Object),
         schemas: [],
-        samples: [],
       });
       expect(pair.head?.files).toContain("services/billing/src/index.ts");
       // Files only in the working tree aren't at the commit, and there's no local copy to open.

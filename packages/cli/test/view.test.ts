@@ -50,7 +50,7 @@ describe("view server", () => {
     });
   });
 
-  it("compares with another model file, and finds samples named after journeys", async () => {
+  it("compares with another model file, and sends no samples (simulation is hidden)", async () => {
     const examples = join(tmp, "examples");
     await mkdir(examples, { recursive: true });
     const model = (desc: string) =>
@@ -66,11 +66,11 @@ describe("view server", () => {
     });
     const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
       base: { ref: string; sources: { text: string }[] };
-      samples: { path: string }[];
+      samples?: unknown;
     };
     expect(payload.base.ref).toBe("shop.yaml");
     expect(payload.base.sources[0]?.text).toContain("Before");
-    expect(payload.samples.map((s) => s.path)).toContain("buy.sample.json");
+    expect(payload.samples).toBeUndefined();
   });
 
   it("serves the model sources and the explorer", async () => {

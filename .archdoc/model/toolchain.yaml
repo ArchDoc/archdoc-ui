@@ -145,11 +145,11 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           data:
             kind: component
-            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage and journey simulation.
+            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage, and for journey simulation, which is experimental and only core runs.
             code:
               - { path: packages/core/src/data/** }
               - { path: packages/core/src/data/flows.ts, symbol: stepMessage, description: The message a journey step carries }
-              - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample }
+              - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample (experimental; no surface calls it) }
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:
@@ -240,7 +240,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, sync, publish, landscape build, mcp, and schema. eval and migrate are hidden maintainer commands."
+        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, mcp, and schema. sync, publish, landscape build, and view --landscape are experimental and left out of --help. eval and migrate are hidden maintainer commands."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -274,7 +274,7 @@ elements:
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
-            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models, sample requests for simulation, and which sealed facts to re-check.
+            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models, and which sealed facts to re-check.
             code: [packages/cli/src/server.ts]
 
       mcp:
@@ -295,7 +295,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time, samples in the browser), Traces (a bug's path as lanes beneath the modeled step, checked in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
+        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time), Traces (a bug's path as lanes beneath the modeled step, checked in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
         code: [{ path: apps/web/** }]
         uses:
           core:
@@ -304,7 +304,7 @@ elements:
         elements:
           model-loader:
             kind: component
-            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, samples, the comparison, the address), with the facts whose sealed code changed.
+            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, the comparison, the address), with the facts whose sealed code changed.
             code: [{ path: apps/web/src/model/** }]
             uses:
               graph: Hands the model to the canvas
