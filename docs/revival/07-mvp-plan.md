@@ -142,7 +142,7 @@ What the review found:
 
 ## 12. Website
 
-- [~] One tagline across the README, the website, and the plugin: "Architecture your AI agents can read, and your PRs can't quietly break." README and plugin done; the website is next.
+- [x] One tagline across the README, the website, and the plugin: "Architecture your AI agents can read, and your PRs can't quietly break." The website's hero, Try it, Getting started, and Agents pages now install through the plugin.
 - [ ] A landing page that tells the 30-second story: the agent's brief before it edits, and the PR comment that blocks a personal-data leak. Its demo is a real explorer built with `archdoc site`, not screenshots. Installing means the plugin.
 - [ ] Docs for the stable surface; one experimental page for federation and simulation.
 - [ ] Archive `versioned_docs/version-1.0.0` (v0) so search and the version menu don't lead there.
