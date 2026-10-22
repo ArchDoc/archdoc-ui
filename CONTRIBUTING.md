@@ -57,6 +57,8 @@ Releases go out from `main` through [`.github/workflows/release.yml`](./.github/
 3. Merging it runs the release: a clean build (`pnpm clean && pnpm build`), the packed-package check (`pnpm smoke`), then `pnpm release`, which packs each package whose version isn't on npm yet and stages it with `npm stage publish`. npm authenticates the workflow with trusted publishing, so there's no token, and adds provenance.
 4. A maintainer approves the staged versions with two-factor authentication: `npm stage list`, then `npm stage approve`, or on npmjs.com. Approve in dependency order (`spec`, `core`, `analyzers`, `federation`, `mcp`, `cli`), so the CLI never goes live before what it needs.
 
+All six packages share one version (a Changesets `fixed` group), and each release is tagged `v<version>`. v2 jumped from 0.1.1 to 0.3.0, because the v0 viewer's tags already use `v0.1.2` to `v0.2.0`. For a version Changesets can't reach like that, `pnpm set-version <x.y.z> "<changelog note>"` sets all six by hand and validates the result.
+
 `pnpm release --dry-run` packs and lists what would be staged, without staging. To publish by hand instead, use `pnpm -r publish` from a clean, committed `main`, never `npm publish`, which would leave `workspace:*` in the dependencies.
 
 ## Commit messages
