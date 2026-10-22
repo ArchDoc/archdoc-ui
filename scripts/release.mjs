@@ -107,12 +107,19 @@ for (const dir of ORDER) {
       });
     } catch {
       const lines = oidcLog();
+      const exchange = lines.find((l) => l.includes("oidc/token/exchange"));
+      const status = Number(exchange?.match(/ (\d{3}) /)?.[1]);
+      const why =
+        status >= 500
+          ? `npm's token exchange failed on npm's side (${status}). Nothing to fix here: re-run the failed job in a few minutes, and check https://status.npmjs.org.`
+          : status === 404 || status === 401 || status === 403
+            ? `npm found no trusted publisher on ${name} that matches this run (above). Check it with: npx npm@latest trust list ${name}. The workflow is release.yml and the environment is empty.`
+            : "npm didn't use trusted publishing; its log above says why.";
       console.error(
         [
           `Couldn't stage ${name}@${version}.`,
           ...(lines.length ? ["npm's trusted publishing log:", ...lines.map((l) => `  ${l}`)] : []),
-          `If it says the token exchange failed, the trusted publisher on ${name} doesn't match this run (above):`,
-          "check the owner and repository, that the workflow is release.yml, and that the environment is empty.",
+          why,
           "Stopped here, so nothing after this package was attempted.",
         ].join("\n"),
       );
