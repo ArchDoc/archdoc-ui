@@ -1,0 +1,67 @@
+name: Release
+
+# On main: while there are changesets, keep a "Version packages" pull request
+# up to date. Once that pull request is merged (no changesets left), build from
+# clean, check the packed packages, and stage every version that isn't on npm yet.
+# A maintainer then approves the staged versions (npm stage approve, or on
+# npmjs.com), which is when they go live.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the version pull request, and the release tag
+  pull-requests: write # the version pull request
+  id-token: write # trusted publishing: npm checks this workflow's identity, no token
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      # npm stage arrived in npm 11; the runner's bundled npm may be older.
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+
+      - name: Open or update the version pull request
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build from clean
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: pnpm clean && pnpm build
+
+      - name: Check the packed packages install and run
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: pnpm smoke
+
+      - name: Stage new versions on npm
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: pnpm release
+
+      - name: Tag the release
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          version=$(node -p "require('./packages/cli/package.json').version")
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "v$version is already tagged."
+          else
+            git tag "v$version" && git push origin "v$version"
+          fi
