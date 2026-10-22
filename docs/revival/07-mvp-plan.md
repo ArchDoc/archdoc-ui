@@ -62,7 +62,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 - [x] Hide `sync`, `publish`, `landscape`, and `view --landscape` from `--help`, with a note after the command list, and one page for everything experimental: [`docs/experimental.md`](../experimental.md).
 - [x] Lead the README and website without federation; the playground and demo org say they show an experimental feature.
 - [x] Cross-repo findings keep working for repos that already use `imports` (the landscape tests still pass).
-- [ ] `context` lists journeys in other repos that pass through what a path touches. `impact` did; `context` names the other repos' consumers but not their journeys.
+- [x] `context` lists journeys in other repos that pass through what a path touches (`journeysElsewhere` in the brief), as `impact` did.
 
 ## 6. Cut the CLI surface
 

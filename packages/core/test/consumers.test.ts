@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildModel,
   consumersElsewhere,
+  context,
   createBundle,
   diffModels,
   federate,
+  formatContext,
   formatDiff,
   formatElement,
   formatImpact,
@@ -123,6 +125,21 @@ const payments = (contract = "proto/charges.proto"): Model =>
       ["(landscape)", { path: "x", text: landscape, integrity: integrityOf(landscape) }],
     ]),
   });
+
+describe("context across repos", () => {
+  it("names the journeys in other repos that pass through what the task touches", () => {
+    const b = context(payments(), "charges");
+    expect(b.journeysElsewhere).toEqual([
+      { id: "rides.refund", importance: "critical", steps: [2] },
+      { id: "acme.goodwill", importance: "normal", steps: [2] },
+    ]);
+    // The fixture maps no code, so give the brief a start file to print.
+    const start = [{ path: "src/charges.ts", element: "charges", why: "named" }];
+    expect(formatContext({ ...b, start })).toContain(
+      "  rides.refund (critical, another repo) · step 2",
+    );
+  });
+});
 
 describe("consumersElsewhere", () => {
   it("finds relationships and journey steps in other repos, by how they reach the change", () => {

@@ -85,6 +85,8 @@ export interface ContextBrief {
   journeys: ContextJourney[];
   /** Other journeys through the elements, by ID, most important first. */
   journeysThrough: { id: string; importance: string }[];
+  /** Journeys in other repos' models with steps on the elements, as namespace.journey, most important first. */
+  journeysElsewhere: { id: string; importance: string; steps: number[] }[];
   tests: { path: string; why: string }[];
   owners: string[];
   /** What uses the elements directly: other elements, actors, and other repos. */
@@ -281,7 +283,31 @@ export function context(model: Model, query: string, inputs: ContextInputs = {})
       ),
     ],
     usedBy: usedBy(model, elements, chain),
+    journeysElsewhere: journeysElsewhere(model, elements),
   };
+}
+
+/** Journeys in other repos that pass through the elements, so a change here can break them. */
+function journeysElsewhere(
+  model: Model,
+  elements: ElementNode[],
+): ContextBrief["journeysElsewhere"] {
+  const out = new Map<string, { id: string; importance: string; steps: number[] }>();
+  for (const e of elements) {
+    const r = impact(model, e.id);
+    if (!r.ok) continue;
+    for (const j of r.impact.elsewhere.journeys) {
+      const id = `${j.namespace}.${j.journey.id}`;
+      const seen = out.get(id);
+      if (seen) seen.steps = [...new Set([...seen.steps, ...j.steps])].sort((a, b) => a - b);
+      else
+        out.set(id, { id, importance: j.journey.spec.importance ?? "normal", steps: [...j.steps] });
+    }
+  }
+  return [...out.values()].sort(
+    (a, b) =>
+      (IMPORTANCE[a.importance] ?? 9) - (IMPORTANCE[b.importance] ?? 9) || a.id.localeCompare(b.id),
+  );
 }
 
 /** Who uses the elements directly, leaving out the elements themselves and their parents. */
