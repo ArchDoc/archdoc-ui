@@ -1,5 +1,11 @@
 # @archdoc/core
 
+## 0.3.0
+
+### Minor Changes
+
+- Moves to 0.3.0. Skips 0.2.x, whose git tags (v0.1.2 to v0.2.0) belong to the v0 viewer. From now on, all six @archdoc packages share one version.
+
 ## 0.1.1
 
 ### Patch Changes

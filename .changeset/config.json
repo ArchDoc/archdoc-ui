@@ -2,7 +2,16 @@
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@archdoc/spec",
+      "@archdoc/core",
+      "@archdoc/analyzers",
+      "@archdoc/federation",
+      "@archdoc/mcp",
+      "@archdoc/cli"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
