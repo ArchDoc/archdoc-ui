@@ -115,10 +115,7 @@ export async function inferModel(root: string, name?: string): Promise<InitResul
   for (const dir of ["scripts", "tools", "bin"]) {
     const inside = files.filter((f) => f.startsWith(`${dir}/`) && SOURCE.test(f));
     if (inside.length >= 2 && !inside.some((f) => ownerOf(units, f)?.dir)) {
-      add(
-        { ...(await directoryUnit(ctx, dir)), source: `the ${dir} the repository runs` },
-        dir,
-      );
+      add({ ...(await directoryUnit(ctx, dir)), source: `the ${dir} the repository runs` }, dir);
     }
   }
 
