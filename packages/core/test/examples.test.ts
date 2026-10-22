@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildModel,
@@ -17,22 +17,23 @@ import {
 // the platform the others don't, plus variants of the quickstart that show
 // what a change looks like to a reviewer.
 const dir = new URL("../../../examples/", import.meta.url);
-const names = readdirSync(dir)
-  .filter((f) => f.endsWith(".yaml"))
-  .map((f) => f.replace(/\.yaml$/, ""))
-  .sort();
+// Examples of experimental features (simulation, decisions) live in examples/experimental/.
+const experimental = new URL("experimental/", dir);
+const yamlIn = (d: URL) =>
+  readdirSync(d)
+    .filter((f) => f.endsWith(".yaml"))
+    .map((f) => f.replace(/\.yaml$/, ""));
+const names = [...yamlIn(dir), ...yamlIn(experimental)].sort();
+/** An example file, from examples/ or examples/experimental/. */
+const at = (file: string) =>
+  existsSync(new URL(file, dir)) ? new URL(file, dir) : new URL(file, experimental);
 const variants = names.filter((n) => n.startsWith("quickstart."));
 const models = names.filter((n) => !variants.includes(n));
 
 const load = (name: string, edit: (text: string) => string = (t) => t): Model =>
-  buildModel([
-    { path: `${name}.yaml`, text: edit(readFileSync(new URL(`${name}.yaml`, dir), "utf8")) },
-  ]);
+  buildModel([{ path: `${name}.yaml`, text: edit(readFileSync(at(`${name}.yaml`), "utf8")) }]);
 const sample = (journey: string) =>
-  JSON.parse(readFileSync(new URL(`${journey}.sample.json`, dir), "utf8")) as Record<
-    string,
-    unknown
-  >;
+  JSON.parse(readFileSync(at(`${journey}.sample.json`), "utf8")) as Record<string, unknown>;
 
 /** The outcome a sample's decision takes, and the records the journey leaves. */
 function run(m: Model, journey: string, s: Record<string, unknown>) {
@@ -44,7 +45,8 @@ function run(m: Model, journey: string, s: Record<string, unknown>) {
 }
 
 describe("the examples", () => {
-  it("are one flat folder: a model per part of the platform, and the quickstart's variants", () => {
+  it("are a model per part of the platform, the quickstart's variants, and experimental ones apart", () => {
+    expect(yamlIn(experimental)).toEqual(["decisions"]);
     expect(models).toEqual([
       "big-schema",
       "decisions",

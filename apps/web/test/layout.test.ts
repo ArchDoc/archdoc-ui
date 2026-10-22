@@ -48,7 +48,7 @@ describe.each(
     "quickstart",
     "modular-monolith",
     "event-driven",
-    "decisions",
+    "experimental/decisions",
     "sensitive-data",
     "big-schema",
   ].map((name) => [name, example(name)]),
@@ -64,7 +64,9 @@ describe.each(
     const graph = buildGraph(model, { expanded, tables });
     expect(graph.nodes.some((n) => n.table)).toBe(true);
     // Foreign keys between tables, where a store holds tables that point at each other.
-    if (["decisions", "sensitive-data", "big-schema", "modular-monolith"].includes(_name)) {
+    if (
+      ["experimental/decisions", "sensitive-data", "big-schema", "modular-monolith"].includes(_name)
+    ) {
       expect(graph.edges.some((e) => e.reference)).toBe(true);
     }
     await expectClean(graph);

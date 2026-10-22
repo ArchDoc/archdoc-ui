@@ -21,8 +21,22 @@ export {
   type CheckRepositoryResult,
   checkRepository,
 } from "./check.js";
+export {
+  type GoModule,
+  type GoReplace,
+  goImports,
+  goModules,
+  indexGoSource,
+  resolveGoImport,
+} from "./go.js";
 export { formatInit, type InitResult, inferModel, initModel } from "./init.js";
 export { manifests } from "./manifests.js";
+export {
+  indexPythonSource,
+  pythonImports,
+  pythonRoots,
+  resolvePythonModule,
+} from "./python.js";
 export {
   contextOf,
   type LoadRevisionOptions,

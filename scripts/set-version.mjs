@@ -110,6 +110,10 @@ for (const p of PKGS) {
   ok(`${pkg.name} → ${version}`);
 }
 
+step("Pin the Claude Code plugin to it");
+sh("node", ["scripts/sync-plugin.mjs"]);
+ok(`integrations/claude-plugin → ${version}`);
+
 step("Validate");
 const run = (label, cmd, args) => {
   try {

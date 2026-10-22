@@ -290,11 +290,13 @@ export const JourneyStepSchema = z.strictObject({
   decides: z
     .string()
     .optional()
-    .describe("A logic block that decides where this step goes, such as payments.refund-approval"),
+    .describe(
+      "Experimental (docs/experimental.md): a logic block that decides where this step goes, such as payments.refund-approval",
+    ),
   branches: z
     .record(z.string(), BranchSchema)
     .optional()
-    .describe("What happens for each outcome of `decides`"),
+    .describe("Experimental (docs/experimental.md): what happens for each outcome of `decides`"),
   when: z
     .string()
     .optional()
@@ -396,7 +398,7 @@ export const RuleSchema = z.looseObject({
     .enum(["repo", "org"])
     .optional()
     .describe(
-      "org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
+      "Experimental (docs/experimental.md): org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
     ),
 });
 
@@ -456,18 +458,24 @@ const sections = {
   mappings: z
     .record(IdSchema, MappingSchema)
     .optional()
-    .describe("How records become other records, field by field, for lineage and simulation"),
+    .describe(
+      "Experimental (docs/experimental.md): how records become other records, field by field, for lineage and simulation",
+    ),
   logic: z
     .record(IdSchema, LogicSchema)
     .optional()
-    .describe("Decisions elements make on the data they receive"),
+    .describe(
+      "Experimental (docs/experimental.md): decisions elements make on the data they receive",
+    ),
   // Reserved for the learning phase. Accepted now, validated later.
   tours: z.record(IdSchema, z.looseObject({})).optional(),
   rules: z.array(RuleSchema).optional(),
   domains: z
     .record(IdSchema, DomainSchema)
     .optional()
-    .describe("Business domains, for grouping a landscape by more than repo"),
+    .describe(
+      "Experimental (docs/experimental.md): business domains, for grouping a landscape by more than repo",
+    ),
 };
 
 /**
@@ -479,9 +487,14 @@ export const ModelFileSchema = z.strictObject({
   namespace: NamespaceSchema.optional(),
   name: z.string().optional(),
   description: z.string().optional(),
-  imports: z.record(NamespaceSchema, ImportSchema).optional(),
+  imports: z
+    .record(NamespaceSchema, ImportSchema)
+    .optional()
+    .describe(
+      "Experimental (docs/experimental.md): other repos' models, by namespace. archdoc sync pins them in archdoc.lock.",
+    ),
   landscape: ImportSchema.optional().describe(
-    "The landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
+    "Experimental (docs/experimental.md): the landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
   ),
 });
 

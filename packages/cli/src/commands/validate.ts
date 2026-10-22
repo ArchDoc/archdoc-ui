@@ -1,4 +1,10 @@
-import { formatDiagnostic, hasErrors, loadModel } from "@archdoc/core";
+import {
+  experimentalUses,
+  formatDiagnostic,
+  formatExperimentalUses,
+  hasErrors,
+  loadModel,
+} from "@archdoc/core";
 import type { Io } from "../io.js";
 
 export interface ValidateOptions {
@@ -9,6 +15,8 @@ export interface ValidateOptions {
 
 export async function validate(target: string, options: ValidateOptions, io: Io): Promise<number> {
   const model = await loadModel(target, { cwd: io.cwd });
+  // Experimental parts of the format are a note, not a warning: using one on purpose isn't a problem.
+  const experimental = experimentalUses(model);
   const failed =
     hasErrors(model.diagnostics) ||
     (options.strict === true && model.diagnostics.some((d) => d.severity === "warning"));
@@ -27,6 +35,7 @@ export async function validate(target: string, options: ValidateOptions, io: Io)
             journeys: model.journeys.size,
           },
           diagnostics: model.diagnostics,
+          experimental,
         },
         null,
         2,
@@ -57,6 +66,11 @@ export async function validate(target: string, options: ValidateOptions, io: Io)
     ].join(", ");
     io.out(
       `${model.diagnostics.length ? "\n" : ""}✓ ${model.namespace}: ${summary} in ${plural(model.files.length, "file")}${problems ? ` (${problems})` : ""}`,
+    );
+  }
+  if (experimental.length) {
+    io.err(
+      `note: uses experimental parts of the format, which may change before they're stable: ${formatExperimentalUses(experimental)}. See https://github.com/ArchDoc/archdoc/blob/main/docs/experimental.md`,
     );
   }
   return failed ? 1 : 0;

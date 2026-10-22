@@ -32,6 +32,15 @@ describe("archdoc validate", () => {
     expect(r.err).toContain("packages/spec/test/fixtures/v1/blog.yaml:1:1 error spec/v1-model");
   });
 
+  it("notes experimental parts of the format without failing --strict", async () => {
+    const r = await run("validate", "examples/experimental/decisions.yaml", "--strict");
+    expect(r.code).toBe(0);
+    expect(r.err).toContain(
+      "note: uses experimental parts of the format, which may change before they're stable: mappings (2)",
+    );
+    expect((await run("validate")).err).not.toContain("experimental");
+  });
+
   it("prints JSON", async () => {
     const r = await run("validate", "--json");
     const result = JSON.parse(r.out);

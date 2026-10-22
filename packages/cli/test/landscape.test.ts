@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatSimulation, loadModel, simulate } from "@archdoc/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProgram, startViewServer } from "../src/index.js";
 
@@ -224,43 +225,47 @@ describe("the landscape", () => {
       "! The model and a schema disagree: migrations#trips has a field Trip doesn't model: email. Add it, and classify any that hold sensitive data.",
     );
   });
-  it("simulates Refund a fare: the branch a sample takes, and the records and tables it writes across repos", async () => {
-    const r = await run(
-      "rides",
-      "show",
-      "request-refund",
-      "--sample",
-      "samples/refund-overcharge.json",
+  // Simulation is hidden from the CLI, MCP, and explorer (docs/revival/07-mvp-plan.md, §4), but core
+  // keeps it, so it's tested here, across repos, on the model show would load.
+  it("core simulates Refund a fare: the branch a sample takes, and the records and tables it writes across repos", async () => {
+    const rides = await loadModel(".", { cwd: join(org, "rides") });
+    const sample = JSON.parse(
+      await readFile(join(org, "rides/samples/refund-overcharge.json"), "utf8"),
     );
-    expect(r.code).toBe(0);
-    expect(r.out).toContain("Journey request-refund · decided: auto-approve");
-    expect(r.out).toContain(
+    const sim = simulate(rides, "request-refund", sample);
+    if (!sim) throw new Error("no simulation");
+    const out = formatSimulation(sim);
+    expect(out).toContain("Journey request-refund · decided: auto-approve");
+    expect(out).toContain(
       "     decides payments.refund-approval → auto-approve (rule 2: request.amount_cents <= charge.amount_cents / 2)",
     );
-    expect(r.out).toContain(
+    expect(out).toContain(
       "     + creates payments.Refund { id: refund-ch-81, charge_id: ch-81, amount_cents: 400, status: approved } via payments.request-to-refund → payments.ledger (refunds)",
     );
-    expect(r.out).toContain(
+    expect(out).toContain(
       "     ~ changes payments.Charge.status: captured → partially_refunded → payments.ledger (charges)",
     );
-    expect(r.out).toContain("amount_cents: -400, source_ref: refund-ch-81");
-    expect(r.out).toContain(
+    expect(out).toContain("amount_cents: -400, source_ref: refund-ch-81");
+    expect(out).toContain(
       "     ~ changes trips.Trip.refunded_cents: 0 → 400 → trips.trips-db (trips)",
     );
-    expect(r.out).toContain(
+    expect(out).toContain(
       "     ~ changes trips.Trip.status: completed → refunded → trips.trips-db (trips)",
     );
 
     // A large refund needs finance: it's saved for finance, and nothing reaches the ledger or the trip.
-    const sample = JSON.parse(
-      await readFile(join(org, "rides/samples/refund-overcharge.json"), "utf8"),
-    );
     sample["payments.RefundRequest"].amount_cents = 1000;
-    await writeFile(join(org, "rides/large.json"), JSON.stringify(sample));
-    const large = await run("rides", "show", "request-refund", "--sample", "large.json");
-    expect(large.out).toContain("Journey request-refund · decided: needs-finance-approval");
-    expect(large.out).toContain("status: pending_approval");
-    expect(large.out).not.toContain("trips.Trip.refunded_cents");
+    const large = simulate(rides, "request-refund", sample);
+    expect(large?.outcomes).toEqual(["needs-finance-approval"]);
+    expect(large?.records["payments.Refund"]?.status).toBe("pending_approval");
+    expect(large?.steps.slice(4).map((s) => s.skipped)).toEqual([
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      undefined,
+      "runs only when escalate-to-safety; the decision was needs-finance-approval",
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      "runs only when auto-approve; the decision was needs-finance-approval",
+      "runs only when auto-approve; the decision was needs-finance-approval",
+    ]);
   });
 
   it("follows a field's lineage from one repo's mappings into another's tables", async () => {
@@ -291,7 +296,7 @@ describe("the landscape", () => {
       "  - rule 2: when request.amount_cents <= charge.amount_cents / 2 then auto-approve → when request.amount_cents <= charge.amount_cents * 3 / 4 then auto-approve",
     );
   });
-  it("view sends samples and other repos' models, so the explorer simulates across repos", async () => {
+  it("view sends other repos' models, so the explorer checks across repos", async () => {
     const server = await startViewServer({
       target: ".",
       cwd: join(org, "rides"),
@@ -299,10 +304,8 @@ describe("the landscape", () => {
     });
     try {
       const payload = (await (await fetch(`${server.url}/api/model`)).json()) as {
-        samples: { path: string }[];
         federation: { bundles: { key: string; text?: string }[] };
       };
-      expect(payload.samples.map((s) => s.path)).toEqual(["samples/refund-overcharge.json"]);
       expect(payload.federation.bundles.map((b) => b.key).sort()).toEqual(["payments", "trips"]);
       expect(payload.federation.bundles.every((b) => b.text?.startsWith("{"))).toBe(true);
     } finally {

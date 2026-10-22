@@ -1,10 +1,28 @@
 # ArchDoc
 
-**An architecture control plane for AI-assisted development.**
+**Architecture your AI agents can read, and your PRs can't quietly break.**
 
-ArchDoc is an interactive software modeling platform that helps engineers understand the systems AI is modifying and stay in the driver's seat. It's open source and AI-first. It analyzes the current state of a system, proposes future-state changes, and maps architectural concepts to code. Developers of any experience level can use it to explore and learn the system they're building.
+ArchDoc keeps a model of your system's architecture next to its code. Your coding agent reads it before it edits, so it knows where a change belongs and what it affects, and every pull request is checked against it, so a change that breaks a rule or sends personal data somewhere new doesn't merge unnoticed. You stay in the driver's seat. It's open source and AI-first. It analyzes the current state of a system, proposes future-state changes, and maps architectural concepts to code. Developers of any experience level can use it to explore and learn the system they're building.
 
 > **Status: v2 is under active development.** The v0 viewer (`@archdoc/archdoc-ui`) is frozen at [`v0.2.0`](https://github.com/ArchDoc/archdoc/releases/tag/v0.2.0) on the [`legacy/v0`](https://github.com/ArchDoc/archdoc/tree/legacy/v0) branch. The plan for v2 is in [`docs/revival/`](./docs/revival/README.md).
+
+## Install
+
+In Claude Code, install the plugin. It brings the skill and the MCP tools, pinned to a released CLI:
+
+```
+/plugin marketplace add ArchDoc/archdoc
+/plugin install archdoc@archdoc
+```
+
+Then open a repository and ask your agent to start an architecture model (or, where there's one, just start a task). For Cursor, Codex, and other agents, see [`integrations/agent-skills`](./integrations/agent-skills). The CLI runs anywhere with Node 22.12+:
+
+```bash
+npx -y @archdoc/cli init     # start a model in this repository
+npx -y @archdoc/cli view     # open it in the explorer
+```
+
+For pull requests, add the [GitHub Action](./integrations/github-action).
 
 ## Why
 
@@ -30,7 +48,7 @@ People and agents reach the engine through the surface that fits the moment:
 - **AI agents, before editing:** an MCP server and agent skill. *Where am I? What depends on this? Which rules and journeys apply?*
 - **Reviewers, before merging:** a PR comment that leads with a verdict: what blocks the merge and how to fix it, what to check, and who to involve. It stays quiet when the architecture didn't change.
 - **Everyone, anytime:** the explorer, which starts from what people do: journeys as stories, a map one level at a time, data and its lineage, and click-through to code.
-- **Enterprises, across teams:** the landscape, which composes every repo's model into one view.
+- **Enterprises, across teams** (experimental): the landscape, which composes every repo's model into one view.
 
 ## A taste of the model
 
@@ -78,11 +96,11 @@ The quickest way to see everything is the playground: one command sets up the de
 pnpm install && pnpm playground --open      # builds if needed, then opens the whole org in the explorer
 ```
 
-`.playground/PLAYGROUND.md` ([what it sets up](./examples/org/README.md#playground)) lists what to try: simulating a refund, field lineage across repos, and what a pull request would be told when it sends personal data to a third party, breaks an API another repo uses, loosens a decision, or renames a classified column. Run it again for a fresh copy.
+`.playground/PLAYGROUND.md` ([what it sets up](./examples/org/README.md#playground)) lists what to try: field lineage across repos, and what a pull request would be told when it sends personal data to a third party, breaks an API another repo uses, loosens a decision, or renames a classified column. Run it again for a fresh copy.
 
-For single systems, [`examples/`](./examples) has one model per part of the platform. They are a quickstart, a modular monolith taken apart into components with code snippets, an event-driven system, decisions and simulation, a 24-table schema, and sensitive data. Each is one file you can open with `archdoc view examples/quickstart.yaml`. Three variants of the quickstart show what a change looks like to a reviewer, compared straight from the files: `archdoc diff examples/quickstart.yaml examples/quickstart.add-reviews.yaml`. [examples/README.md](./examples/README.md) says what each one shows.
+For single systems, [`examples/`](./examples) has one model per part of the platform. They are a quickstart, a modular monolith taken apart into components with code snippets, an event-driven system, a 24-table schema, and sensitive data. Each is one file you can open with `archdoc view examples/quickstart.yaml`. Three variants of the quickstart show what a change looks like to a reviewer, compared straight from the files: `archdoc diff examples/quickstart.yaml examples/quickstart.add-reviews.yaml`. [examples/README.md](./examples/README.md) says what each one shows.
 
-The packages aren't published yet, so run the CLI from a clone:
+To work on ArchDoc itself, run the CLI from a clone, on ArchDoc's own model:
 
 ```bash
 pnpm install && pnpm build
@@ -103,24 +121,21 @@ pnpm archdoc diff main                      # what changed in the model since ma
 pnpm archdoc report --base main             # the PR comment, as markdown
 pnpm archdoc site --base main --out site     # the explorer as a static site, opened on your branch's change
 pnpm archdoc eval --min-recall 0.5          # how well context points at what recent commits changed
-pnpm archdoc sync                           # pin imported repos' models in archdoc.lock
-pnpm archdoc publish 1.0.0 --out -          # the bundle other repos would import
-pnpm archdoc landscape build                # in a landscape repo: check it and write the site
 pnpm archdoc init /path/to/another/repo     # start a model for a repository that has none
 pnpm archdoc validate examples/quickstart.yaml               # a single-file model
 pnpm archdoc migrate packages/spec/test/fixtures/v1/blog.yaml  # convert a v0/v1 model to v2
-pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation
+pnpm archdoc schema -o archdoc.schema.json  # JSON Schema for editor validation, also at https://cdn.jsdelivr.net/npm/@archdoc/spec@0/schema/archdoc.v2.schema.json
 ```
 
-`view` opens the explorer on an overview: what the system is, its journeys as cards (most important first, each with the path it takes and how many steps, repos, and decisions it has), and who owns what, beside a map of the top level. Hover a journey to light up its path on the map; click it to read it as a story on the Journeys tab: a lane per participant, a numbered arrow per step with the data it sends, and after a decision, a block per outcome with its condition. The panel beside it shows one step at a time: what it does, between whom and through which contract, the message's fields with their values, the records it writes, and its code. "Try a sample" runs the journey on a sample and fades the branches it doesn't take; "Show on map" plays it on the system map instead. On the map, a box's shape says what it is (actors are pills, datastores have a lid, what lives in another repo is dashed); click one to see what it uses, who uses it, and which journeys pass through it, and open it to see what's inside, one level at a time. With `--watch`, the explorer updates as you save model files, and shows any problems at the top. The Changes tab compares the model on two branches, or a branch and your working tree, with the number of changes on the tab. It leads with the same verdict as the PR comment, then what blocks the merge and what to check, each with how to fix it, who to ask before merging, the journeys affected (other repos' too), elements and uses, data (including sensitive data that goes somewhere new), and facts an agent suggested. Click one to go to it. On the map, new and changed boxes and uses are marked, removed ones appear as ghosts, and suggested facts are dotted. Pick the branches at the top; `--base main` picks the base to start with, and the address keeps the tab and what's open (`#journeys=request-refund`, `#changes=main...feature`), so a link opens the same view. Traces of bugs get a tab of their own (below). A branch is read from git the way the working tree is read from disk: with what its schema sources say, the other repos its lockfile pins, its sample data, and code links to the files at its commit.
+`view` opens the explorer on an overview: what the system is, its journeys as cards (most important first, each with the path it takes and how many steps, repos, and decisions it has), and who owns what, beside a map of the top level. Hover a journey to light up its path on the map; click it to read it as a story on the Journeys tab: a lane per participant, a numbered arrow per step with the data it sends, and after a decision, a block per outcome with its condition. The panel beside it shows one step at a time: what it does, between whom and through which contract, the message's fields with their values, the records it writes, and its code. "Show on map" plays it on the system map instead. On the map, a box's shape says what it is (actors are pills, datastores have a lid, what lives in another repo is dashed); click one to see what it uses, who uses it, and which journeys pass through it, and open it to see what's inside, one level at a time. With `--watch`, the explorer updates as you save model files, and shows any problems at the top. The Changes tab compares the model on two branches, or a branch and your working tree, with the number of changes on the tab. It leads with the same verdict as the PR comment, then what blocks the merge and what to check, each with how to fix it, who to ask before merging, the journeys affected (other repos' too), elements and uses, data (including sensitive data that goes somewhere new), and facts an agent suggested. Click one to go to it. On the map, new and changed boxes and uses are marked, removed ones appear as ghosts, and suggested facts are dotted. Pick the branches at the top; `--base main` picks the base to start with, and the address keeps the tab and what's open (`#journeys=request-refund`, `#changes=main...feature`), so a link opens the same view. Traces of bugs get a tab of their own (below). A branch is read from git the way the working tree is read from disk: with what its schema sources say, the other repos its lockfile pins, and code links to the files at its commit.
 
 `validate` checks the schema, every reference, and every journey step against the declared relationships. It reports problems as `file:line:column` and exits nonzero on errors, so it works as a CI gate.
 
-`show` prints the details of any element, actor, journey, data entry, trace, or sealed fact by ID; `show Entry.field` follows a field's lineage, and `show <journey> --sample <file>` runs a journey on a sample. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `context` is where an agent starts a task: give it the task in words, the files it plans to change, or both, and it returns a short brief: the files and functions to open first (ranked from file names, exported symbols, tool names, the owning element, and the journey steps that name a file), other code that does the same job (other callers of the functions those files use from another element), the data and rules involved, the narrowest journeys (those whose steps name the files; the rest as a count), the tests to run, owners, and who uses it (other repos too). A path that doesn't exist yet says where a new file would belong; `--error` places an error instead (below); with nothing, it prints an overview. It reads an index of the code's exported symbols and named imports that the TS/JS analyzer builds. `eval` measures it: it replays the last 50 commits, asks `context` with each subject, and reports how many of the source files each changed the brief named in Start here or under the elements it involved (recall), next to word search alone, using the model and code as they are now. `--min-recall` fails CI below a threshold. `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
+`show` prints the details of any element, actor, journey, data entry, trace, or sealed fact by ID; `show Entry.field` follows a field's lineage. An element's `code:` can point at whole paths and at snippets: a line range (`{ path: app/checkout.rb, lines: 40-88 }`) or a declaration (`{ path: app/checkout.rb, symbol: Checkout::PlaceOrder.call }`), each with what it's for. That lets a component inside a container say where its logic lives, even when the container is one deployable app. `show <element> --code` prints each snippet's text, the explorer links each one to its lines (finding where a symbol is declared), and `check` warns when a snippet no longer matches the code. `context` is where an agent starts a task: give it the task in words, the files it plans to change, or both, and it returns a short brief: the files and functions to open first (ranked from file names, exported symbols, tool names, the owning element, and the journey steps that name a file), other code that does the same job (other callers of the functions those files use from another element), the data and rules involved, the narrowest journeys (those whose steps name the files; the rest as a count), the tests to run, owners, and who uses it (other repos too). A path that doesn't exist yet says where a new file would belong; `--error` places an error instead (below); with nothing, it prints an overview. It reads an index of the code's exported symbols and named imports that the analyzers build for TypeScript and JavaScript, Python, and Go. `eval` measures it: it replays the last 50 commits, asks `context` with each subject, and reports how many of the source files each changed the brief named in Start here or under the elements it involved (recall), next to word search alone, using the model and code as they are now. `--min-recall` fails CI below a threshold. `map` shows how much of the repository the model covers, which files no element claims, and which code paths no longer match anything.
 
 ## Keep the model honest
 
-`archdoc check` compares the model with the code. Analyzers read workspace manifests and TS/JS imports, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it checks the merge base the same way, marks what your change introduced (what the base didn't have), and fails only on that, so it works as a CI gate from day one.
+`archdoc check` compares the model with the code. Analyzers read workspace manifests and the imports of TypeScript and JavaScript, Python, and Go files, and `check` reports dependencies between elements that the model doesn't declare, relationships that break the rules in `.archdoc/rules.yaml`, broken journeys, code paths that match nothing, and elements nothing connects to. With `--base main`, it checks the merge base the same way, marks what your change introduced (what the base didn't have), and fails only on that, so it works as a CI gate from day one.
 
 ### Seals: know which facts to re-check when code changes
 
@@ -220,9 +235,9 @@ journeys:
       - { from: charges, to: ledger, via: refund-to-ledger, when: auto-approve }
 ```
 
-`archdoc show Refund.amount_cents` (and `archdoc_show` for agents) lists every place a value is copied or derived, across repos, and the tables it lands in. `archdoc show refund --sample request.json` runs a journey against a sample request without running anything: the branch each decision takes and why, the records each step creates and changes, and where they're stored. `validate` checks that mappings and logic read fields that exist, parse, and cover every case, and that journeys only take branches their logic can decide.
+`archdoc show Refund.amount_cents` (and `archdoc_show` for agents) lists every place a value is copied or derived, across repos, and the tables it lands in. Running a journey on a sample (simulation) is experimental: core keeps it, but the CLI, MCP tools, and explorer don't run journeys for now. `validate` checks that mappings and logic read fields that exist, parse, and cover every case, and that journeys only take branches their logic can decide.
 
-The explorer's Data tab lists every data entry, from this repo and the ones it imports, with sensitive fields marked, and shows data on the same map as the system. Pick a message and the arrows it travels along light up and flow; pick an entity and the datastore that stores it opens into its tables, with a line for each foreign key (or open any datastore's tables from its box). Click a field, in a table or the details panel, and its lineage lights up: the field in every table on the way, and the arrows its value travels, while the panel lists each mapping expression. On the Journeys tab, each step shows the record it sends from one element to another (or, where a step stores what it wrote, the records it writes): every value, nested objects included, with sensitive fields marked and values the model doesn't declare called out, or as JSON to copy. With "Show on map", each step's message travels along its arrow, while the datastores it writes to open into their tables and show the row each step adds or the fields it changes; any of them can switch between its schema (ERD) and its rows: the rows the sample starts with, and each record the journey creates or changes, linked to the rows it points at. Tables show their names and how many fields they have until you open one, so a big schema reads at a glance; a field's lineage opens the tables it goes through. During a journey, the tables it doesn't write or read fold into one box, and in Rows only the rows it creates, changes, or reads stay, with the rows they point at; click a folded table to bring it back, or tick "All tables". Rows are ordered to keep the lines between them from crossing. A journey runs when it opens, on a sample named after it (`archdoc view` loads `<journey>.sample.json` files and any `samples/*.json` in the repo; an entry can be a list of rows, the first being the one the journey reads) or else on example data made up from each field's name and type, so rows always show values, never a mapping's expressions. Pick another sample and the same views show its values: what each message carries, the branch each decision takes, and the records each step writes. Agents get the same answers from `archdoc_show`.
+The explorer's Data tab lists every data entry, from this repo and the ones it imports, with sensitive fields marked, and shows data on the same map as the system. Pick a message and the arrows it travels along light up and flow; pick an entity and the datastore that stores it opens into its tables, with a line for each foreign key (or open any datastore's tables from its box). Click a field, in a table or the details panel, and its lineage lights up: the field in every table on the way, and the arrows its value travels, while the panel lists each mapping expression. On the Journeys tab, each step shows the record it sends from one element to another (or, where a step stores what it wrote, the records it writes): its fields, nested objects included, with sensitive fields marked. With "Show on map", each step's message travels along its arrow, while the datastores it writes to open into their tables and show the row each step adds or the fields it changes; any of them can switch between its schema (ERD) and its rows: each record the journey's steps declare they create or change, linked to the rows it points at. Tables show their names and how many fields they have until you open one, so a big schema reads at a glance; a field's lineage opens the tables it goes through. During a journey, the tables it doesn't write or read fold into one box, and in Rows only the rows it creates, changes, or reads stay, with the rows they point at; click a folded table to bring it back, or tick "All tables". Rows are ordered to keep the lines between them from crossing. Agents get the same answers from `archdoc_show`.
 
 The pull request report lists the data entries a change touches, the mappings and decisions it changes (with the expressions before and after), and calls out sensitive data that goes somewhere new, external services first.
 
@@ -234,29 +249,9 @@ A journey is the design; a **trace** is what one failing request actually did. W
 
 The explorer has a Traces tab when the model has traces. It shows the log you gave the agent and how to reproduce it beside the diagnosis (the journey step it opens up, whether it was reproduced, and how many hops the model doesn't declare), then the run as lanes beneath the step as modeled: the cause in red, where it spreads in amber, the step that matches the log, hops the model doesn't declare and calls that are missing dashed, and, in green, where the same job is done right. Pick a hop to see its code, what was observed and expected, and how it's known.
 
-## Share models across repos
+## Across repos (experimental)
 
-Each repo owns its namespace and models its own part. When it depends on another team's repo, it imports that repo's model and refers to its elements by namespace:
-
-```yaml
-# .archdoc/archdoc.yaml in the rides repo
-namespace: rides
-imports:
-  payments: { github: acme/payments, version: ^5 }
-elements:
-  api-gateway:
-    kind: container
-    uses:
-      payments.charges: { description: Asks for a refund, via: proto/charges.proto }
-```
-
-`archdoc sync` reads each import's model at the newest release tag its range allows (`v5.2.0`, read straight from git, so private repos work with the credentials you already have) and vendors it in `.archdoc/vendor/`, pinned in `.archdoc/archdoc.lock`. Commit both: `check`, the explorer, MCP, and CI then work offline and reproducibly, and taking a new release shows up as a diff in review. From then on, `validate` and `check` report references into other repos that don't exist at the pinned version, deprecated targets, contracts (`via`) the target doesn't `provide`, journey steps that start in another repo but don't follow its relationships, and imports built against a different major version than yours.
-
-A repo also learns who uses *it* from the landscape: the repo that imports every team's model and adds enterprise actors and cross-team journeys. Point at it with `landscape: { github: acme/architecture, version: ^1 }` and `archdoc sync` brings it with every model it pins. Then `archdoc context`, `archdoc show`, and the MCP tools list consumers and journeys in other repos, and the pull request report says which consumers a change breaks (an element they use is removed, or a contract they use `via`) before it merges.
-
-The landscape repo itself runs `archdoc landscape build`. It composes every repo's model into one (each repo a system, its elements inside), checks journeys that cross teams, owners (every team must be defined somewhere), and its rules across repos, and writes the explorer as a static site for GitHub Pages; `archdoc view --landscape` shows the same thing live. The explorer groups the landscape by repo, team, or domain, and marks where a journey crosses from one repo into another. The landscape also defines `domains:` for grouping, and its rules marked `scope: org` run in every repo that imports it, just as its teams resolve owners there. [`integrations/landscape-template`](./integrations/landscape-template) is a starting point, with a workflow that takes every team's newest release weekly and publishes the site.
-
-`archdoc sync --update` moves to the newest allowed release, and `archdoc sync --frozen` checks the lock in CI. `archdoc publish` writes a validated, versioned bundle (`dist/payments@5.2.0.json`) for repos that import it by `url:`. [`examples/org`](./examples/org) is a demo org of four repos that import each other.
+A repo can import other teams' models and refer to their elements by namespace (`payments.charges`); `archdoc sync` pins them in `archdoc.lock`, and a landscape repo composes every team's model into one view. It works, but it's experimental and left out of `--help` for now: see [docs/experimental.md](./docs/experimental.md#sharing-models-across-repos).
 
 ## Review pull requests
 
@@ -269,7 +264,7 @@ The [GitHub Action](./integrations/github-action) comments on every pull request
 | Tool | Question |
 |---|---|
 | `archdoc_context` | Where do I start, and what does it affect? From a task in words, the files to change, or an error |
-| `archdoc_show` | What is this one thing? An element (with its code), actor, journey (with a sample, simulated), data entry, `Entry.field` (lineage), trace, or sealed fact |
+| `archdoc_show` | What is this one thing? An element (with its code), actor, journey, data entry, `Entry.field` (lineage), trace, or sealed fact |
 | `archdoc_check` | What's wrong or stale, and with a base, what does my change do? The PR comment's verdict, each finding with its fix |
 | `archdoc_seal` | I checked these facts against their code. Says what's left |
 | `archdoc_init` | There's no model yet: start one, every fact marked inferred |
@@ -280,7 +275,7 @@ A task is `context`, edit, `check`, `seal`: three or four calls. The agent edits
 
 `archdoc init` (or `archdoc_init`) writes `.archdoc/` for a repository that has none, from what the repository declares: a container per package or module its manifests name (`package.json`, `go.mod` with one per `cmd/` binary, `Cargo.toml`, `pyproject.toml`, Maven and Gradle) or per code directory none claims, GitHub Actions included; datastores and queues from compose images, with `depends_on` as uses; uses from imports; and data entries, the datastore that stores them, and contracts from Prisma, SQL migrations, OpenAPI, and protobuf files. It's deterministic, marks every fact `provenance: { source: inferred }` so reviewers see it as unaccepted, never writes over a model, and never seals. On ArchDoc itself it finds all 10 containers and 13 of the 17 uses between them. What it can't know (what each part is for, who uses the system, and how) it leaves to you or your agent, and says so.
 
-[`integrations/agent-skills`](./integrations/agent-skills) has a Claude Code skill, an `AGENTS.md` snippet, and MCP configs that teach agents the workflows: a change (context, edit code and model, check, seal), a bug (context on the error, then a trace), and a repository with no model yet (init, then describe it, add actors and journeys, and check). This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
+The [Claude Code plugin](./integrations/claude-plugin) (see [Install](#install)) and [`integrations/agent-skills`](./integrations/agent-skills), for other agents, teach the workflows: a change (context, edit code and model, check, seal), a bug (context on the error, then a trace), and a repository with no model yet (init, then describe it, add actors and journeys, and check). This repository uses them itself (`.mcp.json`, `.claude/skills/archdoc`, `AGENTS.md`).
 
 ## Roadmap
 
@@ -293,7 +288,7 @@ ArchDoc is built in phases. Each phase ends with an exit test, not a date. The f
 | 2 · Code mapping + MCP | `locate` and `impact` for agents, before they edit |
 | 3 · Diff, drift, PR loop | Semantic diff, TypeScript import analysis, a verdict-first PR comment, a before/after view, agents proposing model changes, context briefs and eval, bug traces |
 | 4 · Federation | Models published across repos, a landscape repo, cross-repo impact |
-| 5 · Data | Entities, storage, field lineage, logic, and simulation |
+| 5 · Data | Entities, storage, field lineage, and logic (simulation is experimental) |
 | 6 · Bootstrap + interop | Draft models from code, LikeC4/Structurizr importers |
 | 7 · Learning | Tours, team onboarding pages, a static site |
 | 8 · Reach | VS Code, OpenTelemetry checks, community spec process |
@@ -306,12 +301,13 @@ packages/
   core/   @archdoc/core   load, validate, and query models (no LLM)
   cli/    @archdoc/cli    the `archdoc` command, including the `view` server
   mcp/    @archdoc/mcp    MCP server for coding agents
-  analyzers/ @archdoc/analyzers  find the dependencies code actually has (manifests, TS/JS imports)
+  analyzers/ @archdoc/analyzers  find the dependencies code actually has (manifests; TS/JS, Python, and Go imports)
   federation/ @archdoc/federation  share models across repos: sync, archdoc.lock, publish
 apps/
   web/    @archdoc/web    the explorer (React, React Flow, ELK), served by `archdoc view`
 integrations/
-  agent-skills/           Claude Code skill, AGENTS.md snippet, MCP configs
+  claude-plugin/          the Claude Code plugin: the skill, and MCP pinned to the CLI (marketplace in .claude-plugin/)
+  agent-skills/           AGENTS.md snippet and MCP configs for other agents
   landscape-template/     starting point for a landscape repo, with a sync-and-publish workflow
   github-action/          the pull request impact comment and drift gate
 examples/                 one model per part of the platform, the quickstart's change variants, and org/, a demo org

@@ -185,6 +185,11 @@ export {
   subjectQuery,
 } from "./query/eval.js";
 export {
+  type ExperimentalUse,
+  experimentalUses,
+  formatExperimentalUses,
+} from "./query/experimental.js";
+export {
   type AffectedJourney,
   type Impact,
   type ImpactConsumer,

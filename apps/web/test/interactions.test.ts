@@ -103,7 +103,10 @@ describe("a journey's interactions", () => {
 describe("rows without a sample", () => {
   const dir = new URL("../../../examples/", import.meta.url);
   const issuer = buildModel([
-    { path: "decisions.yaml", text: readFileSync(new URL("decisions.yaml", dir), "utf8") },
+    {
+      path: "decisions.yaml",
+      text: readFileSync(new URL("experimental/decisions.yaml", dir), "utf8"),
+    },
   ]);
   const j = issuer.journeys.get("authorize-purchase");
   if (!j) throw new Error("no journey");

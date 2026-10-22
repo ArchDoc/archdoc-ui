@@ -89,18 +89,15 @@ export async function map(options: ModelOptions & { unmapped?: boolean }, io: Io
 /** Prints the details of an element, actor, or journey by ID. */
 /**
  * `archdoc show <id>`: one thing in the model, whatever kind of ID names it:
- * an element, actor, journey (with --sample, run on it), data entry,
+ * an element, actor, journey, data entry,
  * Entry.field (its lineage), trace, or a sealed fact. What archdoc_show answers.
  */
 export async function show(
   id: string,
-  options: ModelOptions & { code?: boolean; sample?: string },
+  options: ModelOptions & { code?: boolean },
   io: Io,
 ): Promise<number> {
-  const r = await showAnswer(
-    { model: options.model, cwd: io.cwd },
-    { id, code: options.code, sample: options.sample },
-  );
+  const r = await showAnswer({ model: options.model, cwd: io.cwd }, { id, code: options.code });
   if (!r.ok) {
     io.err(r.text);
     return 1;

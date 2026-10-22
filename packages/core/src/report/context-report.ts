@@ -48,7 +48,7 @@ export function formatContext(b: ContextBrief): string {
     for (const r of b.rules) out.push(`  ${r.id}${r.description ? ` — ${r.description}` : ""}`);
   }
 
-  if (b.journeys.length || b.journeysThrough.length) {
+  if (b.journeys.length || b.journeysThrough.length || b.journeysElsewhere.length) {
     out.push("Journeys");
     for (const j of b.journeys) {
       out.push(
@@ -63,6 +63,9 @@ export function formatContext(b: ContextBrief): string {
       out.push(
         `  +${through.length} through ${where}${critical.length ? ` (critical: ${critical.join(", ")})` : ""}`,
       );
+    }
+    for (const j of b.journeysElsewhere) {
+      out.push(`  ${j.id} (${j.importance}, another repo) · step ${j.steps.join(", ")}`);
     }
   }
 

@@ -1,6 +1,6 @@
 # Acme Rides: a demo org
 
-Four repos that share their architecture through ArchDoc federation (roadmap Phase 4). Each folder stands for its own git repository:
+Four repos that share their architecture through ArchDoc federation (roadmap Phase 4), which is [experimental](../../docs/experimental.md#sharing-models-across-repos): it works, but `sync`, `publish`, and `landscape` are left out of `archdoc --help` for now. Each folder stands for its own git repository:
 
 | Repo | Namespace | Imports |
 |---|---|---|
@@ -40,6 +40,5 @@ The repos also carry data: payments reads its entries from a Prisma schema and a
 
 ```bash
 cd rides
-archdoc show request-refund --sample samples/refund-overcharge.json   # the branch, records, and tables
 archdoc show payments.RefundRequest.amount_cents                       # where the amount goes, across repos
 ```

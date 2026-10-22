@@ -173,6 +173,18 @@ describe("prReport", () => {
     expect(info.headline).toEqual(["Touches app"]);
   });
 
+  it("lists suggested facts without earning a comment when they're all there is", () => {
+    const suggested = prReport({
+      model: after,
+      changedFiles: ["apps/mobile/x.ts"],
+      diff: diffModels(before, after),
+      findings: [],
+    });
+    expect(suggested.attention.map((c) => c.code)).toEqual(["model/suggested"]);
+    expect(suggested.verdict).toBe("info");
+    expect(suggested.markdown).toContain("- **2 facts an agent suggested.**");
+  });
+
   it("draws the change and the most important journeys", () => {
     expect(r.markdown).toMatch(
       /\*\*What changed\*\*\n\n```mermaid\nflowchart TB\n[\s\S]*?```\n\n<sub>🟩 added/,

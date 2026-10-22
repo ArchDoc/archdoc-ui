@@ -344,14 +344,13 @@ async function payloadOf(
     files: snap.files,
     // Where each code snippet is, so the explorer links a symbol to its lines.
     snippets: resolveSnippets(model, (path) => snippetFiles.get(path)),
-    // Other repos' models, so the explorer checks and simulates across repos like the CLI.
+    // Other repos' models, so the explorer checks across repos like the CLI.
     federation: {
       lockPath: federation.lockPath,
       lock: federation.lock,
       lockError: federation.lockError,
       bundles: [...federation.bundles].map(([key, b]) => ({ key, ...b })),
     },
-    samples: await readSamples(snap.files, readRel),
     // Bug traces beside the model, for the explorer's trace view. Never part of the model.
     traces: await readTraces(snap),
     // What data entries' schema sources say (types, values, foreign keys), as check reads them.
@@ -377,24 +376,4 @@ async function sourcesOfFile(path: string, cwd?: string): Promise<SourcesAtRef> 
   const read = await readModelSources(path, { cwd });
   if (!read) throw new Error(`No ArchDoc model at ${path}.`);
   return { ref: path, commit: "", root: read.root, sources: read.sources };
-}
-
-/**
- * Sample records for simulating journeys: JSON files in any samples/
- * directory, and <journey>.sample.json files anywhere, such as next to a
- * single-file model.
- */
-async function readSamples(
-  files: readonly string[],
-  read: (path: string) => Promise<string | undefined>,
-): Promise<{ path: string; text: string }[]> {
-  const paths = files
-    .filter((f) => /(^|\/)samples\/[^/]+\.json$/.test(f) || /\.sample\.json$/.test(f))
-    .slice(0, 50);
-  const out: { path: string; text: string }[] = [];
-  for (const path of paths) {
-    const text = await read(path);
-    if (text !== undefined && text.length <= 256 * 1024) out.push({ path, text });
-  }
-  return out;
 }

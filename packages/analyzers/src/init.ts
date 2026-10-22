@@ -94,7 +94,9 @@ export async function inferModel(root: string, name?: string): Promise<InitResul
   const only = units.filter((u) => u.kind === "container");
   if (only.length === 1 && only[0]) {
     const whole = only[0];
-    for (const dir of codeDirs(files, whole.dir)) {
+    const dirs = codeDirs(files, whole.dir);
+    // A flat layout, such as a Go module or a Python service: its packages sit at the top.
+    for (const dir of dirs.length ? dirs : topDirs(files, whole.dir)) {
       whole.components.push({
         key: sanitize(basename(dir)),
         dir,
@@ -106,6 +108,14 @@ export async function inferModel(root: string, name?: string): Promise<InitResul
         components: [],
         source: "a code directory",
       });
+    }
+  }
+
+  // Build, release, and maintenance scripts at the top, which no package claims.
+  for (const dir of ["scripts", "tools", "bin"]) {
+    const inside = files.filter((f) => f.startsWith(`${dir}/`) && SOURCE.test(f));
+    if (inside.length >= 2 && !inside.some((f) => ownerOf(units, f)?.dir)) {
+      add({ ...(await directoryUnit(ctx, dir)), source: `the ${dir} the repository runs` }, dir);
     }
   }
 
@@ -354,6 +364,8 @@ async function manifests(ctx: AnalyzerContext): Promise<Found[]> {
   }
   for (const f of manifestsAt.filter((f) => /(^|\/)(pyproject\.toml|setup\.py)$/.test(f))) {
     const text = await read(f);
+    // A workspace root (uv, a tools-only pyproject) has no [project] of its own.
+    if (f.endsWith("pyproject.toml") && !/^\[(project|tool\.poetry)\]/m.test(text)) continue;
     const project =
       /^name\s*=\s*["']([^"']+)["']/m.exec(text) ?? /name\s*=\s*["']([^"']+)["']/.exec(text);
     const dir = dirOf(f);
@@ -653,6 +665,32 @@ function codeDirs(
     .filter(([, n]) => n >= (keep ? 1 : 2))
     .map(([d]) => d)
     .sort();
+}
+
+/** Directories right under `under` that hold two source files, for layouts with no code roots. */
+function topDirs(files: readonly string[], under: string, depth = 0): string[] {
+  const prefix = under ? `${under}/` : "";
+  const counts = new Map<string, number>();
+  for (const f of files) {
+    const rest = f.slice(prefix.length);
+    if (!f.startsWith(prefix) || SKIP_DIR.test(rest) || !SOURCE.test(f)) continue;
+    const [top, ...more] = rest.split("/");
+    if (!more.length || !top || top.startsWith(".") || top.startsWith("_") || top === "scripts") {
+      continue;
+    }
+    counts.set(`${prefix}${top}`, (counts.get(`${prefix}${top}`) ?? 0) + 1);
+  }
+  const dirs = [...counts]
+    .filter(([, n]) => n >= 2)
+    .map(([d]) => d)
+    .sort();
+  // One package under the project, such as backend/app: its parts are one level down.
+  const [only] = dirs;
+  if (dirs.length === 1 && only && depth < 2) {
+    const inner = topDirs(files, only, depth + 1);
+    if (inner.length > 1) return inner;
+  }
+  return dirs;
 }
 
 /** The unit whose directory holds the path, most specific first. */

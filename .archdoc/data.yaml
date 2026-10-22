@@ -53,7 +53,7 @@ data:
 
   CodeIndex:
     kind: message
-    description: What the analyzers read from the code for context, search, and eval, per TS/JS file. Plain data that core ranks.
+    description: What the analyzers read from the code for context, search, and eval, per TS/JS, Python, and Go file. Plain data that core ranks.
     provenance: { source: suggested, by: agent:claude-code }
     fields:
       path: { type: string }
@@ -78,7 +78,6 @@ data:
       sources: { type: "ModelFile[]" }
       files: { type: "string[]" }
       schemas: { type: json, description: What data entries' schema sources say }
-      samples: { type: json, description: Sample requests for simulation }
       base: { type: json, description: The model's files at --base }
       federation: { type: json, description: Vendored models of other repos }
 
@@ -87,7 +86,7 @@ data:
     description: Something a person does in the explorer.
     provenance: { source: suggested, by: agent:claude-code }
     fields:
-      action: { type: enum, values: [open, focus, select, step, simulate] }
+      action: { type: enum, values: [open, focus, select, step] }
       target: { type: string }
 
   SyncRequest:

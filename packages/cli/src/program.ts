@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { SPEC_VERSION } from "@archdoc/spec";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { check } from "./commands/check.js";
 import { map, show } from "./commands/code.js";
 import { context, evalCommand } from "./commands/context.js";
@@ -33,6 +33,10 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
   program
     .description("An architecture control plane for AI-assisted development.")
     .version(`${version} (spec ${SPEC_VERSION})`)
+    .addHelpText(
+      "after",
+      "\nExperimental, and left out above: sharing models across repos (sync, publish,\nlandscape build, view --landscape). See https://github.com/ArchDoc/archdoc/blob/main/docs/experimental.md",
+    )
     .configureOutput({
       writeOut: (s) => io.out(s.trimEnd()),
       writeErr: (s) => io.err(s.trimEnd()),
@@ -70,9 +74,11 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
       "-b, --base <ref>",
       "show what changed in the model since this branch or commit, or since another model file",
     )
-    .option(
-      "-l, --landscape",
-      "show the landscape: this model composed with every model it imports",
+    .addOption(
+      new Option(
+        "-l, --landscape",
+        "show the landscape: this model composed with every model it imports (experimental)",
+      ).hideHelp(),
     )
     .option("-p, --port <port>", "port to listen on (default: a free port)")
     .option("--open", "open the explorer in your default browser")
@@ -152,13 +158,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     .argument("<id>", "such as payments.charges, Refund.amount_cents, or step:refund#2")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
     .option("--code", "print the code snippets an element points at")
-    .option(
-      "-s, --sample <file>",
-      "run a journey on JSON or YAML records that exist when it starts, by data entry",
-    )
-    .action((id: string, opts: { model?: string; code?: boolean; sample?: string }) =>
-      run(show(id, opts, io)),
-    );
+    .action((id: string, opts: { model?: string; code?: boolean }) => run(show(id, opts, io)));
 
   program
     .command("map")
@@ -279,7 +279,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     );
 
   program
-    .command("sync")
+    .command("sync", { hidden: true })
     .description(
       "Pin the model's imports in archdoc.lock and vendor other repos' models, then check references into them",
     )
@@ -294,7 +294,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     );
 
   program
-    .command("publish")
+    .command("publish", { hidden: true })
     .description("Write a versioned, validated bundle of the model for other repos to import")
     .argument("[version]", "release version, such as 5.2.0 (default: the release tag on HEAD)")
     .option("-m, --model <path>", "repository, .archdoc directory, or model file", ".")
@@ -304,7 +304,7 @@ export function createProgram(io: Io = processIo): Command & { exitCode?: number
     );
 
   const landscape = program
-    .command("landscape")
+    .command("landscape", { hidden: true })
     .description("Compose every repo's model into one landscape (run in the landscape repo)");
   landscape
     .command("build")

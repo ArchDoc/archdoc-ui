@@ -3,20 +3,25 @@ sealVersion: 1
 seals:
   element:toolchain.agent-skills:
     kind: structure
-    hash: fnv-b9bc1dd10b81d90f
+    hash: fnv-d97c99971e8ef979
     files:
+      .claude-plugin/marketplace.json: []
       .claude/skills/archdoc/SKILL.md: []
       .mcp.json: []
       AGENTS.md: []
       CLAUDE.md: []
       integrations/agent-skills/AGENTS.md: []
       integrations/agent-skills/README.md: []
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
       integrations/agent-skills/mcp/claude-code.mcp.json: []
       integrations/agent-skills/mcp/cursor.mcp.json: []
+      integrations/claude-plugin/.claude-plugin/plugin.json: []
+      integrations/claude-plugin/.mcp.json: []
+      integrations/claude-plugin/README.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   element:toolchain.analyzers:
     kind: structure
-    hash: fnv-14ac190a3724c3dc
+    hash: fnv-c5f014802cce4d30
     files:
       packages/analyzers/package.json: []
       packages/analyzers/src/answers.ts:
@@ -43,6 +48,15 @@ seals:
         - CheckRepositoryOptions
         - CheckRepositoryResult
         - checkRepository
+      packages/analyzers/src/go.ts:
+        - GoModule
+        - GoReplace
+        - goImports
+        - goModules
+        - indexGoSource
+        - isGoSource
+        - packageName
+        - resolveGoImport
       packages/analyzers/src/index.ts: []
       packages/analyzers/src/init.ts:
         - InitResult
@@ -51,6 +65,12 @@ seals:
         - initModel
       packages/analyzers/src/manifests.ts:
         - manifests
+      packages/analyzers/src/python.ts:
+        - indexPythonCode
+        - indexPythonSource
+        - pythonImports
+        - pythonRoots
+        - resolvePythonModule
       packages/analyzers/src/revision.ts:
         - LoadRevisionOptions
         - Revision
@@ -473,7 +493,7 @@ seals:
         - parseYaml
   element:toolchain.core.query:
     kind: structure
-    hash: fnv-f83627f617790886
+    hash: fnv-dedf9f11a0e12d55
     files:
       packages/core/src/query/code-index.ts:
         - CodeIndex
@@ -509,6 +529,10 @@ seals:
         - evaluate
         - isEvalSource
         - subjectQuery
+      packages/core/src/query/experimental.ts:
+        - ExperimentalUse
+        - experimentalUses
+        - formatExperimentalUses
       packages/core/src/query/impact.ts:
         - AffectedJourney
         - Impact
@@ -533,6 +557,7 @@ seals:
         - sameWord
         - singular
         - splitIdentifier
+    by: agent:claude-code
   element:toolchain.core.report:
     kind: structure
     hash: fnv-9511105a37c0f07a
@@ -965,7 +990,7 @@ seals:
         - roundedPath
   element:toolchain.web.model-loader:
     kind: structure
-    hash: fnv-6860947504f10307
+    hash: fnv-ec21bedb05a35305
     files:
       apps/web/src/model/compare.ts:
         - ChangeFindings
@@ -973,12 +998,6 @@ seals:
         - ChangeItem
         - Compare
         - compareModels
-      apps/web/src/model/samples.ts:
-        - SampleFile
-        - matchingSample
-        - parseSample
-        - sampleName
-        - samplesFor
       apps/web/src/model/stories.ts:
         - IMPORTANCE
         - JourneyCard
@@ -1034,7 +1053,7 @@ seals:
     by: agent:claude-code
   element:toolchain.web.ui:
     kind: structure
-    hash: fnv-728f3161540859f7
+    hash: fnv-f45ea09e0a899082
     files:
       apps/web/src/App.tsx:
         - App
@@ -1066,7 +1085,6 @@ seals:
         - dataGroups
         - search
       apps/web/src/components/StepPanel.tsx:
-        - SampleChoice
         - StepPanel
         - StepPanelProps
       apps/web/src/components/Traces.tsx:
@@ -1103,11 +1121,13 @@ seals:
         - TableNode
         - nodeTypes
       apps/web/src/styles.css: []
+    by: agent:claude-code
   step:agent-preflight#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   step:agent-preflight#2:
     kind: structure
     hash: fnv-3c8e7a02bbae7918
@@ -1240,9 +1260,10 @@ seals:
         - lookupImported
   step:explain-a-bug#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
+    by: agent:claude-code
   step:explain-a-bug#2:
     kind: structure
     hash: fnv-3c8e7a02bbae7918
@@ -1326,9 +1347,9 @@ seals:
         - App
   step:keep-the-model-true#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
     by: agent:claude-code
   step:keep-the-model-true#2:
     kind: structure
@@ -1450,9 +1471,9 @@ seals:
     by: agent:claude-code
   step:start-a-model#1:
     kind: structure
-    hash: fnv-341f41ac97dcb5ce
+    hash: fnv-b5eb9a68eba1ed3e
     files:
-      integrations/agent-skills/claude-code/archdoc/SKILL.md: []
+      integrations/claude-plugin/skills/archdoc/SKILL.md: []
     by: agent:claude-code
   step:start-a-model#2:
     kind: structure

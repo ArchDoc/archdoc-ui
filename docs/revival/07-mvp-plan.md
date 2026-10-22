@@ -14,15 +14,16 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 | Federation (`sync`, `publish`, `landscape`, `imports`) | Experimental; stays in the code, leaves the main docs, lands after the release | A release requirement |
 | Simulation (`show --sample`, "Try a sample", samples) | Hidden until we know it's a feature people use | Shipped as stable |
 | Tours, onboarding pages, the Ask panel | Cut from the release | Phase 7 as planned |
-| Agent plugin | Its own repo, as the way people install ArchDoc; skill text stays in `integrations/agent-skills/` and the release copies it over | Skill text maintained in the plugin repo |
+| Agent plugin (revised 2026-10-22) | In this repo: the marketplace at the root (`.claude-plugin/marketplace.json`), the plugin in `integrations/claude-plugin/`, so the skill has one copy and the plugin is versioned with the CLI | Its own repo, with the skill copied over on release |
 | The PR comment | Only posts when there's a finding | Posts whenever a PR touches mapped code |
+| Languages (2026-10-22) | Python and Go import analyzers and symbol indexes, next to TS/JS | Other languages first |
+| Decision rules (2026-10-22) | Experimental, with mappings and simulation | Stable |
+| How "experimental" shows (2026-10-22) | The JSON Schema and docs mark the fields; `validate` prints a note naming them, which doesn't fail `--strict` or reach the PR comment | A warning per use |
+
+| Tagline (2026-10-22) | "Architecture your AI agents can read, and your PRs can't quietly break." | "An architecture control plane for AI-assisted development", "Software system modeling for the AI age" |
 
 ## Open decisions
 
-- **Decision rules (`logic:`, `decides:`, `branches:`).** They power simulation, but they're also a review finding on their own ("Changes the decision refund-approval" in the playground). Stable, or experimental with simulation?
-- **Which languages.** Python and Go are the proposal. Each needs an import analyzer and a symbol index.
-- **One tagline.** The README says "architecture control plane for AI-assisted development"; the newer framing is "software system modeling for the AI age". The README, the website, and the plugin should say the same thing.
-- **How "experimental" shows in the model format.** Proposal: the JSON Schema and docs mark the fields, and `validate` warns when a model uses one.
 - **First version number.** `0.x` keeps room to change the format; `1.0` promises it.
 
 ## 1. Release pipeline
@@ -32,7 +33,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 - [x] Build from clean (`pnpm clean` removes every output), so a deleted source file's `.js` can't ship again (0.1.0 shipped a stale `dist/commands/data.js`).
 - [x] Turn the pending changesets into the first release's notes (0.1.0's changelogs).
 - [x] A CI step that packs every package, installs the tarballs into an empty project, and runs the CLI (`validate`, an `mcp` initialize handshake, and `site`, which needs the bundled explorer): `pnpm smoke`.
-- [ ] The first release through the workflow, to confirm `npm stage publish` works from CI the way it does in the docs.
+- [x] The first release through the workflow, to confirm `npm stage publish` works from CI the way it does in the docs. 0.1.1 and 0.3.0 were staged from CI and approved.
 
 **Exit:** on a clean machine, `npx -y @archdoc/cli mcp` starts the server and `npx -y @archdoc/cli view` opens the explorer.
 
@@ -43,26 +44,26 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 3. Freeze the model format
 
-- [ ] List each field as stable or experimental. Proposal:
+- [x] List each field as stable or experimental ([docs/experimental.md](../experimental.md#the-model-format)):
   - **Stable:** `actors`, `elements` (`code`, `uses`, `stores`, `provides`), `journeys` (`steps`, `sends`, `creates`, `changes`), `data` (`fields`, `classification`, `references`, `source`, `states`), `rules`, `provenance`, and the trace format.
-  - **Experimental:** `imports`, `landscape`, `domains`, `scope: org` rules, `mappings`, and the decision rules (pending the open decision).
-- [ ] Mark experimental fields in the JSON Schema and docs; `validate` warns when a model uses one.
-- [ ] Publish the JSON Schema at a stable URL for editors.
+  - **Experimental:** `imports`, `landscape`, `domains`, `scope: org` rules, `mappings`, and the decision rules (`logic`, `decides`, `branches`).
+- [x] Mark experimental fields in the JSON Schema (their descriptions start "Experimental") and docs; `validate` prints a note naming the ones a model uses (`experimentalUses` in core).
+- [x] Publish the JSON Schema at a stable URL for editors: `https://cdn.jsdelivr.net/npm/@archdoc/spec@0/schema/archdoc.v2.schema.json`, which serves the newest 0.x from npm.
 
 ## 4. Hide simulation
 
-- [ ] Remove `show --sample` from the CLI and `archdoc_show`.
-- [ ] In the explorer, remove "Try a sample" and the rows a journey writes. The ERD view stays.
-- [ ] Stop loading `*.sample.json` and `samples/` in `archdoc view` and `archdoc site`.
-- [ ] Keep `simulate` in core with its tests, so it can come back.
-- [ ] Move `examples/decisions.yaml` and its sample out of the quickstart path.
+- [x] Remove `show --sample` from the CLI and `archdoc_show`.
+- [x] In the explorer, remove "Try a sample" and stop running journeys: steps show their messages' fields, and Rows show only what steps declare (`creates:`, `changes:`). The ERD view stays. Simulation is switched off in one place, `apps/web/src/App.tsx`.
+- [x] Stop loading `*.sample.json` and `samples/` in `archdoc view` and `archdoc site`.
+- [x] Keep `simulate` in core with its tests, so it can come back. The cross-repo simulation test now calls core directly.
+- [x] Move `examples/decisions.yaml` and both samples to `examples/experimental/`.
 
 ## 5. Make federation experimental
 
-- [ ] Move `sync`, `publish`, and `landscape` under `archdoc experimental` (or hide them from `--help`), with one docs page for all of them.
-- [ ] Lead the README and website without federation; the playground's cross-repo scenarios say they show an experimental feature.
-- [ ] Cross-repo findings keep working for repos that already use `imports`.
-- [ ] `context` lists journeys in other repos that pass through what a path touches. `impact` did; `context` names the other repos' consumers but not their journeys.
+- [x] Hide `sync`, `publish`, `landscape`, and `view --landscape` from `--help`, with a note after the command list, and one page for everything experimental: [`docs/experimental.md`](../experimental.md).
+- [x] Lead the README and website without federation; the playground and demo org say they show an experimental feature.
+- [x] Cross-repo findings keep working for repos that already use `imports` (the landscape tests still pass).
+- [x] `context` lists journeys in other repos that pass through what a path touches (`journeysElsewhere` in the brief), as `impact` did.
 
 ## 6. Cut the CLI surface
 
@@ -73,11 +74,23 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 7. Multi-language analysis
 
-- [ ] Import analyzers for Python and Go behind the existing plugin API, so undeclared dependencies and rule violations are found the way they are for TS/JS. Today only `ts-imports.ts` exists, so `check`'s strongest finding does nothing outside TS/JS.
-- [ ] A symbol index for the same languages, so `context` ranks files and functions there and seals fingerprint their exports.
-- [ ] `init` adds uses from those imports (it already reads `go.mod` and `pyproject.toml`).
+- [x] Import analyzers for Python and Go behind the existing plugin API (`python.ts`, `go.ts`), so undeclared dependencies and rule violations are found the way they are for TS/JS. Python resolves through project roots (`src/`, each `pyproject.toml`), packages, and relative imports, and marks `if TYPE_CHECKING:` imports type-only; Go resolves through every `go.mod`, `replace` lines, and `go.work`.
+- [x] A symbol index for the same languages, so `context` ranks files and functions there and seals fingerprint their exports. Core counts `_test.go`, `test_*.py`, and `*_test.py` as tests.
+- [x] `init` adds uses from those imports, splits a flat Go module or Python project by its packages, and skips a `pyproject.toml` that only declares a workspace.
 
 **Exit:** on one Python and one Go repository, `check --base` flags an undeclared import introduced on a branch, and `eval` recall is within reach of what it is on TS/JS.
+
+Met on 2026-10-22:
+
+| Repository | `init` | Undeclared import on a branch | `eval` recall (Start here) |
+|---|---|---|---|
+| [golang-gin-realworld-example-app](https://github.com/gothinkster/golang-gin-realworld-example-app) (Go, one module) | 3 packages, the 3 uses between them | ⛔ `common` → `articles` | 92% (18%) |
+| [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) (FastAPI + React, uv workspace) | frontend, emails, the backend, Postgres | ⛔ `store` → `api`, after splitting the backend into 3 components by hand | 51% (4%) |
+| ArchDoc (TS) | | | 42% (23%) |
+
+Both are `init` models with no descriptions or journeys (the template's backend split into 3 components), so recall is wide rather than sharp: on the template, most recent commits are dependency bumps and frontend changes with subjects `context` can't place. §10 picks this up with described models.
+
+Known gaps: Go package names are guessed from the import path (as `goimports` does), not read from the `package` clause; Python's dynamic imports, `sys.path` changes, and package-dir mappings aren't followed.
 
 ## 8. Make the PR comment worth reading
 
@@ -102,18 +115,19 @@ What the review found:
   - "Touches no code the model maps" on a PR that changed a mapped contract;
   - `type string → undefined` in data changes when a schema field is removed;
   - suggested facts as a list, not one sentence joined by semicolons.
-- [ ] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives. Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
+- [~] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives (`pnpm replay-prs [repo] --show`). Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
+  - **This repo (2026-10-22), 27 PRs with a model:** 56% would have got a comment. On 8 of the 15, the only item was facts an agent suggested, so suggested facts are now listed in the report but no longer earn a comment on their own: 37%, 2 blocks (7%). Both blocks are real: #19 and #20 added components and imports between them without declaring the uses. The other 8 change a critical journey's steps (3) or add journeys whose steps don't say what they send (5), which `check` flags today but didn't when they were written. Nearly every PR here rewrites the model, so it's a poor baseline; the §10 repos decide whether 20% holds.
 
 **Exit:** a body-only code change posts nothing, and on the scenarios that stay in the release (personal data to an external service, a renamed classified column, an undeclared import, a changed sealed contract) the comment's top fits on one screen.
 
 ## 9. Agent plugin
 
-- [ ] A new repo that is a Claude Code plugin marketplace: one plugin with the skills (a change, a bug, start a model) and an MCP config pinned to the CLI version it was tested with.
-- [ ] The release workflow copies the skill text from `integrations/agent-skills/` into the plugin repo, so the sync test keeps covering it.
-- [ ] The first run is `init`: from install to a model that `archdoc check` passes, in one session.
-- [ ] Document the MCP config and `AGENTS.md` snippet for Cursor, Codex, and other agents.
+- [x] A Claude Code plugin marketplace in this repo (`.claude-plugin/marketplace.json`), with one plugin (`integrations/claude-plugin/`): the skill (a change, a bug, start a model) and an MCP config pinned to the CLI released with it. `claude plugin validate` passes both. Install: `/plugin marketplace add ArchDoc/archdoc`, then `/plugin install archdoc@archdoc`.
+- [x] The skill has one copy, in the plugin; this repo's `.claude/skills/archdoc` must match it, and the plugin's version and CLI pin must match the CLI's (`integrations/agent-skills/test/sync.test.ts`). `pnpm version-packages` and `set-version` run `scripts/sync-plugin.mjs`. *(The release workflow has to call `pnpm version-packages` instead of `pnpm changeset version` for this; a maintainer edits the workflow.)*
+- [x] The first run is `init`. On 2026-10-22, the plugin installed from this repo, in a fresh clone of golang-gin-realworld-example-app with no `.archdoc/`, given "This repository has no architecture model yet. Start one, so that archdoc check passes.", allowed only the ArchDoc tools and file edits: 13 turns, 36 seconds, a model with 4 elements, their uses, an actor, and a critical journey with code on each step, all marked suggested. `archdoc check` passes it (0 errors, 4 warnings: the steps don't say what they send, which the agent left rather than guess).
+- [x] Document the MCP config and `AGENTS.md` snippet for Cursor, Codex, and other agents (`integrations/agent-skills/README.md`).
 
-**Exit:** on a fresh machine, someone installs the plugin, opens a repository without `.archdoc/`, and ends the session with a model that passes `archdoc check`, without cloning ArchDoc.
+**Exit:** on a fresh machine, someone installs the plugin, opens a repository without `.archdoc/`, and ends the session with a model that passes `archdoc check`, without cloning ArchDoc. *Met in a container, except that the marketplace was added from a local clone; `/plugin marketplace add ArchDoc/archdoc` works once this merges to main.*
 
 ## 10. Prove it outside this repo
 
@@ -124,11 +138,11 @@ What the review found:
 ## 11. ArchDoc's own model
 
 - [ ] Accept or reject the 65 facts still marked `provenance: suggested` (47 in `model/toolchain.yaml`, 17 in `data.yaml`, 1 in `actors.yaml`) and the open proposal in `.archdoc/proposals/`. *(a person decides)*
-- [ ] Remove the planned `onboard-contributor` journey, since tours are cut.
+- [x] Remove the planned `onboard-contributor` journey, since tours are cut. `new-contributor` stays as someone who reads the explorer.
 
 ## 12. Website
 
-- [ ] One tagline (see open decisions) across the README, the website, and the plugin.
+- [x] One tagline across the README, the website, and the plugin: "Architecture your AI agents can read, and your PRs can't quietly break." The website's hero, Try it, Getting started, and Agents pages now install through the plugin.
 - [ ] A landing page that tells the 30-second story: the agent's brief before it edits, and the PR comment that blocks a personal-data leak. Its demo is a real explorer built with `archdoc site`, not screenshots. Installing means the plugin.
 - [ ] Docs for the stable surface; one experimental page for federation and simulation.
 - [ ] Archive `versioned_docs/version-1.0.0` (v0) so search and the version menu don't lead there.

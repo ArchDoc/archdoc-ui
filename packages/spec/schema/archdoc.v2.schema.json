@@ -352,11 +352,11 @@
                       "description": "Where a fact came from. Absent means declared by a person."
                     },
                     "decides": {
-                      "description": "A logic block that decides where this step goes, such as payments.refund-approval",
+                      "description": "Experimental (docs/experimental.md): a logic block that decides where this step goes, such as payments.refund-approval",
                       "type": "string"
                     },
                     "branches": {
-                      "description": "What happens for each outcome of `decides`",
+                      "description": "Experimental (docs/experimental.md): what happens for each outcome of `decides`",
                       "type": "object",
                       "propertyNames": {
                         "type": "string"
@@ -569,7 +569,7 @@
           }
         },
         "mappings": {
-          "description": "How records become other records, field by field, for lineage and simulation",
+          "description": "Experimental (docs/experimental.md): how records become other records, field by field, for lineage and simulation",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -743,7 +743,7 @@
           }
         },
         "logic": {
-          "description": "Decisions elements make on the data they receive",
+          "description": "Experimental (docs/experimental.md): decisions elements make on the data they receive",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -1006,7 +1006,7 @@
                 "additionalProperties": false
               },
               "scope": {
-                "description": "org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
+                "description": "Experimental (docs/experimental.md): org: a landscape rule that also runs in every repo that imports the landscape. Defaults to repo.",
                 "type": "string",
                 "enum": ["repo", "org"]
               }
@@ -1016,7 +1016,7 @@
           }
         },
         "domains": {
-          "description": "Business domains, for grouping a landscape by more than repo",
+          "description": "Experimental (docs/experimental.md): business domains, for grouping a landscape by more than repo",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -1067,6 +1067,7 @@
           "type": "string"
         },
         "imports": {
+          "description": "Experimental (docs/experimental.md): other repos' models, by namespace. archdoc sync pins them in archdoc.lock.",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -1142,7 +1143,7 @@
           }
         },
         "landscape": {
-          "description": "The landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
+          "description": "Experimental (docs/experimental.md): the landscape repo, which imports every team's model. archdoc sync vendors it with those models, so this repo knows who uses it in other repos.",
           "anyOf": [
             {
               "type": "object",
@@ -1375,11 +1376,11 @@
                 "description": "Where a fact came from. Absent means declared by a person."
               },
               "decides": {
-                "description": "A logic block that decides where this step goes, such as payments.refund-approval",
+                "description": "Experimental (docs/experimental.md): a logic block that decides where this step goes, such as payments.refund-approval",
                 "type": "string"
               },
               "branches": {
-                "description": "What happens for each outcome of `decides`",
+                "description": "Experimental (docs/experimental.md): what happens for each outcome of `decides`",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
@@ -1705,11 +1706,11 @@
                 "description": "Where a fact came from. Absent means declared by a person."
               },
               "decides": {
-                "description": "A logic block that decides where this step goes, such as payments.refund-approval",
+                "description": "Experimental (docs/experimental.md): a logic block that decides where this step goes, such as payments.refund-approval",
                 "type": "string"
               },
               "branches": {
-                "description": "What happens for each outcome of `decides`",
+                "description": "Experimental (docs/experimental.md): what happens for each outcome of `decides`",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"

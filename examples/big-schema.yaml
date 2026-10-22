@@ -4,7 +4,7 @@
 # shipping, invoicing, and payment. In the explorer, tables show their names
 # until opened; during the journey, the ones it doesn't touch fold away, and
 # Rows shows the records it creates, linked to the rows they point at.
-# order-to-cash.sample.json seeds several rows per table and runs on its own.
+# experimental/order-to-cash.sample.json seeds several rows per table, for simulation (experimental).
 archdoc: "2.0"
 namespace: erp
 name: Wholesale ERP

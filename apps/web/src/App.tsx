@@ -7,7 +7,6 @@ import {
   resolveCodeMap,
   type Simulation,
   type SnippetPlace,
-  simulate,
 } from "@archdoc/core/browser";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,7 +16,7 @@ import { Lanes } from "./components/Lanes.js";
 import { Overview } from "./components/Overview.js";
 import type { PayloadEntry } from "./components/Payload.js";
 import { ChangesList, DataList, dataGroups, JourneyList, SearchBox } from "./components/Sidebar.js";
-import { type SampleChoice, StepPanel } from "./components/StepPanel.js";
+import { StepPanel } from "./components/StepPanel.js";
 import { TraceList, TraceStepPanel, TraceStory } from "./components/Traces.js";
 import {
   dataPlaces,
@@ -26,13 +25,11 @@ import {
   journeyInteractions,
   journeyInvolvement,
   journeyStores,
-  sampleSkeleton,
   stepData,
 } from "./graph/data.js";
 import { ancestorsOf, defaultExpanded, journeyExpansion } from "./graph/graph.js";
 import { type GroupBy, type Grouping, groupLandscape } from "./graph/groups.js";
 import { type Compare, compareModels } from "./model/compare.js";
-import { matchingSample, parseSample, sampleName, samplesFor } from "./model/samples.js";
 import { journeyLanes, journeysByImportance } from "./model/stories.js";
 import { firstCause, readTraces } from "./model/traces.js";
 import {
@@ -61,10 +58,9 @@ export function App() {
     [chosen, presetRef],
   );
   const compared = useCompared(pair, preset);
-  // A branch replaces the working tree while the Changes tab shows it: its model, files, and samples.
+  // A branch replaces the working tree while the Changes tab shows it: its model and files.
   const branch = tab === "changes" && compared.status === "ready" ? compared.head : undefined;
   const shown = branch ?? (state.status === "ready" ? state : undefined);
-  const samples = useMemo(() => (shown ? samplesFor(shown.model, shown.samples) : []), [shown]);
   const headModel =
     compared.status === "ready"
       ? (compared.head ?? (state.status === "ready" ? state : undefined))?.model
@@ -121,7 +117,6 @@ export function App() {
         pair={chosen}
         changes={changes}
         landscape={state.landscape}
-        samples={samples}
         traces={shown.traces}
         seals={branch ? undefined : state.seals}
       />
@@ -155,14 +150,11 @@ interface ExplorerProps {
   pair?: Pair | undefined;
   changes?: ChangesControl | undefined;
   landscape?: LandscapeInfo | undefined;
-  samples: { path: string; text: string }[];
   /** Trace files beside the model. */
   traces: { path: string; text: string }[];
   /** The working tree's facts to re-check, when the repository keeps an archdoc.sum. */
   seals?: SealsInfo | undefined;
 }
-
-const EXAMPLE = "";
 
 function Explorer({
   model,
@@ -177,13 +169,10 @@ function Explorer({
   pair,
   changes,
   landscape,
-  samples,
   traces,
   seals,
 }: ExplorerProps) {
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
-  // What the open journey runs on: example data ("") or a sample's path, so it reruns when the model reloads.
-  const [sample, setSample] = useState<{ journey: string; key: string }>();
   // Boxes opened by hand, and boxes closed by hand that something else opened (by context).
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [closed, setClosed] = useState<{ context: string; ids: ReadonlySet<string> }>();
@@ -229,20 +218,10 @@ function Explorer({
     [model, journey],
   );
   const interaction: Interaction | undefined = interactions[at];
-  const run = useMemo(() => {
-    if (!journey) return undefined;
-    const key = sample?.journey === journey.id ? sample.key : defaultSample(samples, journey.id);
-    const file = samples.find((s) => s.path === key);
-    const records = file ? parseSample(file) : undefined;
-    return {
-      key: records ? key : EXAMPLE,
-      records: records ?? sampleSkeleton(model, journey),
-    };
-  }, [journey, sample, samples, model]);
-  const simulation = useMemo<Simulation | undefined>(
-    () => (journey && run ? simulate(model, journey.id, run.records) : undefined),
-    [model, journey, run],
-  );
+  // Simulation is hidden until we know people want it (docs/revival/07-mvp-plan.md, §4): journeys
+  // show what the model declares, not a run. Lanes, the step panel, and the map all work without one,
+  // and core's simulate() and its tests stay, so turning it back on starts here.
+  const simulation: Simulation | undefined = undefined;
   // The map shows what changed only on the Changes tab.
   const compare = tab === "changes" ? changes?.compare : undefined;
   const code = useMemo(
@@ -343,7 +322,7 @@ function Explorer({
       journeyOnMap && rowStores.size
         ? interactionRows(model, journeyOnMap, interactions, at, simulation)
         : undefined,
-    [model, journeyOnMap, interactions, at, simulation, rowStores],
+    [model, journeyOnMap, interactions, at, rowStores],
   );
   // What the journey uses; the rest of its datastores folds away.
   const involved = useMemo(
@@ -528,16 +507,7 @@ function Explorer({
   );
   const payload = useMemo(
     () => (journey && interaction ? payloadOf(model, journey, interaction, simulation) : []),
-    [model, journey, interaction, simulation],
-  );
-  const sampleChoices = useMemo<SampleChoice[]>(
-    () => [
-      { key: EXAMPLE, label: "Example data", title: "Example values for each field, by its type" },
-      ...samples
-        .filter((s) => parseSample(s) !== undefined)
-        .map((s) => ({ key: s.path, label: sampleName(s.path), title: s.path })),
-    ],
-    [samples],
+    [model, journey, interaction],
   );
   const journeyStoreIds = useMemo(
     () =>
@@ -668,9 +638,6 @@ function Explorer({
           onAt={go}
           payload={payload}
           simulation={simulation}
-          samples={sampleChoices}
-          sample={run?.key}
-          onSample={(key) => setSample({ journey: journey.id, key })}
           code={code}
           landscape={landscape}
           onSelect={select}
@@ -894,11 +861,6 @@ function Explorer({
       ) : null}
     </div>
   );
-}
-
-/** The sample a journey runs on first: one named after it, else example data. */
-function defaultSample(samples: { path: string; text: string }[], journey: string): string {
-  return matchingSample(samples, journey)?.path ?? EXAMPLE;
 }
 
 /** What an interaction carries, or for a writer storing it, what it writes: with the simulated records. */

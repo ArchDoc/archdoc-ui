@@ -85,21 +85,10 @@ describe("data, through context and show", () => {
     );
   });
 
-  it("runs a journey on a sample request", async () => {
-    const r = await call("archdoc_show", {
-      id: "refund",
-      sample: { RefundRequest: { amount_cents: 300 }, Charge: { amount_cents: 1000 } },
-    });
-    expect(r.text).toContain("decides payments.approval → auto (rule 1:");
-    expect(r.text).toContain(
-      "+ creates payments.Refund { amount_cents: 300 } via payments.to-refund",
-    );
-    const manual = await call("archdoc_show", {
-      id: "refund",
-      sample: { RefundRequest: { amount_cents: 900 }, Charge: { amount_cents: 1000 } },
-    });
-    expect(manual.text).toContain("skipped: runs only when auto; the decision was manual");
-    const notJourney = await call("archdoc_show", { id: "Refund", sample: {} });
-    expect(notJourney.isError).toBe(true);
+  it("shows a journey without running it (simulation is hidden)", async () => {
+    const r = await call("archdoc_show", { id: "refund" });
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toContain("refund");
+    expect(r.text).not.toContain("decided:");
   });
 });

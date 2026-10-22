@@ -200,3 +200,54 @@ describe("archdoc init on a Go service with compose and SQL migrations", () => {
     expect(out).toContain("archdoc seal --all");
   });
 });
+
+describe("archdoc init on flat Go and Python layouts", () => {
+  let dir: string;
+  const write = async (path: string, text: string) => {
+    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await writeFile(join(dir, path), text);
+  };
+  const uses = (m: Model) =>
+    m.relationships
+      .map((x) => `${"id" in x.from ? x.from.id : ""}->${"id" in x.to ? x.to.id : ""}`)
+      .sort();
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "archdoc-init-flat-"));
+  });
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  it("splits a Go module by its packages, with uses from their imports", async () => {
+    const root = join(dir, "go");
+    const w = (p: string, t: string) => write(`go/${p}`, t);
+    await w("go.mod", "module github.com/acme/blog\n\ngo 1.23\n");
+    await w("main.go", 'package main\n\nimport "github.com/acme/blog/articles"\n');
+    await w("articles/models.go", 'package articles\n\nimport "github.com/acme/blog/common"\n');
+    await w("articles/routers.go", "package articles\n");
+    await w("common/db.go", 'package common\n\nimport "database/sql"\n');
+    await w("common/errors.go", "package common\n");
+    const { model } = await inferred(root);
+    expect([...model.elements.keys()].sort()).toEqual(["blog", "blog.articles", "blog.common"]);
+    expect(uses(model)).toEqual(["blog.articles->blog.common"]);
+  });
+
+  it("skips a pyproject that only declares a workspace, and reads the project's imports", async () => {
+    const root = join(dir, "py");
+    const w = (p: string, t: string) => write(`py/${p}`, t);
+    await w("pyproject.toml", '[tool.uv.workspace]\nmembers = ["backend"]\n');
+    await w("backend/pyproject.toml", '[project]\nname = "app"\ndependencies = ["fastapi"]\n');
+    await w("backend/app/__init__.py", "");
+    await w("backend/app/api/routes.py", "from app.core.security import hash_password\n");
+    await w("backend/app/api/deps.py", "from app.core import config\n");
+    await w("backend/app/core/security.py", "def hash_password(p): ...\n");
+    await w("backend/app/core/config.py", "settings = {}\n");
+    const { model } = await inferred(root);
+    expect([...model.elements.values()].map((e) => `${e.id} ${e.spec.technology}`)).toContain(
+      "app Python, FastAPI",
+    );
+    expect([...model.elements.values()].some((e) => e.code.some((c) => c.path === "**"))).toBe(
+      false,
+    );
+    expect(uses(model)).toEqual(["app.api->app.core"]);
+  });
+});

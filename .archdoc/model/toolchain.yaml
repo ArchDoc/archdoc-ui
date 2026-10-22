@@ -58,7 +58,7 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
-            description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, and eval scoring.
+            description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, eval scoring, and which experimental parts of the format a model uses.
             code: [{ path: packages/core/src/query/** }]
             uses:
               data:
@@ -145,11 +145,11 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           data:
             kind: component
-            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage and journey simulation.
+            description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage, and for journey simulation, which is experimental and only core runs.
             code:
               - { path: packages/core/src/data/** }
               - { path: packages/core/src/data/flows.ts, symbol: stepMessage, description: The message a journey step carries }
-              - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample }
+              - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample (experimental; no surface calls it) }
             provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:
@@ -206,7 +206,7 @@ elements:
       analyzers:
         kind: container
         technology: TypeScript (ts.preProcessFile), yaml
-        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, TS/JS imports), a symbol index (exported declarations and named imports per TS/JS file) for search and context, and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf. loadRevision builds the model at any ref the way every surface reads it, and check --base checks the merge base the same way. Reads archdoc.sum and the files seals fingerprint, and finds the facts a change sealed again. Answers the agent's questions for the CLI and MCP alike (context, show, check, seal), and init infers a starting model from manifests, compose files, imports, and schema files.
+        description: Pluggable analyzers that find the dependencies code actually has (workspace manifests, and TS/JS, Python, and Go imports, resolved through workspaces, Python project roots, and Go modules), a symbol index (exported declarations and named imports per TS/JS, Python, and Go file) for search and context, and schema importers that read data entries' fields from SQL migrations, Prisma, OpenAPI and JSON Schema, and Protobuf. loadRevision builds the model at any ref the way every surface reads it, and check --base checks the merge base the same way. Reads archdoc.sum and the files seals fingerprint, and finds the facts a change sealed again. Answers the agent's questions for the CLI and MCP alike (context, show, check, seal), and init infers a starting model from manifests, compose files, imports, and schema files.
         code: [{ path: packages/analyzers/** }]
         uses:
           source-tree: Reads manifests, imports, and infra files
@@ -240,7 +240,7 @@ elements:
       cli:
         kind: container
         technology: Node.js, commander
-        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, sync, publish, landscape build, mcp, and schema. eval and migrate are hidden maintainer commands."
+        description: "`archdoc` command. For agents, the same answers as the MCP tools: init, context, show, check, and seal. For people and CI: validate, view, site, map, diff, report, trace list, mcp, and schema. sync, publish, landscape build, and view --landscape are experimental and left out of --help. eval and migrate are hidden maintainer commands."
         code: [{ path: packages/cli/** }]
         uses:
           core:
@@ -274,7 +274,7 @@ elements:
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
-            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models, sample requests for simulation, and which sealed facts to re-check.
+            description: Localhost-only server for the explorer. Sends model files, not a built model, so the browser runs core itself; with them, other repos' vendored models, and which sealed facts to re-check.
             code: [packages/cli/src/server.ts]
 
       mcp:
@@ -295,7 +295,7 @@ elements:
       web:
         kind: container
         technology: React 19, Vite, @xyflow/react, elkjs
-        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time, samples in the browser), Traces (a bug's path as lanes beneath the modeled step, checked in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
+        description: Explorer. Tabs for Overview (journeys as cards, owners, a top-level map), Journeys (lanes per participant, branches by outcome, one step at a time), Traces (a bug's path as lanes beneath the modeled step, checked in the browser), Data (entries, tables, lineage), and Changes (the PR comment's verdict and what changed on the map). The map opens one level at a time; a box's kind is its shape. Runs from any path, so a landscape's site is the same explorer, grouped by repo, team, or domain.
         code: [{ path: apps/web/** }]
         uses:
           core:
@@ -304,7 +304,7 @@ elements:
         elements:
           model-loader:
             kind: component
-            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, samples, the comparison, the address), with the facts whose sealed code changed.
+            description: Fetches the model files and rebuilds the model on every change event; reads it for the tabs (journey cards and lanes, the comparison, the address), with the facts whose sealed code changed.
             code: [{ path: apps/web/src/model/** }]
             uses:
               graph: Hands the model to the canvas
@@ -335,9 +335,9 @@ elements:
 
       agent-skills:
         kind: container
-        technology: Markdown (Claude Code skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflows. A change starts with a context brief and ends with check and seal, with the model edited alongside the code. A bug starts with context on the error, and ends with a trace with evidence on every step. A repository without a model starts with init.
-        code: [{ path: integrations/agent-skills/** }, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
+        technology: Claude Code plugin and marketplace, Markdown (skill, AGENTS.md), MCP configs
+        description: Teaches coding agents the workflows. A change starts with a context brief and ends with check and seal, with the model edited alongside the code. A bug starts with context on the error, and ends with a trace with evidence on every step. A repository without a model starts with init. Claude Code users install it as a plugin (the skill, and an MCP server pinned to the CLI released with it) from the marketplace at the repository root; other agents get an AGENTS.md snippet and MCP configs.
+        code: [{ path: integrations/agent-skills/** }, { path: integrations/claude-plugin/** }, .claude-plugin/**, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools
 

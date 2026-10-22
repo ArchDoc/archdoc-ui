@@ -16,7 +16,6 @@ import {
   formatJourney,
   formatLineage,
   formatOverview,
-  formatSimulation,
   formatSum,
   formatTrace,
   getElement,
@@ -32,12 +31,10 @@ import {
   type SealStatus,
   sealSum,
   search,
-  simulate,
   summarizeChange,
   traceSkeleton,
   tracesInChange,
 } from "@archdoc/core";
-import { parse } from "yaml";
 import { checkRepository } from "./check.js";
 import { formatInit, initModel } from "./init.js";
 import { resealedSince, sealReport } from "./seals.js";
@@ -131,11 +128,6 @@ export interface ShowInput {
   id: string;
   /** For an element: the text of its code snippets. */
   code?: boolean | undefined;
-  /**
-   * For a journey: records that exist when it starts, by data entry, or a
-   * JSON/YAML file of them. Runs the journey on them.
-   */
-  sample?: string | Record<string, unknown> | undefined;
 }
 
 const FACT = /^(element|contract|step|logic|mapping|data):/;
@@ -147,18 +139,6 @@ export function showAnswer(where: Where, input: ShowInput): Promise<Answer> {
     if (FACT.test(id)) return showFact(where, id);
 
     const journey = m.journeys.get(id);
-    if (input.sample !== undefined) {
-      if (!journey) return fail(`A sample runs a journey, and "${id}" isn't one. ${known(m)}`);
-      const sample = readSample(input.sample, where.cwd);
-      if (typeof sample === "string") return fail(sample);
-      const result = simulate(m, id, sample);
-      if (!result) return fail(`No journey "${id}".`);
-      return {
-        ok: true,
-        text: formatSimulation(result),
-        failing: result.steps.some((s) => s.problems.length > 0),
-      };
-    }
     if (input.code) {
       const e = getElement(m, id)?.element;
       if (!e) return fail(`No element "${id}". ${hint(m, id)}`);
@@ -368,23 +348,6 @@ function factLines(s: SealStatus): string[] {
   ];
 }
 
-/** Records by data entry, from an object, or a JSON or YAML file; a string says what's wrong. */
-function readSample(
-  sample: string | Record<string, unknown>,
-  cwd: string,
-): Record<string, unknown> | string {
-  if (typeof sample !== "string") return sample;
-  try {
-    const parsed: unknown = parse(readFileSync(resolve(cwd, sample), "utf8"));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return `${sample} should map data entries to records, such as { RefundRequest: { amount_cents: 400 } }.`;
-    }
-    return parsed as Record<string, unknown>;
-  } catch (err) {
-    return `Couldn't read ${sample}: ${err instanceof Error ? err.message : String(err)}`;
-  }
-}
-
 /** A file in the repository, or undefined when there's none (or it's outside it). */
 export function readRepoFile(baseDir: string, path: string): string | undefined {
   const absolute = resolve(baseDir, path);
@@ -408,7 +371,7 @@ function hint(m: LoadedModel, id: string): string {
   return parts.filter(Boolean).join(" ");
 }
 
-function known(m: LoadedModel): string {
+function _known(m: LoadedModel): string {
   return `Journeys: ${[...m.journeys.keys()].join(", ") || "none"}.`;
 }
 

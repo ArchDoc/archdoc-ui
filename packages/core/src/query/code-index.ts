@@ -62,7 +62,8 @@ export interface CodeIndex {
   sources: IndexedSource[];
 }
 
-const TEST = /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$/;
+const TEST =
+  /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$|_test\.go$|(^|\/)test_[^/]*\.py$|_test\.py$|(^|\/)conftest\.py$/;
 const CODE =
   /\.(?:[cm]?[jt]sx?|py|go|rb|rs|java|kt|cs|php|swift|scala|vue|svelte|sql|proto|prisma)$/;
 /** Files that are never where a change starts: lockfiles, generated output, the model itself. */
