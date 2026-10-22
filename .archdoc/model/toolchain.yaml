@@ -58,7 +58,7 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
-            description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, and eval scoring.
+            description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, eval scoring, and which experimental parts of the format a model uses.
             code: [{ path: packages/core/src/query/** }]
             uses:
               data:

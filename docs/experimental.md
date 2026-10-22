@@ -6,7 +6,19 @@ These features work and are tested, but they're left out of `archdoc --help`, th
 |---|---|---|
 | [Sharing models across repos](#sharing-models-across-repos) | `sync`, `publish`, `landscape build`, and `view --landscape` are left out of `--help` | Every command, and cross-repo findings in `check`, `context`, `show`, and the PR report for repos that already use `imports` |
 | [Simulation](#simulation) | `show <journey> --sample`, the `sample` input of `archdoc_show`, and the explorer's "Try a sample" are gone | `simulate()` in `@archdoc/core`, with its tests |
-| [Decision rules](#decision-rules) | Nothing yet: whether they stay stable is an open decision | `logic:`, `decides:`, `branches:`, and `mappings:` validate, diff, and show in the PR report |
+| [Decision rules](#decision-rules) | Nothing: they stay in the format, marked experimental | `logic:`, `decides:`, `branches:`, and `mappings:` validate, diff, and show in the PR report |
+
+## The model format
+
+These parts of the format are stable: `actors`, `elements` (with `code`, `uses`, `stores`, and `provides`), `journeys` (with `steps`, `sends`, `creates`, and `changes`), `data` (with `fields`, `classification`, `references`, `source`, and `states`), `rules`, `provenance`, and the trace format.
+
+These are experimental: `imports`, `landscape`, `domains`, rules with `scope: org`, `mappings`, `logic`, and journey steps' `decides` and `branches`. Their descriptions in the JSON Schema start "Experimental", so editors show it, and `archdoc validate` prints a note naming the ones a model uses. The note doesn't fail `--strict` and doesn't reach the PR comment: using one on purpose isn't a problem.
+
+For editor validation, point at the JSON Schema, which `@archdoc/spec` ships:
+
+```yaml
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@archdoc/spec@0/schema/archdoc.v2.schema.json
+```
 
 ## Sharing models across repos
 
@@ -42,4 +54,4 @@ For now the CLI, the MCP tools, and the explorer don't run journeys: the explore
 
 `logic:` blocks say how an element decides on the data it receives, as [CEL](https://cel.dev) rules; journey steps name the decision they take (`decides:`) and what each outcome does (`branches:`); `mappings:` say how one record becomes another, field by field. `validate` checks they read fields that exist, parse, and cover every case, and the PR report shows a changed rule before and after. [`examples/experimental/decisions.yaml`](../examples/experimental/decisions.yaml) shows them.
 
-Whether they stay in the stable model format is an open decision in [the MVP plan](./revival/07-mvp-plan.md#open-decisions).
+They're experimental, along with simulation: they work, but may change before they're stable.

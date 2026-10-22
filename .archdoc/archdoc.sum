@@ -473,7 +473,7 @@ seals:
         - parseYaml
   element:toolchain.core.query:
     kind: structure
-    hash: fnv-f83627f617790886
+    hash: fnv-dedf9f11a0e12d55
     files:
       packages/core/src/query/code-index.ts:
         - CodeIndex
@@ -509,6 +509,10 @@ seals:
         - evaluate
         - isEvalSource
         - subjectQuery
+      packages/core/src/query/experimental.ts:
+        - ExperimentalUse
+        - experimentalUses
+        - formatExperimentalUses
       packages/core/src/query/impact.ts:
         - AffectedJourney
         - Impact
@@ -533,6 +537,7 @@ seals:
         - sameWord
         - singular
         - splitIdentifier
+    by: agent:claude-code
   element:toolchain.core.report:
     kind: structure
     hash: fnv-9511105a37c0f07a

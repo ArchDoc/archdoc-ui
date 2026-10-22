@@ -16,13 +16,13 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 | Tours, onboarding pages, the Ask panel | Cut from the release | Phase 7 as planned |
 | Agent plugin | Its own repo, as the way people install ArchDoc; skill text stays in `integrations/agent-skills/` and the release copies it over | Skill text maintained in the plugin repo |
 | The PR comment | Only posts when there's a finding | Posts whenever a PR touches mapped code |
+| Languages (2026-10-22) | Python and Go import analyzers and symbol indexes, next to TS/JS | Other languages first |
+| Decision rules (2026-10-22) | Experimental, with mappings and simulation | Stable |
+| How "experimental" shows (2026-10-22) | The JSON Schema and docs mark the fields; `validate` prints a note naming them, which doesn't fail `--strict` or reach the PR comment | A warning per use |
 
 ## Open decisions
 
-- **Decision rules (`logic:`, `decides:`, `branches:`).** They power simulation, but they're also a review finding on their own ("Changes the decision refund-approval" in the playground). Stable, or experimental with simulation?
-- **Which languages.** Python and Go are the proposal. Each needs an import analyzer and a symbol index.
 - **One tagline.** The README says "architecture control plane for AI-assisted development"; the newer framing is "software system modeling for the AI age". The README, the website, and the plugin should say the same thing.
-- **How "experimental" shows in the model format.** Proposal: the JSON Schema and docs mark the fields, and `validate` warns when a model uses one.
 - **First version number.** `0.x` keeps room to change the format; `1.0` promises it.
 
 ## 1. Release pipeline
@@ -43,11 +43,11 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done.
 
 ## 3. Freeze the model format
 
-- [ ] List each field as stable or experimental. Proposal:
+- [x] List each field as stable or experimental ([docs/experimental.md](../experimental.md#the-model-format)):
   - **Stable:** `actors`, `elements` (`code`, `uses`, `stores`, `provides`), `journeys` (`steps`, `sends`, `creates`, `changes`), `data` (`fields`, `classification`, `references`, `source`, `states`), `rules`, `provenance`, and the trace format.
-  - **Experimental:** `imports`, `landscape`, `domains`, `scope: org` rules, `mappings`, and the decision rules (pending the open decision).
-- [ ] Mark experimental fields in the JSON Schema and docs; `validate` warns when a model uses one.
-- [ ] Publish the JSON Schema at a stable URL for editors.
+  - **Experimental:** `imports`, `landscape`, `domains`, `scope: org` rules, `mappings`, and the decision rules (`logic`, `decides`, `branches`).
+- [x] Mark experimental fields in the JSON Schema (their descriptions start "Experimental") and docs; `validate` prints a note naming the ones a model uses (`experimentalUses` in core).
+- [x] Publish the JSON Schema at a stable URL for editors: `https://cdn.jsdelivr.net/npm/@archdoc/spec@0/schema/archdoc.v2.schema.json`, which serves the newest 0.x from npm.
 
 ## 4. Hide simulation
 

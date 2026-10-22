@@ -10,3 +10,6 @@ packages/cli/web/
 
 # Explorer screenshots taken while working on it
 .screenshots/
+
+# Worktrees that Claude Code agents create while working
+.claude/worktrees/
