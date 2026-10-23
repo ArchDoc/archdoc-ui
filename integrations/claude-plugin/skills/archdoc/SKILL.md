@@ -1,6 +1,6 @@
 ---
 name: archdoc
-description: Use at the start of every coding task in a repository that has an .archdoc/ directory, before searching or reading code. Finds where the change belongs in the architecture model and what it affects (consumers, actors, journeys, owners, rules). Also use after editing, to check the change and keep the model true; when asked to explain or fix a bug, to place the error and write a trace; and in a repository with no .archdoc/ yet, to start a model with archdoc init.
+description: Use at the start of every coding task in a repository that has an .archdoc/ directory, before searching or reading code. Finds where the change belongs in the architecture model and what it affects (consumers, actors, journeys, owners, rules). Also use after editing, to check the change and keep the model true; when asked to explain or fix a bug, to place the error and write a trace; in a repository with no .archdoc/ yet, to start a model with archdoc init; and when the user asks to see, show, view, or open the architecture or the model, to open the explorer in their browser.
 ---
 
 # Working in a repository with an ArchDoc model
@@ -79,4 +79,14 @@ What `init` writes is a starting point, not a model: it knows the packages and t
 2. **Describe each element** with the code open (`archdoc_show <id>` with `code: true`): what it does, not what it's called. Merge or split elements where the packages don't match how the system works; a component can point at the function its logic lives in (`code: { path, symbol }`).
 3. **Add actors**: who and what uses the system. Look for routes, CLIs, UIs, scheduled jobs, webhooks, and other services calling in.
 4. **Add the two or three journeys that matter most**, with `code:` on each step, so `archdoc_context` can point at them.
-5. **Check** with `archdoc_check` until it has no errors. Fix a warning only with what the code shows: an element nothing connects to is fine to leave or remove (build tooling often is), and a step that doesn't say what it sends can wait for `data:`. Never add a use or step you haven't seen in the code to quiet a warning; say what's left instead. Then ask the user to review the model in `archdoc view`. They accept facts by removing their `provenance` blocks. Once they have, `archdoc seal --all` starts keeping the model true.
+5. **Check** with `archdoc_check` until it has no errors. Fix a warning only with what the code shows: an element nothing connects to is fine to leave or remove (build tooling often is), and a step that doesn't say what it sends can wait for `data:`. Never add a use or step you haven't seen in the code to quiet a warning; say what's left instead. Then ask the user to review the model. They accept facts by removing their `provenance` blocks. Once they have, `archdoc seal --all` starts keeping the model true.
+6. **Offer to open it.** Ask whether they'd like to see it, and if so, open the explorer for them (below).
+
+## Show the user the model
+
+When the user asks to see, show, view, or open the architecture or the model, or right after you've created or changed it and they'd want to look, open the explorer for them. Don't send them to a terminal.
+
+1. **Already running?** If you started the explorer earlier in this session and it's still running, give its URL again. It runs with `--watch`, so it already shows the model as it is now. Don't start a second one.
+2. **On a remote machine?** If `CLAUDE_CODE_REMOTE` is `true`, or `SSH_CONNECTION` or `SSH_TTY` is set, `127.0.0.1` is that machine, not the user's. Write the explorer as a static site instead, with `npx -y @archdoc/cli site --out archdoc-site`, and tell them where it is (a folder of HTML they can open or host, not for committing).
+3. **Otherwise, start it in the background**, so it doesn't block the session (in Claude Code, the Bash tool's background option, not a trailing `&`): `npx -y @archdoc/cli view --watch --open`. `--open` opens their browser, and `--watch` updates the page as the model changes. To show a change, add `--base <ref>`, such as `--base main`.
+4. **Tell them the URL** from the line it prints, `ArchDoc explorer: http://127.0.0.1:<port>`; read the background output for it. With `--base`, add `#changes` so the link opens on the change. If the output says there's no model, say so and offer to start one.

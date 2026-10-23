@@ -286,10 +286,14 @@ elements:
       agent-skills:
         kind: container
         technology: Claude Code plugin and marketplace, Markdown (skill, AGENTS.md), MCP configs
-        description: Teaches coding agents the workflows. A change starts with a context brief and ends with check and seal, with the model edited alongside the code. A bug starts with context on the error, and ends with a trace with evidence on every step. A repository without a model starts with init. Claude Code users install it as a plugin (the skill, and an MCP server pinned to the CLI released with it) from the marketplace at the repository root; other agents get an AGENTS.md snippet and MCP configs.
+        description: Teaches coding agents the workflows. A change starts with a context brief and ends with check and seal, with the model edited alongside the code. A bug starts with context on the error, and ends with a trace with evidence on every step. A repository without a model starts with init. Asked to show the model, the skill starts `archdoc view` in the background and gives the user its URL (a static `archdoc site` on a remote machine), and `/archdoc:view` does the same. Claude Code users install it as a plugin (the skills, and an MCP server pinned to the CLI released with it) from the marketplace at the repository root; other agents get an AGENTS.md snippet and MCP configs.
         code: [{ path: integrations/agent-skills/** }, { path: integrations/claude-plugin/** }, .claude-plugin/**, .claude/**, AGENTS.md, CLAUDE.md, .mcp.json]
         uses:
           mcp: Points agents at the MCP tools
+          cli:
+            description: Has the agent start `archdoc view` in the background, or write `archdoc site`, to show the user the model
+            sends: Command
+            provenance: { source: suggested, by: agent:claude-code }
 
       landscape-template:
         kind: container
