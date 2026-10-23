@@ -7,9 +7,11 @@ description: Use at the start of every coding task in a repository that has an .
 
 `.archdoc/` holds the architecture the team agreed on: who uses the system (actors), what it's made of (elements, each mapped to code paths), how people use it (journeys), and the data it sends and stores. People own it. It's the fastest way to find where code lives and what a change affects, so start with it, before you grep.
 
-Five MCP tools, one per question. Each has a CLI command of the same name that prints the same answer, for when MCP isn't there.
+Five MCP tools, one per question. Use them, not the CLI.
 
-| Tool | Question | CLI |
+The ArchDoc MCP server starts with the session through `npx`, which takes a few seconds the first time, so its tools may not be in your tool list yet, or may be listed by name only (`mcp__plugin_archdoc_archdoc__archdoc_context` and the like). If you don't see them, search your tools for "archdoc" and load them, and if the server is still starting, wait and search again. Run the CLI instead only when no ArchDoc MCP server is configured at all; each command prints the same answer as its tool.
+
+| Tool | Question | CLI, only without the MCP server |
 |---|---|---|
 | `archdoc_context` | Where do I start, and what does it affect? | `archdoc context <words or paths>`, `--error <file>` |
 | `archdoc_show` | What is this one thing? | `archdoc show <id>` |
@@ -21,7 +23,7 @@ Five MCP tools, one per question. Each has a CLI command of the same name that p
 
 1. **Find where to start.** Call `archdoc_context` with the task in a few words, the files you plan to change, or both, such as `pr report shows type undefined for data fields`. You get the files and functions to open first (with line numbers), other code that does the same job (a fix in one place usually needs them too), the data and rules involved, the narrowest journeys, the tests to run, owners, and who uses it, other repos included. Read those files before you grep. A path you're about to create works too: it says where the file belongs.
 2. **Say what it affects.** Name the affected journeys and actors when you share your plan. Ask the user first if a critical journey is involved, if the change would break a rule, or if it removes or renames something another repo uses.
-3. **Look things up as you go.** `archdoc_show` takes any ID: an element (`code: true` adds its snippets' text), an actor, a journey (with `sample`, it runs the journey on those records: which branch, which records it writes), a data entry, `Entry.field` (where its value comes from and goes), a trace, or a fact `archdoc_check` names.
+3. **Look things up as you go.** `archdoc_show` takes any ID: an element (`code: true` adds its snippets' text), an actor, a journey, a data entry, `Entry.field` (where its value comes from and goes), a trace, or a fact `archdoc_check` names.
 4. **Edit the code and the model together.** Stay inside the element boundaries you found. When the change adds a component or a dependency between elements on purpose, add it to `.archdoc/` and mark it as a suggestion, so a person accepts it:
 
    ```yaml

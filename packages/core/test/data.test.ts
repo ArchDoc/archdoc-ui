@@ -16,7 +16,7 @@ import {
   serializeBundle,
   stepMessage,
 } from "../src/index.js";
-import { dedent } from "./helpers.js";
+import { dedent, model, root } from "./helpers.js";
 
 const paymentsText = dedent(`
   archdoc: "2.0"
@@ -292,6 +292,32 @@ describe("journey step messages", () => {
           'Journey "refund", step 9 (auditor → ledger) doesn\'t say what it sends. Add sends: to the step, or to the relationship it travels along.',
         location: { file: "extra.yaml", line: 28, column: 9 },
       },
+    ]);
+  });
+});
+
+describe("a model that describes no data yet", () => {
+  it("notes the steps that don't say what they send once, as info, not a warning per step", () => {
+    const m = model({
+      "archdoc.yaml": root(`
+        actors:
+          user: { kind: person, uses: { web: Uses } }
+        elements:
+          web: { kind: container, uses: { api: Calls } }
+          api: { kind: container }
+        journeys:
+          post:
+            actor: user
+            goal: Post something
+            steps: [{ from: user, to: web }, { from: web, to: api }]
+      `),
+    });
+    expect(m.diagnostics.filter((d) => d.code === "journey/step-without-message")).toEqual([
+      expect.objectContaining({
+        severity: "info",
+        message:
+          "2 journey steps in 1 journey don't say what they send, since the model describes no data yet. When it does (data:), add sends: to the steps or the relationships they travel along.",
+      }),
     ]);
   });
 });
