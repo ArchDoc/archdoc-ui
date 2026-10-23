@@ -160,9 +160,9 @@ What failed, and what changed:
 ## 12. Website
 
 - [x] One tagline across the README, the website, and the plugin: "Architecture your AI agents can read, and your PRs can't quietly break." The website's hero, Try it, Getting started, and Agents pages now install through the plugin.
-- [ ] A landing page that tells the 30-second story: the agent's brief before it edits, and the PR comment that blocks a personal-data leak. Its demo is a real explorer built with `archdoc site`, not screenshots. Installing means the plugin.
+- [x] A landing page that tells the 30-second story: the agent's brief before it edits, and the PR comment that blocks a personal-data leak. Its demo is a real explorer built with `archdoc site`, not screenshots. Installing means the plugin. *(ArchDoc.github.io#9: the brief and the comment are real output on a small shop, and `npm run demo` rebuilds them and the explorer.)*
 - [ ] Docs for the stable surface; one experimental page for federation and simulation.
-- [ ] Archive `versioned_docs/version-1.0.0` (v0) so search and the version menu don't lead there.
+- [x] Archive `versioned_docs/version-1.0.0` (v0) so search and the version menu don't lead there. `/v0` says where they are on GitHub, and every old address redirects there.
 
 ## Not in the release
 
