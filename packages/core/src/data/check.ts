@@ -139,7 +139,10 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
     }
   }
   // Every arrow on a journey carries something: the step says, or what it travels along does.
+  // A model that describes no data yet can't say, so a new model gets one note, not a warning a step.
   const flows = dataFlows(model);
+  const describesData = model.data.size > 0;
+  const silent: { journey: string; step: number; location?: SourceLocation | undefined }[] = [];
   for (const j of model.journeys.values()) {
     for (const step of j.steps) {
       if (!step.from || !step.to) continue;
@@ -152,6 +155,10 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
       if ([step.from, step.to].some((t) => t.type === "external" && !synced.has(t.namespace)))
         continue;
       if (stepMessage(model, step, flows)) continue;
+      if (!describesData) {
+        silent.push({ journey: j.id, step: step.index + 1, location: step.location });
+        continue;
+      }
       out.push({
         severity: "warning",
         code: "journey/step-without-message",
@@ -159,6 +166,16 @@ export function checkData(model: Model, scope: "local" | "imported"): Diagnostic
         location: step.location,
       });
     }
+  }
+  const [first] = silent;
+  if (first) {
+    const journeys = new Set(silent.map((x) => x.journey)).size;
+    out.push({
+      severity: "info",
+      code: "journey/step-without-message",
+      message: `${silent.length} journey step${silent.length === 1 ? "" : "s"} in ${journeys} journey${journeys === 1 ? "" : "s"} ${silent.length === 1 ? "doesn't say what it sends" : "don't say what they send"}, since the model describes no data yet. When it does (data:), add sends: to the steps or the relationships they travel along.`,
+      location: first.location,
+    });
   }
   // Each step is one interaction: storing what a step writes is a step of its own.
   if (scope === "local") {
