@@ -13,7 +13,7 @@ import {
   splitIdentifier,
   subjectQuery,
 } from "../src/index.js";
-import { model } from "./helpers.js";
+import { model, root } from "./helpers.js";
 
 const m = model({
   "archdoc.yaml": `
@@ -391,5 +391,38 @@ describe("evaluate", () => {
     expect(r.medianScope).toBe(c?.scope);
     expect(formatEval(r)).toMatch(/Recall: 67% \(2\/3\)/);
     expect(formatEval(r)).toContain("For comparison, word search alone");
+  });
+});
+
+describe("context and data rules", () => {
+  const shop = model({
+    "archdoc.yaml": root(`
+      elements:
+        orders: { kind: container, code: services/orders/**, uses: { db: { description: Saves, sends: Order } } }
+        db: { kind: datastore }
+      data:
+        Order: { kind: entity, fields: { id: { type: string }, email: { type: string, classification: pii } } }
+      rules:
+        - id: no-personal-data-out
+          description: Personal data stays in.
+          data: { classification: pii, not-sent-to: { kind: external } }
+        - id: cards-in-vault
+          data: { classification: pci, stored-in: db }
+    `),
+  });
+
+  it("names the data rules that apply to the brief's data, and the fields they apply to", () => {
+    const b = context(shop, "services/orders/src/place-order.ts");
+    expect(b.data.map((d) => d.id)).toContain("Order");
+    expect(b.rules).toEqual([
+      {
+        id: "no-personal-data-out",
+        description: "Personal data stays in.",
+        applies: "Order.email (pii)",
+      },
+    ]);
+    expect(formatContext(b)).toContain(
+      "  no-personal-data-out — Personal data stays in. (applies to Order.email (pii))",
+    );
   });
 });

@@ -4,14 +4,16 @@
 // target is that each one is real.
 //
 //   pnpm build
-//   node scripts/replay-prs.mjs [repo] [--limit 50] [--branch main] [--show]
+//   node scripts/replay-prs.mjs [repo] [--limit 50] [--branch main] [--model dir] [--show]
 //
 // repo defaults to this one; it needs the history (not a shallow clone) and a
-// model in .archdoc/ at the commits replayed. A merge commit is replayed as
+// model in .archdoc/ at the commits replayed. For a repository whose history
+// has no model, --model copies one (such as the .archdoc/ init and an agent
+// just wrote) into every commit, the way eval uses the model as it is now. A merge commit is replayed as
 // its second parent against the merge base; a squashed or rebased commit as
 // itself against its parent. --show prints each blocking report.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -27,6 +29,8 @@ const flag = (name, fallback) => {
 const show = args.includes("--show");
 const limit = Number(flag("--limit", "50"));
 const branch = flag("--branch", undefined);
+const modelNow = flag("--model", undefined);
+const modelDir = modelNow && resolve(modelNow);
 const repo = resolve(args.find((a) => !a.startsWith("--")) ?? here);
 
 const git = (...a) => execFileSync("git", a, { cwd: repo, encoding: "utf8" }).trim();
@@ -54,10 +58,32 @@ try {
     let lines = 0;
     let report = "";
     try {
-      git("worktree", "add", "-q", "--detach", "-f", tree, head);
+      let against = base;
+      if (modelDir) {
+        // The same model on both sides, committed in the worktree, so the
+        // report sees only the PR's code change.
+        const at = (...a) =>
+          execFileSync("git", ["-C", tree, ...a], { encoding: "utf8", stdio: "pipe" }).trim();
+        const commitModel = () => {
+          rmSync(join(tree, ".archdoc"), { recursive: true, force: true });
+          cpSync(modelDir, join(tree, ".archdoc"), { recursive: true });
+          at("add", "-A", "-f", ".");
+          const id = ["-c", "user.name=replay", "-c", "user.email=replay@archdoc"];
+          at(...id, "commit", "-q", "--no-verify", "--allow-empty", "-m", "replay");
+          return at("rev-parse", "HEAD");
+        };
+        git("worktree", "add", "-q", "--detach", "-f", tree, base);
+        against = commitModel();
+        // The PR's tree on top of it, so the merge base is the base with the model.
+        at("read-tree", "--reset", "-u", head);
+        at("clean", "-fdq");
+        commitModel();
+      } else {
+        git("worktree", "add", "-q", "--detach", "-f", tree, head);
+      }
       if (!existsSync(join(tree, ".archdoc")))
         throw Object.assign(new Error(), { stderr: "no model" });
-      report = execFileSync("node", [cli, "report", "--base", base, "--model", "."], {
+      report = execFileSync("node", [cli, "report", "--base", against, "--model", "."], {
         cwd: tree,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],

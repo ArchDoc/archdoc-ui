@@ -154,9 +154,9 @@ export async function loadModelAtRef(
   return Object.assign(model, { ref, commit: at.commit });
 }
 
-/** Files changed between a commit and the working tree (or another commit), relative to the repo root. */
+/** Files changed between a commit and the working tree (or another commit), relative to the repo root. A renamed file is listed under both names. */
 export async function changedFiles(cwd: string, base: string, head?: string): Promise<string[]> {
-  const args = ["diff", "--name-only", "-z", base, ...(head ? [head] : []), "--"];
+  const args = ["diff", "--name-only", "--no-renames", "-z", base, ...(head ? [head] : []), "--"];
   const tracked = (await git(cwd, ...args)).split("\0").filter(Boolean);
   const untracked = head
     ? []

@@ -197,4 +197,13 @@ describe("against a git history", () => {
     const r = await run("diff", "main...feature");
     expect(r.out).toContain("+ search (container)");
   });
+
+  it("reads the base when the change renames a file it has, content unchanged", async () => {
+    // git's rename detection names only the new path; the base still has the old one.
+    git("mv", "services/billing/src/index.ts", "services/billing/src/index.mts");
+    const r = await run("report", "--base", "main");
+    expect(r.err).not.toContain("Can't read");
+    expect(r.out).toContain("<!-- archdoc-report -->");
+    git("mv", "services/billing/src/index.mts", "services/billing/src/index.ts");
+  });
 });

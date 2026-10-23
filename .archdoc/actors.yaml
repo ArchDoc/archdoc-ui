@@ -28,8 +28,7 @@ actors:
 
   architecture-team:
     kind: team
-    description: Runs an org's landscape repo, which composes every team's model and adds enterprise teams, cross-team journeys, domains, and org rules.
-    provenance: { source: suggested, by: agent:claude-code }
+    description: Runs an org's landscape repo, which composes every team's model and adds enterprise teams, cross-team journeys, domains, and org rules. The landscape is experimental (docs/experimental.md).
     uses:
       cli:
         description: Runs archdoc sync and archdoc landscape build in the landscape repo

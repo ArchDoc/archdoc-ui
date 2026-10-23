@@ -52,10 +52,8 @@ elements:
               checker: Validates journeys once references resolve
               data:
                 description: Checks data references, fields, and lifecycles
-                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Loads archdoc.lock and the vendored models of other repos
-                provenance: { source: suggested, by: agent:claude-code }
           query:
             kind: component
             description: Element, actor, and overview queries, search by words (and by file paths and symbols with a code index), impact (consumers, actors, journeys, owners, rules, and consumers and journeys in other repos), context briefs that rank the files and symbols to start a task in, eval scoring, and which experimental parts of the format a model uses.
@@ -63,10 +61,8 @@ elements:
             uses:
               data:
                 description: Lists the data the elements of a context brief send and store
-                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Adds consumers and journeys in other repos to impact
-                provenance: { source: suggested, by: agent:claude-code }
               loader: Resolves references the same way the model does
               codemap: Turns a file path into its owning element
           codemap:
@@ -83,52 +79,38 @@ elements:
             uses:
               imports:
                 description: Lists consumers and journeys in other repos, and what a change breaks
-                provenance: { source: suggested, by: agent:claude-code }
               loader:
                 description: Names contracts the same way the model checks them
-                provenance: { source: suggested, by: agent:claude-code }
               query: Formats element, actor, overview, and impact results
               checker:
                 description: Formats check findings
-                provenance: { source: suggested, by: agent:claude-code }
               differ:
                 description: Formats model diffs as text, markdown, and mermaid
-                provenance: { source: suggested, by: agent:claude-code }
               data:
                 description: Shows data entries, and the sensitive data a change sends or stores somewhere new
-                provenance: { source: suggested, by: agent:claude-code }
               codemap:
                 description: Formats locate results
-                provenance: { source: suggested, by: agent:claude-code }
               traces:
                 description: Prints traces, trace checks, and error anchors
-                provenance: { source: suggested, by: agent:claude-code }
               seals:
                 description: Prints what archdoc check --seals says
-                provenance: { source: suggested, by: agent:claude-code }
           checker:
             kind: component
-            description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans).
+            description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans). Build tooling (devDependencies, tool config files) is not a dependency between elements.
             code: [{ path: packages/core/src/check/** }]
             uses:
               seals:
                 description: Reports facts whose code changed since they were sealed
-                provenance: { source: suggested, by: agent:claude-code }
               traces:
                 description: Checks the traces in .archdoc/traces/ with the model, so check reports stale ones
-                provenance: { source: suggested, by: agent:claude-code }
               query:
                 description: Takes the code index seals fingerprint with
-                provenance: { source: suggested, by: agent:claude-code }
               data:
                 description: Runs data rules with the other rules
-                provenance: { source: suggested, by: agent:claude-code }
               codemap:
                 description: Maps observed file dependencies onto elements
-                provenance: { source: suggested, by: agent:claude-code }
               loader:
                 description: Resolves rule selectors and journey steps
-                provenance: { source: suggested, by: agent:claude-code }
           differ:
             kind: component
             description: Semantic diff between two model revisions (actors, elements, relationships, journeys, data, rules).
@@ -137,12 +119,10 @@ elements:
             kind: component
             description: Other repos' models. Packs and reads bundles, checks the lockfile and every reference, contract, and journey step into another repo at its pinned version, and indexes who uses this repo from the others (through the landscape).
             code: [{ path: packages/core/src/federation/** }]
-            provenance: { source: suggested, by: agent:claude-code }
             uses:
               loader: Builds the models inside bundles, and checks contracts the same way
               data:
                 description: Checks data in other repos once they're synced
-                provenance: { source: suggested, by: agent:claude-code }
           data:
             kind: component
             description: Data entries and where they go. Resolves data references (here and in other repos), walks data flows and stores, checks fields, lifecycles, and what targets accept, evaluates data rules (stored-in, not-sent-to), and finds sensitive data a change sends somewhere new. Evaluates CEL mappings and logic for field lineage, and for journey simulation, which is experimental and only core runs.
@@ -150,37 +130,28 @@ elements:
               - { path: packages/core/src/data/** }
               - { path: packages/core/src/data/flows.ts, symbol: stepMessage, description: The message a journey step carries }
               - { path: packages/core/src/data/simulate.ts, symbol: simulate, description: Runs a journey on a sample (experimental; no surface calls it) }
-            provenance: { source: suggested, by: agent:claude-code }
             uses:
               checker:
                 description: Matches rule selectors the same way relationship rules do
-                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Reads other repos' data, mappings, and logic for lineage and simulation
-                provenance: { source: suggested, by: agent:claude-code }
           seals:
             kind: component
             description: Seals, in archdoc.sum beside the model. Fingerprints the code each fact points at (an element's files and exports, a snippet's or decision's lines, a step's entry file, a data entry's schema fields), says what changed since someone sealed it, and writes the file again when they have checked.
             code:
               - { path: packages/core/src/seal/** }
               - { path: packages/core/src/seal/seal.ts, symbol: fingerprints, description: What each fact's code is now }
-            provenance: { source: suggested, by: agent:claude-code }
             uses:
               codemap:
                 description: Finds the files each element owns, and the snippets facts point at
-                provenance: { source: suggested, by: agent:claude-code }
               loader:
                 description: Reads decisions' and mappings' code references
-                provenance: { source: suggested, by: agent:claude-code }
               query:
                 description: Reads the exports in the code index
-                provenance: { source: suggested, by: agent:claude-code }
               data:
                 description: Reads what schema sources say
-                provenance: { source: suggested, by: agent:claude-code }
               checker:
                 description: Reports in the shape of check's findings
-                provenance: { source: suggested, by: agent:claude-code }
           traces:
             kind: component
             description: Bug traces, in .archdoc/traces/ and never part of the model. Parses them, checks them against the model and the code (elements, the journey step they expand, code references, and hops the model doesn't declare), and anchors an error's stack frames, paths, and names to elements and ranked journey steps.
@@ -188,20 +159,15 @@ elements:
               - { path: packages/core/src/trace/** }
               - { path: packages/core/src/trace/check.ts, symbol: checkTrace, description: Checks a trace and resolves it for drawing }
               - { path: packages/core/src/trace/anchor.ts, symbol: anchorError, description: Where an error belongs }
-            provenance: { source: suggested, by: agent:claude-code }
             uses:
               loader:
                 description: Parses trace YAML and resolves references the way journey steps do
-                provenance: { source: suggested, by: agent:claude-code }
               codemap:
                 description: Maps code references and stack frames to elements, and checks lines and symbols
-                provenance: { source: suggested, by: agent:claude-code }
               query:
                 description: Finds the journey steps through the elements an error names
-                provenance: { source: suggested, by: agent:claude-code }
               imports:
                 description: Resolves hops and journeys in other repos
-                provenance: { source: suggested, by: agent:claude-code }
 
       analyzers:
         kind: container
@@ -212,23 +178,19 @@ elements:
           source-tree: Reads manifests, imports, and infra files
           core:
             description: Produces core's ObservedDependency records
-            provenance: { source: suggested, by: agent:claude-code }
           model-files:
             description: Writes archdoc.sum for seal, and a starting model for init
             sends: [Seal, ModelFile]
-            provenance: { source: suggested, by: agent:claude-code }
 
       federation:
         kind: container
         technology: Node.js, git, semver
-        description: Shares models across repos. `sync` reads other repos' models (and the landscape, with every model it pins) at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle, with what the model's schema sources say.
+        description: Shares models across repos. `sync` reads other repos' models (and the landscape, with every model it pins) at their release tags and vendors them, pinned in archdoc.lock; `publish` writes a versioned bundle, with what the model's schema sources say. Experimental (docs/experimental.md).
         code: [{ path: packages/federation/** }]
-        provenance: { source: suggested, by: agent:claude-code }
         uses:
           core: Builds and validates bundles, and reads the current lock
           analyzers:
             description: Reads the schema sources a bundle carries the fields of
-            provenance: { source: suggested, by: agent:claude-code }
           spec: Reads and writes the lockfile and bundle formats
           model-files:
             description: Writes archdoc.lock and the bundles in .archdoc/vendor/
@@ -251,17 +213,11 @@ elements:
             description: Serves the explorer, the raw model files (and with --base, the files at a ref), and change events for `archdoc view`
             sends: ExplorerPayload
           mcp: Starts the MCP server for `archdoc mcp`
-          model-files:
-            description: Writes the lockfile and vendored models for `archdoc sync`
-            sends: Seal
-            provenance: { source: suggested, by: agent:claude-code }
           analyzers:
             description: Runs analyzers for `archdoc check`, and builds the code index for `context`, `search`, `eval`, and seals
-            provenance: { source: suggested, by: agent:claude-code }
           federation:
             description: Runs `archdoc sync` and `archdoc publish`
             sends: SyncRequest
-            provenance: { source: suggested, by: agent:claude-code }
         elements:
           commands:
             kind: component
@@ -270,7 +226,6 @@ elements:
             uses:
               view-server:
                 description: Starts the server for `archdoc view`
-                provenance: { source: suggested, by: agent:claude-code }
           view-server:
             kind: component
             technology: node:http, fs.watch, server-sent events
@@ -288,9 +243,6 @@ elements:
             sends: ModelSources
           analyzers:
             description: Every tool is an answer analyzers gives, the same one the CLI prints
-            provenance:
-              source: suggested
-              by: agent:claude-code
 
       web:
         kind: container
@@ -320,7 +272,6 @@ elements:
               graph: Renders the laid-out graph
               model-loader:
                 description: Gets the model, files, and repository links
-                provenance: { source: suggested, by: agent:claude-code }
 
       github-action:
         kind: container
@@ -331,7 +282,6 @@ elements:
           cli:
             description: Runs archdoc report and archdoc check against the pull request's base
             sends: Command
-            provenance: { source: suggested, by: agent:claude-code }
 
       agent-skills:
         kind: container
@@ -344,9 +294,8 @@ elements:
       landscape-template:
         kind: container
         technology: Markdown, YAML, GitHub Actions
-        description: Starting point for a landscape repo. A model with teams, a cross-team journey, domains, and an org rule, and a workflow that takes every team's newest release weekly and publishes the site to GitHub Pages.
+        description: Starting point for a landscape repo. A model with teams, a cross-team journey, domains, and an org rule, and a workflow that takes every team's newest release weekly and publishes the site to GitHub Pages. Experimental, with federation (docs/experimental.md).
         code: [{ path: integrations/landscape-template/** }]
-        provenance: { source: suggested, by: agent:claude-code }
         uses:
           cli: Runs archdoc sync --update and archdoc landscape build
 
@@ -365,7 +314,6 @@ elements:
       other-repos:
         kind: external
         description: Other teams' repositories whose models this one imports, read at their release tags.
-        provenance: { source: suggested, by: agent:claude-code }
 
       source-tree:
         kind: datastore

@@ -45,7 +45,11 @@ export function formatContext(b: ContextBrief): string {
   if (b.data.length) out.push(`Data: ${b.data.map((d) => `${d.id} (${d.how})`).join(", ")}`);
   if (b.rules.length) {
     out.push("Rules");
-    for (const r of b.rules) out.push(`  ${r.id}${r.description ? ` — ${r.description}` : ""}`);
+    for (const r of b.rules) {
+      out.push(
+        `  ${r.id}${r.description ? ` — ${r.description}` : ""}${r.applies ? ` (applies to ${r.applies})` : ""}`,
+      );
+    }
   }
 
   if (b.journeys.length || b.journeysThrough.length || b.journeysElsewhere.length) {

@@ -18,6 +18,18 @@ export interface ObservedDependency {
   typeOnly?: boolean | undefined;
 }
 
+/**
+ * Build and test tooling, not a dependency between parts of the system: a
+ * devDependency in a manifest, or an import in a tool's config file
+ * (eslint.config.js, tailwind.config.ts, vite.config.ts). check and init
+ * leave it out; an import of the same package from the code still counts.
+ */
+export function isDevTooling(d: ObservedDependency): boolean {
+  return (d.analyzer === "manifests" && d.typeOnly === true) || CONFIG_FILE.test(d.from);
+}
+
+const CONFIG_FILE = /(^|\/)[^/]+\.config\.[cm]?[jt]s$/;
+
 export function evidenceOf(d: ObservedDependency): string {
   return `${d.from}${d.line ? `:${d.line}` : ""}${d.specifier ? ` (${d.specifier})` : ""}`;
 }

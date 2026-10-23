@@ -24,7 +24,7 @@ When you're asked to explain or fix a bug (a log line, a stack trace, wrong outp
 3. `archdoc_check` checks it: fix unknown elements and stale code references. A hop the model doesn't declare is drift you found while debugging, so mention it.
 4. Commit the trace with the fix, so the PR says which bug it fixes.
 
-In a repository with no `.archdoc/` yet, `archdoc_init` (or `pnpm -s archdoc init`) starts a model from its packages, compose services, imports, and schema files, every fact marked inferred. Then describe each element with the code open, add actors and the two or three journeys that matter most, run `archdoc_check` until it's clean, and ask a person to review it.
+In a repository with no `.archdoc/` yet, `archdoc_init` (or `pnpm -s archdoc init`) starts a model from its packages, compose services, imports, and schema files, every fact marked inferred. Then describe each element with the code open, add actors and the two or three journeys that matter most, run `archdoc_check` until it has no errors (never add a use the code doesn't show just to quiet a warning), and ask a person to review it.
 
 The MCP server is configured in `.mcp.json` and runs from the build, so run `pnpm build` first.
 
