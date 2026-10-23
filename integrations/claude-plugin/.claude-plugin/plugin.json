@@ -1,6 +1,6 @@
 {
   "name": "archdoc",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Architecture your AI agents can read, and your PRs can't quietly break. A skill and MCP tools that start every task from your repository's architecture model, keep it true as the code changes, and start one where there's none.",
   "author": { "name": "ArchDoc", "url": "https://github.com/ArchDoc" },
   "homepage": "https://archdoc.github.io",

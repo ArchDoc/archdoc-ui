@@ -1,5 +1,21 @@
 # @archdoc/federation
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [02d583c]
+- Updated dependencies [c672281]
+- Updated dependencies [5b72266]
+- Updated dependencies [8389170]
+- Updated dependencies [8f5359b]
+- Updated dependencies [b434769]
+- Updated dependencies [b9fdff6]
+- Updated dependencies [9c1bee7]
+  - @archdoc/core@0.4.0
+  - @archdoc/analyzers@0.4.0
+  - @archdoc/spec@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

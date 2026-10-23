@@ -1,5 +1,26 @@
 # @archdoc/analyzers
 
+## 0.4.0
+
+### Minor Changes
+
+- 8389170: Simulation is hidden, and sharing models across repos is experimental. `show <journey> --sample`, the `sample` input of `archdoc_show`, and the explorer's "Try a sample" are gone, and the explorer no longer runs journeys: steps show their messages' fields, and a journey's rows are what its steps declare. `archdoc view` and `archdoc site` stop sending sample files. `simulate()` stays in `@archdoc/core`. `sync`, `publish`, `landscape build`, and `view --landscape` still work but are left out of `--help`, which now ends with a note pointing to docs/experimental.md.
+- b434769: Python and Go analysis. `check` finds imports between elements the model doesn't declare in Python and Go code, the way it does for TS/JS: Python imports resolve through project roots (`src/`, each `pyproject.toml`), packages, and relative imports; Go imports through every `go.mod`, with `replace` lines and `go.work`. The code index covers both, so `context` ranks their files and functions and seals fingerprint their exports. `init` adds uses from those imports, splits a flat Go module or Python project by its packages, skips a `pyproject.toml` that only declares a workspace, and claims a top-level `scripts/`, `tools/`, or `bin/` folder as one element. Core counts `_test.go`, `test_*.py`, and `*_test.py` as tests.
+
+### Patch Changes
+
+- 5b72266: `check` and `init` leave out build tooling: devDependencies in a manifest, and imports in a tool's config file (`eslint.config.js`, `tailwind.config.ts`, `vite.config.ts`). On a Turborepo monorepo, `init` went from 47 uses, most of them every package using its lint and tsconfig packages, to the 14 between its apps and packages. A runtime import of the same package still counts. Core exports `isDevTooling`.
+  
+  The warning for an element nothing connects to says to connect it only with a use the code shows, or remove it, and the skill tells agents never to add a use to quiet a warning, and that describing what `init` wrote is the work. In first runs, agents had invented uses to clear these warnings.
+- Updated dependencies [02d583c]
+- Updated dependencies [c672281]
+- Updated dependencies [5b72266]
+- Updated dependencies [8f5359b]
+- Updated dependencies [b434769]
+- Updated dependencies [b9fdff6]
+- Updated dependencies [9c1bee7]
+  - @archdoc/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

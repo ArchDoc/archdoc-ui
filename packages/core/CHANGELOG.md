@@ -1,5 +1,24 @@
 # @archdoc/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 02d583c: `context` names the data rules that apply to the brief's data, with the fields they apply to, such as `no-personal-data-out — Shoppers' personal data stays in the shop. (applies to Order.email (pii))`. Before, a brief listed only rules that name its elements, so an agent about to send personal data somewhere wasn't told the rule it would break.
+- c672281: `context` names journeys in other repos' models that pass through the elements a task touches (`journeysElsewhere` in the brief, and a line per journey under Journeys).
+- 5b72266: `check` and `init` leave out build tooling: devDependencies in a manifest, and imports in a tool's config file (`eslint.config.js`, `tailwind.config.ts`, `vite.config.ts`). On a Turborepo monorepo, `init` went from 47 uses, most of them every package using its lint and tsconfig packages, to the 14 between its apps and packages. A runtime import of the same package still counts. Core exports `isDevTooling`.
+  
+  The warning for an element nothing connects to says to connect it only with a use the code shows, or remove it, and the skill tells agents never to add a use to quiet a warning, and that describing what `init` wrote is the work. In first runs, agents had invented uses to clear these warnings.
+- 8f5359b: The model format is split into stable and experimental parts. `imports`, `landscape`, `domains`, rules with `scope: org`, `mappings`, `logic`, and journey steps' `decides` and `branches` are experimental: their JSON Schema descriptions start "Experimental", and `archdoc validate` (and its `--json`) names the ones a model uses in a note that doesn't fail `--strict`. Core's `experimentalUses(model)` lists them. The JSON Schema is at https://cdn.jsdelivr.net/npm/@archdoc/spec@0/schema/archdoc.v2.schema.json for editors.
+
+### Patch Changes
+
+- b434769: Python and Go analysis. `check` finds imports between elements the model doesn't declare in Python and Go code, the way it does for TS/JS: Python imports resolve through project roots (`src/`, each `pyproject.toml`), packages, and relative imports; Go imports through every `go.mod`, with `replace` lines and `go.work`. The code index covers both, so `context` ranks their files and functions and seals fingerprint their exports. `init` adds uses from those imports, splits a flat Go module or Python project by its packages, skips a `pyproject.toml` that only declares a workspace, and claims a top-level `scripts/`, `tools/`, or `bin/` folder as one element. Core counts `_test.go`, `test_*.py`, and `*_test.py` as tests.
+- b9fdff6: `check --base`, `report`, and the explorer's branch compare no longer fail with "Can't read <file>" when a change renames a file without changing it. Changed files now list a renamed file under both names, so the base reads the old one from git.
+- 9c1bee7: The PR report still lists facts an agent suggested, but they no longer earn a comment on their own: with nothing else to check, the verdict is `info` (job summary only). Replaying this repo's merged PRs, they were the only item on most comments.
+- Updated dependencies [8f5359b]
+  - @archdoc/spec@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

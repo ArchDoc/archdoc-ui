@@ -2,7 +2,7 @@
   "mcpServers": {
     "archdoc": {
       "command": "npx",
-      "args": ["-y", "@archdoc/cli@0.3.0", "mcp"]
+      "args": ["-y", "@archdoc/cli@0.4.0", "mcp"]
     }
   }
 }
