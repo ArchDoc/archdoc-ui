@@ -4,7 +4,6 @@ data:
   Command:
     kind: message
     description: An archdoc command line, from a person, an agent, or CI.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       command: { type: string, description: "validate, view, check, report, sync, and the rest" }
       args: { type: "string[]" }
@@ -13,7 +12,6 @@ data:
   Output:
     kind: message
     description: What a command prints, as text or --json, and its exit code.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       text: { type: string }
       json: { type: json }
@@ -22,7 +20,6 @@ data:
   ToolCall:
     kind: message
     description: An MCP tool call from an agent.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       tool: { type: string, description: "archdoc_context, archdoc_show, archdoc_check, archdoc_seal, or archdoc_init" }
       arguments: { type: json }
@@ -30,7 +27,6 @@ data:
   ToolResult:
     kind: message
     description: What an MCP tool answers, in the same words the CLI prints.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       content: { type: string }
       is_error: { type: bool }
@@ -38,7 +34,6 @@ data:
   AgentInstructions:
     kind: message
     description: The workflow a skill, CLAUDE.md, or AGENTS.md teaches an agent.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       path: { type: string }
       text: { type: string }
@@ -46,7 +41,6 @@ data:
   ModelSources:
     kind: message
     description: The model's files, handed to core to build the model.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       root: { type: string }
       sources: { type: "ModelFile[]" }
@@ -54,7 +48,6 @@ data:
   CodeIndex:
     kind: message
     description: What the analyzers read from the code for context, search, and eval, per TS/JS, Python, and Go file. Plain data that core ranks.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       path: { type: string }
       exports: { type: json, description: "Declarations with their kind and line" }
@@ -64,7 +57,6 @@ data:
   ModelFile:
     kind: entity
     description: One YAML file under .archdoc/.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       path: { type: string }
       text: { type: string }
@@ -72,7 +64,6 @@ data:
   ExplorerPayload:
     kind: message
     description: What archdoc view serves the explorer at /api/model.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       root: { type: string }
       sources: { type: "ModelFile[]" }
@@ -80,11 +71,15 @@ data:
       schemas: { type: json, description: What data entries' schema sources say }
       base: { type: json, description: The model's files at --base }
       federation: { type: json, description: Vendored models of other repos }
+      commit: { type: string, description: "The commit it was read at, for a branch" }
+      snippets: { type: json, description: "Where each code snippet is, so a symbol links to its lines" }
+      traces: { type: json, description: The bug traces beside the model }
+      seals: { type: json, description: "Facts whose code changed since they were sealed, and the ones never sealed" }
+      change: { type: json, description: "With --base: the verdict and findings the PR comment gives" }
 
   ExplorerAction:
     kind: message
     description: Something a person does in the explorer.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       action: { type: enum, values: [open, focus, select, step] }
       target: { type: string }
@@ -92,7 +87,6 @@ data:
   SyncRequest:
     kind: message
     description: What archdoc sync asks federation for.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       update: { type: bool }
       frozen: { type: bool }
@@ -100,7 +94,6 @@ data:
   GitFetch:
     kind: message
     description: A shallow fetch of another repo at a release tag.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       url: { type: string }
       ref: { type: string }
@@ -108,7 +101,6 @@ data:
   Trace:
     kind: entity
     description: A bug trace in .archdoc/traces/, the path one failing request took, attached to the journey step it expands. Checked by archdoc check and shown by archdoc show; never part of the model.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       trace: { type: string }
       title: { type: string }
@@ -120,17 +112,16 @@ data:
   Seal:
     kind: entity
     description: A fingerprint of the code one model fact points at, in archdoc.sum beside the model. When the code changes, someone checks the model and seals the fact again. Written by archdoc seal and archdoc_seal; never part of the model.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       fact: { type: string, description: "element:<id>, element:<id>#<path>:<symbol>, step:<journey>#<n>, logic:<id>, mapping:<id>, data:<id>, or contract:<element>#<api>" }
       kind: { type: enum, values: [structure, content, schema] }
       hash: { type: string }
       by: { type: string, description: "Who last checked the model against it" }
+      files: { type: json, description: "The files the fingerprint covers, with the exports it read in each" }
 
   Lock:
     kind: entity
     description: archdoc.lock, the version and integrity each import is pinned at.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       imports: { type: json }
       landscape: { type: json }
@@ -138,7 +129,6 @@ data:
   Bundle:
     kind: entity
     description: Another repo's model at a release, vendored under .archdoc/vendor/.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       namespace: { type: string }
       version: { type: string }
@@ -147,7 +137,6 @@ data:
   PullRequestEvent:
     kind: event
     description: A pull request opened or updated.
-    provenance: { source: suggested, by: agent:claude-code }
     fields:
       number: { type: int }
       base: { type: string }

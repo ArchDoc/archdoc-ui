@@ -9,10 +9,12 @@ const root = new URL("..", import.meta.url).pathname;
 const plugin = join(root, "integrations/claude-plugin");
 const { version } = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
 
+// Only the version strings change, so the files keep the repo's formatting.
 const manifest = join(plugin, ".claude-plugin/plugin.json");
-const json = JSON.parse(readFileSync(manifest, "utf8"));
-json.version = version;
-writeFileSync(manifest, `${JSON.stringify(json, null, 2)}\n`);
+writeFileSync(
+  manifest,
+  readFileSync(manifest, "utf8").replace(/"version": "[^"]+"/, `"version": "${version}"`),
+);
 
 const mcp = join(plugin, ".mcp.json");
 writeFileSync(

@@ -154,7 +154,7 @@ What failed, and what changed:
 
 ## 11. ArchDoc's own model
 
-- [ ] Accept or reject the 65 facts still marked `provenance: suggested` (47 in `model/toolchain.yaml`, 17 in `data.yaml`, 1 in `actors.yaml`) and the open proposal in `.archdoc/proposals/`. *(a person decides)*
+- [x] Accept or reject the 65 facts still marked `provenance: suggested` (47 in `model/toolchain.yaml`, 17 in `data.yaml`, 1 in `actors.yaml`) and the open proposal in `.archdoc/proposals/`. *(Decided 2026-10-23: 64 accepted after checking each against the code: 37 uses its imports show, 2 that happen at run time, 7 elements, 17 data entries (`ExplorerPayload` and `Seal` with the fields they were missing), and the actor; `federation`, `landscape-template`, and `architecture-team` now say they're experimental. 1 rejected: `cli → model-files`, since `federation` writes the lockfile. The proposal was the `mcp → analyzers` use, so it's done.)*
 - [x] Remove the planned `onboard-contributor` journey, since tours are cut. `new-contributor` stays as someone who reads the explorer.
 
 ## 12. Website
