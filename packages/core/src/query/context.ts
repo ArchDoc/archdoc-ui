@@ -1,6 +1,7 @@
 import { locate } from "../codemap/codemap.js";
 import { compileGlob, normalizePath } from "../codemap/glob.js";
 import { dataFlows, dataStores } from "../data/flows.js";
+import { classifiedFields, resolveData } from "../data/resolve.js";
 import type { ElementNode, Model, Target } from "../model.js";
 import { nodeKey } from "../model.js";
 import {
@@ -80,7 +81,8 @@ export interface ContextBrief {
   elements: { id: string; kind: string }[];
   sameJob: ContextSameJob[];
   data: { id: string; kind: string; how: string }[];
-  rules: { id: string; description?: string | undefined }[];
+  /** Rules that name the elements, and data rules that apply to the brief's data (`applies`: Order.email (pii)). */
+  rules: { id: string; description?: string | undefined; applies?: string | undefined }[];
   /** Journeys with a step whose `code:` names a start file. */
   journeys: ContextJourney[];
   /** Other journeys through the elements, by ID, most important first. */
@@ -264,17 +266,21 @@ export function context(model: Model, query: string, inputs: ContextInputs = {})
   const matchesQuery = (name: string) =>
     splitIdentifier(name).some((t) => terms.some((q) => sameWord(q, t)));
 
+  const data = dataFor(model, elements, chain, matchesQuery);
   return {
     query,
     paths: named,
     start,
     elements: elements.map((e) => ({ id: e.id, kind: e.spec.kind })),
     sameJob: index ? sameJob(model, index, start, matchesQuery) : [],
-    data: dataFor(model, elements, chain, matchesQuery),
-    rules: rulesMentioning(
-      model,
-      new Set([...chain].flatMap((id) => [id, id.split(".").pop() as string])),
-    ).map((r) => ({ id: r.id, description: r.description })),
+    data,
+    rules: [
+      ...rulesMentioning(
+        model,
+        new Set([...chain].flatMap((id) => [id, id.split(".").pop() as string])),
+      ).map((r) => ({ id: r.id, description: r.description })),
+      ...dataRulesFor(model, data),
+    ].filter((r, i, all) => all.findIndex((x) => x.id === r.id) === i),
     ...journeysFor(model, elements, startPaths),
     tests: index ? testsFor(index, start) : [],
     owners: [
@@ -431,6 +437,30 @@ function related(model: Model, a: string | undefined, b: string | undefined): bo
     return false;
   };
   return inside(a, b) || inside(b, a);
+}
+
+/** Data rules whose classifications the brief's data carries: what a change to it must not do. */
+function dataRulesFor(model: Model, data: ContextBrief["data"]): ContextBrief["rules"] {
+  const out: ContextBrief["rules"] = [];
+  for (const rule of model.rules) {
+    const classes = [rule.data?.classification ?? []].flat() as string[];
+    if (!classes.length) continue;
+    const applies = data.flatMap((d) => {
+      const r = resolveData(model, d.id);
+      if (r.status !== "found") return [];
+      return classifiedFields(r.node)
+        .filter((f) => classes.includes(f.classification))
+        .map((f) => `${d.id}.${f.field} (${f.classification})`);
+    });
+    if (applies.length) {
+      out.push({
+        id: rule.id,
+        description: rule.description,
+        applies: applies.slice(0, 3).join(", "),
+      });
+    }
+  }
+  return out;
 }
 
 function dataFor(

@@ -115,8 +115,10 @@ What the review found:
   - "Touches no code the model maps" on a PR that changed a mapped contract;
   - `type string → undefined` in data changes when a schema field is removed;
   - suggested facts as a list, not one sentence joined by semicolons.
-- [~] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives (`pnpm replay-prs [repo] --show`). Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
+- [x] Measure: replay the last 50 merged PRs of a repository and count how many would get a comment and how many would block, then read every block for false positives (`pnpm replay-prs [repo] --show`). Run it on this repo and the repos in §10. A starting target: under 20% of PRs get a comment, and every block is real.
   - **This repo (2026-10-22), 27 PRs with a model:** 56% would have got a comment. On 8 of the 15, the only item was facts an agent suggested, so suggested facts are now listed in the report but no longer earn a comment on their own: 37%, 2 blocks (7%). Both blocks are real: #19 and #20 added components and imports between them without declaring the uses. The other 8 change a critical journey's steps (3) or add journeys whose steps don't say what they send (5), which `check` flags today but didn't when they were written. Nearly every PR here rewrites the model, so it's a poor baseline; the §10 repos decide whether 20% holds.
+  - **Outside repos (2026-10-23):** with each repo's model on both sides (`--model`), none of the last 50 PRs of create-t3-turbo (47 replayed), documenso, full-stack-fastapi-template, or golang-gin-realworld would get a comment, and none would block: 0 of 197. None of them added a dependency between packages or a data flow the models know. The replay does catch one: the branch from §7 that adds an undeclared import blocks.
+  - So the target holds outside this repo. The open question is the other way round: whether real PRs that should block do, which needs repos whose models people wrote and whose history has such a change.
 
 **Exit:** a body-only code change posts nothing, and on the scenarios that stay in the release (personal data to an external service, a renamed classified column, an undeclared import, a changed sealed contract) the comment's top fits on one screen.
 
@@ -131,9 +133,24 @@ What the review found:
 
 ## 10. Prove it outside this repo
 
-- [ ] Pick 3–5 repositories of different shapes: a TS monorepo, a Python service, a Go service, and one with a Prisma or SQL schema.
-- [ ] On each: `init`, describe it with an agent, `check` until clean, `eval`, and the PR replay from §8. Write down what failed.
-- [ ] Fix what blocks a first model; document the rest.
+- [x] Pick 3–5 repositories of different shapes: a TS monorepo, a Python service, a Go service, and one with a Prisma or SQL schema. *(2026-10-23: [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo), a Turborepo monorepo; [documenso](https://github.com/documenso/documenso), a TS monorepo with a 116-table Prisma schema; and from §7, [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) and [golang-gin-realworld-example-app](https://github.com/gothinkster/golang-gin-realworld-example-app).)*
+- [x] On each: `init`, describe it with an agent, `check` until clean, `eval`, and the PR replay from §8. Write down what failed.
+- [x] Fix what blocks a first model; document the rest.
+
+| Repository | `init` | Agent's first run (the plugin's skill and tools) | `eval` recall (Start here) | Replay: comments, blocks |
+|---|---|---|---|---|
+| create-t3-turbo | 13 elements, 14 uses (47 before the tooling fix) | 20 turns, 78 s, $0.22: descriptions, an actor, 2 journeys; 0 errors | 40% (11%) | 0 of 47, 0 |
+| documenso | 16 elements, 50 uses, Postgres with 116 entries from Prisma, in 2 s | 30 turns, 97 s, $0.32: descriptions, 3 actors, 2 critical journeys; 0 errors | 72% (14%), median scope 1,275 files | 0 of 50, 0 |
+| full-stack-fastapi-template | see §7 | | 51% (4%) | |
+| golang-gin-realworld | see §7 | 13 turns, 36 s (§9) | 92% (18%) | |
+
+What failed, and what changed:
+
+- **Build tooling read as architecture.** `init` gave every package in a Turborepo a use of its lint, prettier, tsconfig, and tailwind config packages. `check` and `init` now leave out devDependencies and imports in a tool's config file (`isDevTooling` in core); a runtime import still counts.
+- **Agents invented uses to quiet warnings.** Both first agent runs added relationships they called guesses, to clear "nothing connects to it" warnings. The warning and the skill now say never to add a use the code doesn't show, and that describing what `init` wrote is the work; with only the first change, the agent stopped after `init`. The re-run describes the model and leaves the tooling warnings, saying why.
+- **`report` and `check --base` failed on a renamed file** ("Can't read apps/expo/eslint.config.ts"), 3 of create-t3-turbo's 50 PRs. Changed files now list both names.
+- **The brief didn't name the rule a change was about to break.** `context` now lists data rules that apply to the brief's data, with the fields.
+- **Not fixed:** on a big app, elements are whole packages, so `eval`'s scope is wide (1,275 files on documenso) and Start-here recall is 11–18%, against 23% here. A model gets sharper as people split packages into components; `init` can't tell where. `context -m` on a model file inside another repository ranks that repository's files.
 
 ## 11. ArchDoc's own model
 
