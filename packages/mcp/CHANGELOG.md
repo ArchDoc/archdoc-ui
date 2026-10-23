@@ -1,5 +1,24 @@
 # @archdoc/mcp
 
+## 0.4.0
+
+### Minor Changes
+
+- 8389170: Simulation is hidden, and sharing models across repos is experimental. `show <journey> --sample`, the `sample` input of `archdoc_show`, and the explorer's "Try a sample" are gone, and the explorer no longer runs journeys: steps show their messages' fields, and a journey's rows are what its steps declare. `archdoc view` and `archdoc site` stop sending sample files. `simulate()` stays in `@archdoc/core`. `sync`, `publish`, `landscape build`, and `view --landscape` still work but are left out of `--help`, which now ends with a note pointing to docs/experimental.md.
+
+### Patch Changes
+
+- Updated dependencies [02d583c]
+- Updated dependencies [c672281]
+- Updated dependencies [5b72266]
+- Updated dependencies [8389170]
+- Updated dependencies [8f5359b]
+- Updated dependencies [b434769]
+- Updated dependencies [b9fdff6]
+- Updated dependencies [9c1bee7]
+  - @archdoc/core@0.4.0
+  - @archdoc/analyzers@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

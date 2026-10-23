@@ -1,6 +1,6 @@
 {
   "name": "@archdoc/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The deterministic ArchDoc engine: load, validate, and query architecture models.",
   "license": "MIT",
   "type": "module",
