@@ -245,7 +245,7 @@ seals:
     by: agent:claude-code
   element:toolchain.core.checker:
     kind: structure
-    hash: fnv-a6d687ffe6086bd1
+    hash: fnv-e2d6528e7931fde8
     files:
       packages/core/src/check/check.ts:
         - CheckOptions
@@ -259,11 +259,13 @@ seals:
       packages/core/src/check/observed.ts:
         - ObservedDependency
         - evidenceOf
+        - isDevTooling
       packages/core/src/check/rules.ts:
         - RuleEdge
         - RuleViolation
         - evaluateRules
         - selectorMatcher
+    by: agent:claude-code
   element:toolchain.core.codemap:
     kind: structure
     hash: fnv-a32807dda91ce405

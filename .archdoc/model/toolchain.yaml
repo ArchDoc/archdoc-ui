@@ -108,7 +108,7 @@ elements:
                 provenance: { source: suggested, by: agent:claude-code }
           checker:
             kind: component
-            description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans).
+            description: Validates journeys, and compares the model with the code and its rules (undeclared dependencies, rule violations, stale paths, orphans). Build tooling (devDependencies, tool config files) is not a dependency between elements.
             code: [{ path: packages/core/src/check/** }]
             uses:
               seals:

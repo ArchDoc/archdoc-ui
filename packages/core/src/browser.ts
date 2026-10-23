@@ -12,7 +12,7 @@ export {
   observedEdges,
 } from "./check/check.js";
 export { validateJourneys } from "./check/journeys.js";
-export { evidenceOf, type ObservedDependency } from "./check/observed.js";
+export { evidenceOf, isDevTooling, type ObservedDependency } from "./check/observed.js";
 export {
   evaluateRules,
   type RuleEdge,

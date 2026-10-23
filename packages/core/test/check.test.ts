@@ -59,6 +59,16 @@ describe("observedEdges", () => {
       ],
     );
   });
+  it("leaves out devDependencies and tool config files, which are build tooling, but not the code's imports", () => {
+    const dev = { analyzer: "manifests", typeOnly: true };
+    const edges = observedEdges(m, [
+      dep("services/lonely/package.json", "services/jobs", dev),
+      dep("apps/web/package.json", "services/jobs", dev),
+      dep("apps/web/eslint.config.js", "services/jobs/j.ts", { analyzer: "ts-imports" }),
+      dep("apps/web/w.ts", "services/jobs/j.ts", { analyzer: "ts-imports" }),
+    ]);
+    expect(edges.map((e) => [e.from, e.to, e.dependencies.length])).toEqual([["web", "jobs", 1]]);
+  });
 });
 
 describe("check", () => {

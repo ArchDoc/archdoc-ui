@@ -9,7 +9,7 @@ import type { CodeIndex } from "../query/code-index.js";
 import { fingerprints, parseSum, sealFindings, sealStatuses } from "../seal/seal.js";
 import { checkTrace } from "../trace/check.js";
 import type { Trace } from "../trace/trace.js";
-import { evidenceOf, type ObservedDependency } from "./observed.js";
+import { evidenceOf, isDevTooling, type ObservedDependency } from "./observed.js";
 import { evaluateRules, type RuleEdge } from "./rules.js";
 
 export interface Finding {
@@ -276,7 +276,7 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
     findings.push({
       severity: "warning",
       code: "model/orphan-element",
-      message: `${e.id} has no relationships and no journey passes through it. Connect it, or remove it if it's gone.`,
+      message: `${e.id} has no relationships and no journey passes through it. Connect it with a use the code shows, or remove it if it isn't part of the system (build tooling often isn't). Don't add a use to quiet this.`,
       element: e.id,
       evidence: [],
       files: e.location ? [e.location.file] : [],
@@ -292,6 +292,7 @@ export function check(model: Model, options: CheckOptions = {}): CheckResult {
 export function observedEdges(model: Model, observed: ObservedDependency[]): ObservedEdge[] {
   const byPair = new Map<string, ObservedEdge>();
   for (const d of observed) {
+    if (isDevTooling(d)) continue;
     const from = locate(model, d.from).element;
     const to = locate(model, d.to).element;
     if (!from || !to || related(from.id, to.id)) continue;

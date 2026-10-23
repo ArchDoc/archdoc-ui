@@ -71,8 +71,10 @@ fix: Pass amount_cents through unchanged.
 
 In a repository with no `.archdoc/`, when the user asks you to model it (or to use ArchDoc):
 
+What `init` writes is a starting point, not a model: it knows the packages and their imports, not what they're for or who uses them. Steps 2 to 4 are the work, and they're done before you hand the model over, even when `archdoc_check` already passes.
+
 1. **Start it.** Call `archdoc_init` (or run `archdoc init`). It writes `.archdoc/` from what the repository declares: a container per package, module, or code directory, datastores and queues from compose files, uses from imports, and data and contracts from schema files. Everything is marked `provenance: { source: inferred }`. It never writes over a model.
 2. **Describe each element** with the code open (`archdoc_show <id>` with `code: true`): what it does, not what it's called. Merge or split elements where the packages don't match how the system works; a component can point at the function its logic lives in (`code: { path, symbol }`).
 3. **Add actors**: who and what uses the system. Look for routes, CLIs, UIs, scheduled jobs, webhooks, and other services calling in.
 4. **Add the two or three journeys that matter most**, with `code:` on each step, so `archdoc_context` can point at them.
-5. **Check** with `archdoc_check` until it's clean, then ask the user to review the model in `archdoc view`. They accept facts by removing their `provenance` blocks. Once they have, `archdoc seal --all` starts keeping the model true.
+5. **Check** with `archdoc_check` until it has no errors. Fix a warning only with what the code shows: an element nothing connects to is fine to leave or remove (build tooling often is), and a step that doesn't say what it sends can wait for `data:`. Never add a use or step you haven't seen in the code to quiet a warning; say what's left instead. Then ask the user to review the model in `archdoc view`. They accept facts by removing their `provenance` blocks. Once they have, `archdoc seal --all` starts keeping the model true.

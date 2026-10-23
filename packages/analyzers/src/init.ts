@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, posix } from "node:path";
-import { buildModel, listRepoFiles, locate } from "@archdoc/core";
+import { buildModel, isDevTooling, listRepoFiles, locate } from "@archdoc/core";
 import { parse, stringify } from "yaml";
 import { type AnalyzerContext, contextFor } from "./api.js";
 import { analyze } from "./run.js";
@@ -125,6 +125,7 @@ export async function inferModel(root: string, name?: string): Promise<InitResul
   // 3. Uses, from the dependencies analyzers see between the units' files.
   const owner = (path: string) => ownerOf(units, path);
   for (const d of await analyze(ctx)) {
+    if (isDevTooling(d)) continue;
     const from = owner(d.from);
     const to = owner(d.to);
     if (!from || !to || from === to) continue;
